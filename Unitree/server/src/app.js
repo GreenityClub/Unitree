@@ -14,7 +14,19 @@ const pointsRoutes = require('./routes/points');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    process.env.CLIENT_URL,
+    process.env.CLIENT_DEV_URL,
+    process.env.CLIENT_URL_DEV,
+    process.env.CLIENT_URL_DEV_2,
+    'http://192.168.1.5:3000',  // Add the mobile app's API URL
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

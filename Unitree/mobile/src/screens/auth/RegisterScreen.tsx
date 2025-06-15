@@ -220,8 +220,7 @@ export default function RegisterScreen() {
       setError('');
       
       const registerData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`, // Combine first and last name
         email: studentData?.email || email,
         password: formData.password,
         studentId: formData.studentId || undefined,

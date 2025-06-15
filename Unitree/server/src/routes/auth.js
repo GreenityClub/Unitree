@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Admin = require('../models/Admin');
 const logger = require('../utils/logger');
 const { auth } = require('../middleware/auth');
+const bcrypt = require('bcryptjs');
 
 // Register user
 router.post('/register', async (req, res) => {
@@ -13,7 +14,11 @@ router.post('/register', async (req, res) => {
     const { email, password, name, studentId, university } = req.body;
 
     // Check if user already exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    });
     if (user) {
       return res.status(400).json({
         message: 'User already exists'
@@ -65,7 +70,11 @@ router.post('/login', async (req, res) => {
     }
 
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    }).select('+password');
     if (!user) {
       return res.status(401).json({
         message: 'Invalid credentials'
@@ -76,7 +85,7 @@ router.post('/login', async (req, res) => {
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
-        message: 'Invalid credentials'
+        message: 'Wrong password'
       });
     }
 
@@ -188,7 +197,11 @@ router.post('/send-verification-code', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    });
     if (existingUser) {
       return res.status(400).json({
         message: 'User with this email already exists'
@@ -340,8 +353,15 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
+    console.log('Searching for user with email:', email);
     // Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      } 
+    });
+    console.log('User found:', user ? 'Yes' : 'No');
+    
     if (!user) {
       return res.status(404).json({
         message: 'No account found with this email address'
@@ -451,7 +471,11 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Find user and update password
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    });
     if (!user) {
       return res.status(404).json({
         message: 'User not found'
@@ -459,8 +483,14 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Update password
-    user.password = newPassword;
-    await user.save();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    await User.findByIdAndUpdate(user._id, { 
+      password: hashedPassword 
+    }, { 
+      runValidators: false 
+    });
 
     // Clean up reset code
     delete global.resetCodes[email];
@@ -488,7 +518,11 @@ router.post('/resend-reset-code', async (req, res) => {
     }
 
     // Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    });
     if (!user) {
       return res.status(404).json({
         message: 'No account found with this email address'

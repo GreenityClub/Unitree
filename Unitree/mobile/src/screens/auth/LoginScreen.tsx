@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
+  Modal,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -24,6 +25,7 @@ import SafeScreen from '../../components/SafeScreen';
 import { useAuth } from '../../context/AuthContext';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
 import { Validator } from '../../utils';
+import ENV from '../../config/env';
 
 const REMEMBER_ME_KEY = '@unitree_remember_me';
 
@@ -36,11 +38,14 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('');
 
   // Load saved credentials
   useEffect(() => {
     loadSavedCredentials();
+    testConnection();
   }, []);
 
   const loadSavedCredentials = async () => {
@@ -110,6 +115,7 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Login failed');
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -128,10 +134,59 @@ export default function LoginScreen() {
     router.push('/auth/register');
   };
 
+  const testConnection = async () => {
+    try {
+      setConnectionStatus('Testing connection...');
+      const response = await fetch(`${ENV.API_URL}/api/auth/me`);
+      console.log('Connection test response:', response.status);
+      
+      if (response.status === 401) {
+        // 401 means the server is reachable but we're not authenticated (expected)
+        setConnectionStatus('Connected to server successfully');
+      } else {
+        setConnectionStatus(`Unexpected response: ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('Connection test error:', error);
+      setConnectionStatus(`Connection failed: ${error.message}`);
+    }
+  };
+
   return (
     <SafeScreen backgroundColor="#B7DDE6">
       <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
       <LoadingOverlay visible={loading} />
+
+      {/* Connection Status */}
+      {connectionStatus ? (
+        <View style={styles.connectionStatus}>
+          <Text style={styles.connectionStatusText}>{connectionStatus}</Text>
+        </View>
+      ) : null}
+
+      {/* Error Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showErrorModal}
+        onRequestClose={() => setShowErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Icon name="alert-circle" size={24} color="#FF6B6B" />
+              <Text style={styles.modalTitle}>Login Failed</Text>
+            </View>
+            <Text style={styles.modalText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowErrorModal(false)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Header Section */}
       <Animated.View 
@@ -185,8 +240,6 @@ export default function LoginScreen() {
         >
             <Text style={styles.loginTitle}>Login</Text>
             
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
             {/* Mascot */}
             <View style={styles.mascotContainer}>
                 <Image
@@ -383,15 +436,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: rs(20),
   },
-  errorText: {
-    color: '#fff',
-    fontSize: rf(14),
-    marginBottom: rs(16),
-    textAlign: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: rs(8),
-    borderRadius: rs(8),
-  },
   inputContainer: {
     marginBottom: rs(20),
   },
@@ -516,5 +560,61 @@ const styles = StyleSheet.create({
     fontSize: rf(14),
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  // Add new styles for the modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: rs(16),
+    padding: rs(24),
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: rs(16),
+  },
+  modalTitle: {
+    fontSize: rf(18),
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: rs(8),
+  },
+  modalText: {
+    fontSize: rf(16),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: rs(24),
+  },
+  modalButton: {
+    backgroundColor: '#50AF27',
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(24),
+    borderRadius: rs(8),
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: rf(16),
+    fontWeight: 'bold',
+  },
+  connectionStatus: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: rs(8),
+    zIndex: 1000,
+  },
+  connectionStatusText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: rf(12),
   },
 }); 

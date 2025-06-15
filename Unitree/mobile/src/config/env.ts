@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 // Environment Variables Configuration
 const ENV = {
   // API Configuration
-  API_URL: process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || 'http://192.168.1.6:3000',
+  API_URL: process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || 'http://localhost:3000',
   API_TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '10000', 10),
 
   // App Configuration

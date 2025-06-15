@@ -89,7 +89,7 @@ export default function ForgotPasswordScreen() {
       setEmailLoading(true);
       setEmailError('');
 
-      const response = await fetch(`${ENV.API_URL}/api/auth/send-password-reset-code`, {
+      const response = await fetch(`${ENV.API_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,7 +129,7 @@ export default function ForgotPasswordScreen() {
       setVerificationLoading(true);
       setVerificationError('');
 
-      const response = await fetch(`${ENV.API_URL}/api/auth/verify-password-reset-code`, {
+      const response = await fetch(`${ENV.API_URL}/api/auth/verify-reset-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,8 +146,7 @@ export default function ForgotPasswordScreen() {
         throw new Error(data.message || 'Verification failed');
       }
 
-      // Store reset token and move to password step
-      setResetToken(data.resetToken);
+      // Move to password step (no reset token needed)
       setCurrentStep(3);
     } catch (err: any) {
       setVerificationError(err.message || 'Verification failed');
@@ -185,7 +184,7 @@ export default function ForgotPasswordScreen() {
         },
         body: JSON.stringify({ 
           email: email.trim().toLowerCase(),
-          resetToken: resetToken,
+          code: verificationCode.trim(),
           newPassword: newPassword
         }),
       });
@@ -487,6 +486,7 @@ export default function ForgotPasswordScreen() {
                       onChangeText={setNewPassword}
                       placeholder="Enter new password"
                       secureTextEntry={!showNewPassword}
+                      autoCapitalize="none"
                       style={styles.textInput}
                       underlineColor="transparent"
                       activeUnderlineColor="transparent"

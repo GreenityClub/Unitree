@@ -3,14 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../config/api';
 
 interface User {
-  _id: string;
+  id: string;
+  name: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  points: number;
+  treesPlanted: number;
   studentId?: string;
   university?: string;
-  points: number;
-  trees?: string[];
 }
 
 interface AuthContextType {
@@ -50,7 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         const response = await authAPI.getMe();
-        setUser(response.data.user);
+        setUser(response.data);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
