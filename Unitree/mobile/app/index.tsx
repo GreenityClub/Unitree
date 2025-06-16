@@ -1,45 +1,58 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
+import { theme } from '../src/theme';
+import Animated, { 
+  FadeIn,
+  FadeOut 
+} from 'react-native-reanimated';
 
-export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+const Index = () => {
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated) {
+      if (user) {
         router.replace('/(tabs)');
       } else {
         router.replace('/auth/login');
       }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [user, isLoading]);
 
-  // Show loading screen while checking auth
+  // Show animated loading screen while checking auth
   return (
-    <View style={styles.container}>
-      <Text style={styles.loadingText}>UniTree</Text>
-      <Text style={styles.subtitle}>Loading...</Text>
-    </View>
+    <Animated.View 
+      entering={FadeIn}
+      exiting={FadeOut}
+      style={styles.container}
+    >
+      <Text variant="displayLarge" style={styles.loadingText}>
+        UniTree
+      </Text>
+      <Text variant="titleMedium" style={styles.subtitle}>
+        Loading...
+      </Text>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2E7D32',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
+    color: theme.colors.white,
     marginBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.colors.textWhite,
   },
-}); 
+});
+
+export default Index; 

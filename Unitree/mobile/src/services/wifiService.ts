@@ -1,4 +1,5 @@
 import api from '../config/api';
+import ENV from '../config/env';
 
 export interface WiFiSession {
   _id: string;
@@ -58,8 +59,7 @@ class WiFiService {
 
   // Utility methods for WiFi management
   isUniversityWiFi(ssid: string): boolean {
-    const universitySSIDs = ['UniversityWiFi', 'Campus-Net', 'EduWiFi'];
-    return universitySSIDs.includes(ssid);
+    return ENV.UNIVERSITY_SSIDS.includes(ssid);
   }
 
   calculateSessionDuration(startTime: Date, endTime?: Date): number {
@@ -77,9 +77,8 @@ class WiFiService {
   }
 
   calculatePointsEarned(durationInSeconds: number): number {
-    const POINTS_PER_HOUR = 100;
     const hours = durationInSeconds / 3600;
-    return Math.floor(hours * POINTS_PER_HOUR);
+    return Math.floor(hours * ENV.POINTS_PER_HOUR);
   }
 }
 
