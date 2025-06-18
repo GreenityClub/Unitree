@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Text, ProgressBar } from 'react-native-paper';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -18,6 +19,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
+import { useTabBarContext } from '../../context/TabBarContext';
+import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { wifiService } from '../../services/wifiService';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
 
@@ -44,6 +48,9 @@ const StatItem: React.FC<StatItemProps> = ({ label, duration, points, icon }) =>
 const WifiStatusScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
+  const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
+  const { panGesture } = useSwipeNavigation({ currentScreen: 'wifi' });
   const { 
     isConnected, 
     ssid, 
@@ -93,14 +100,15 @@ const WifiStatusScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
+    <GestureDetector gesture={panGesture}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
 
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={[styles.headerSection, { paddingTop: insets.top }]}
-      >
+        {/* Fixed Header Section */}
+        <Animated.View 
+          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          onTouchStart={handleTouchStart}
+        >
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <Text style={styles.titleText}>
@@ -116,8 +124,7 @@ const WifiStatusScreen: React.FC = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
+        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
       >
         <ScrollView
           style={styles.scrollContainer}
@@ -129,6 +136,11 @@ const WifiStatusScreen: React.FC = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={handleTouchStart}
+          scrollEventThrottle={16}
         >
           <View style={styles.content}>
             {/* WiFi Status Card */}
@@ -235,15 +247,16 @@ const WifiStatusScreen: React.FC = () => {
         </ScrollView>
       </Animated.View>
 
-      {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        <Image
-          source={require('../../assets/mascots/Unitree - Mascot-1.png')}
-          style={styles.mascotImage}
-          resizeMode="contain"
-        />
+        {/* Mascot */}
+        <View style={styles.mascotContainer}>
+          <Image
+            source={require('../../assets/mascots/Unitree - Mascot-1.png')}
+            style={styles.mascotImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
-    </View>
+    </GestureDetector>
   );
 };
 

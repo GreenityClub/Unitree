@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -17,6 +18,9 @@ import Animated, {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
+import { useTabBarContext } from '../../context/TabBarContext';
+import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { rf, rs, deviceValue } from '../../utils/responsive';
@@ -27,11 +31,15 @@ import { getAvatarUrl, handleAvatarError } from '../../utils/imageUtils';
 
 const ProfileScreen = () => {
   const { user, logout, updateUser } = useAuth();
+  const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
+  const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
+  const { panGesture } = useSwipeNavigation({ currentScreen: 'profile' });
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [avatarError, setAvatarError] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [actualTreeCount, setActualTreeCount] = React.useState<number>(0);
+  const [currentPoints, setCurrentPoints] = React.useState<number>(user?.points || 0);
   const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
@@ -40,9 +48,25 @@ const ProfileScreen = () => {
     }
   }, [user?.id]);
 
-  // Listen for tree redemption events
+  // Update points when user data changes
+  React.useEffect(() => {
+    if (user?.points !== undefined) {
+      setCurrentPoints(user.points);
+    }
+  }, [user?.points]);
+
+  // Listen for real-time points updates
   React.useEffect(() => {
     if (!user) return;
+
+    const pointsSubscription = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
+      console.log('ProfileScreen - Received points update:', data);
+      if (data.points !== undefined || data.totalPoints !== undefined) {
+        const newPoints = data.totalPoints ?? data.points;
+        setCurrentPoints(newPoints ?? 0);
+        console.log('ProfileScreen - Updated current points to:', newPoints);
+      }
+    });
 
     const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
       console.log('ProfileScreen - Tree redeemed:', data);
@@ -50,6 +74,7 @@ const ProfileScreen = () => {
     });
 
     return () => {
+      eventService.removeAllListeners('points');
       eventService.removeAllListeners('treeRedeemed');
     };
   }, [user?.id]);
@@ -212,14 +237,15 @@ const ProfileScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
+    <GestureDetector gesture={panGesture}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
 
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={styles.headerSection}
-      >
+        {/* Fixed Header Section */}
+        <Animated.View 
+          style={[styles.headerSection, headerAnimatedStyle]}
+          onTouchStart={handleTouchStart}
+        >
         {/* Profile Header */}
         <View style={styles.profileHeaderSection}>
           <TouchableOpacity 
@@ -260,8 +286,7 @@ const ProfileScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
+        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
       >
         <ScrollView
           style={styles.scrollContainer}
@@ -273,6 +298,11 @@ const ProfileScreen = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={handleTouchStart}
+          scrollEventThrottle={16}
         >
           <View style={styles.content}>
             {/* Stats Card */}
@@ -281,7 +311,7 @@ const ProfileScreen = () => {
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Icon name="star" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{user?.points || 0}</Text>
+                  <Text style={styles.statValue}>{currentPoints}</Text>
                   <Text style={styles.statLabel}>Points</Text>
                 </View>
                 <View style={styles.statDivider} />
@@ -358,7 +388,8 @@ const ProfileScreen = () => {
           </View>
         </View>
       )}
-    </View>
+      </View>
+    </GestureDetector>
   );
 };
 

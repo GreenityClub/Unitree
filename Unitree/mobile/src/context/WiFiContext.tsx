@@ -67,6 +67,38 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   // Monitor network state
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
+      // 🔥 LOG ALL WIFI INFORMATION FROM NETINFO 🔥
+      console.log('📶 NetInfo State Update:', {
+        timestamp: new Date().toISOString(),
+        isConnected: state.isConnected,
+        type: state.type,
+        isInternetReachable: state.isInternetReachable,
+        details: state.details,
+        fullState: state
+      });
+
+      // Additional logging for wifi-specific details
+      if (state.type === 'wifi' && state.details) {
+        const wifiDetails = state.details as any;
+        console.log('📡 WiFi Details:', {
+          ssid: wifiDetails.ssid,
+          bssid: wifiDetails.bssid,
+          strength: wifiDetails.strength,
+          ipAddress: wifiDetails.ipAddress,
+          subnet: wifiDetails.subnet,
+          frequency: wifiDetails.frequency,
+          linkSpeed: wifiDetails.linkSpeed,
+          rxLinkSpeed: wifiDetails.rxLinkSpeed,
+          txLinkSpeed: wifiDetails.txLinkSpeed,
+          allWifiDetails: wifiDetails
+        });
+      } else {
+        console.log('📵 Not connected to WiFi or no WiFi details available:', {
+          type: state.type,
+          isConnected: state.isConnected
+        });
+      }
+
       setIsConnected(state.isConnected === true);
       
       if (state.type === 'wifi' && state.details) {
@@ -74,13 +106,29 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
         const networkSSID = wifiDetails.ssid || null;
         const networkBSSID = wifiDetails.bssid || null;
         
+        console.log('🔄 Setting WiFi State:', {
+          ssid: networkSSID,
+          bssid: networkBSSID
+        });
+        
         setSsid(networkSSID);
         setBssid(networkBSSID);
         
         // Check if connected to university WiFi
-        const isUniWifi = wifiService.isUniversityWifi(networkSSID, networkBSSID);
-        setIsUniversityWifi(isUniWifi);
+        const isUniWifi = wifiService.isUniversityWiFi(networkSSID);
+        const isValidBSSID = wifiService.isValidUniversityBSSID(networkBSSID);
+        console.log('🏫 University WiFi Check:', {
+          ssid: networkSSID,
+          bssid: networkBSSID,
+          isUniversityWifi: isUniWifi,
+          isValidBSSID: isValidBSSID,
+          finalCheck: isUniWifi && isValidBSSID,
+          universitySSIDs: ENV.UNIVERSITY_SSIDS,
+          bssidPrefix: ENV.UNIVERSITY_BSSID_PREFIX
+        });
+        setIsUniversityWifi(isUniWifi && isValidBSSID);
       } else {
+        console.log('❌ Clearing WiFi State - Not connected to WiFi');
         setSsid(null);
         setBssid(null);
         setIsUniversityWifi(false);
@@ -98,7 +146,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
       try {
         if (isUniversityWifi && !isSessionActive) {
           // Start session if connected to university WiFi but no active session
-          await wifiService.startSession(ssid || '', bssid || '');
+          await wifiService.startSession({ ssid: ssid || '', bssid: bssid || '' });
           await refreshStats();
         } else if (!isUniversityWifi && isSessionActive) {
           // End session if not connected to university WiFi but session is active

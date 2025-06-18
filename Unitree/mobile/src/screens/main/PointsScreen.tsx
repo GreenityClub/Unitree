@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   Modal,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -27,6 +28,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
+import { useTabBarContext } from '../../context/TabBarContext';
+import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { formatDistanceToNow } from 'date-fns';
 import { rf, rs } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -680,6 +684,9 @@ const TreeRedemptionModal: React.FC<{
 const PointsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, updateUser } = useAuth();
+  const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
+  const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
+  const { panGesture } = useSwipeNavigation({ currentScreen: 'points' });
   const [pointsState, setPointsState] = useState<PointsState>({ points: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -730,6 +737,12 @@ const PointsScreen = () => {
     const unsubscribePoints = pointsService.addListener((state: PointsState) => {
       console.log('PointsScreen - Received points update:', state);
       setPointsState(state);
+      
+      // Emit to eventService so other screens can listen
+      eventService.emit('points', { 
+        points: state.points, 
+        totalPoints: state.points 
+      });
     });
     
     return () => {
@@ -812,7 +825,14 @@ const PointsScreen = () => {
     try {
       await initializeData();
       await pointsService.refreshPoints();
-      setPointsState(pointsService.getState());
+      const updatedState = pointsService.getState();
+      setPointsState(updatedState);
+      
+      // Emit to eventService so other screens can listen
+      eventService.emit('points', { 
+        points: updatedState.points, 
+        totalPoints: updatedState.points 
+      });
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -868,14 +888,15 @@ const PointsScreen = () => {
 
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
+    <GestureDetector gesture={panGesture}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
 
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={[styles.headerSection, { paddingTop: insets.top }]}
-      >
+        {/* Fixed Header Section */}
+        <Animated.View 
+          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          onTouchStart={handleTouchStart}
+        >
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <Text style={styles.titleText}>Your Points</Text>
@@ -887,8 +908,7 @@ const PointsScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
+        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
       >
         <ScrollView
           style={styles.scrollContainer}
@@ -900,6 +920,11 @@ const PointsScreen = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={handleTouchStart}
+          scrollEventThrottle={16}
         >
           <View style={styles.content}>
             {/* Points Summary Card - Split Design */}
@@ -1038,7 +1063,8 @@ const PointsScreen = () => {
       />
 
 
-    </View>
+      </View>
+    </GestureDetector>
   );
 };
 

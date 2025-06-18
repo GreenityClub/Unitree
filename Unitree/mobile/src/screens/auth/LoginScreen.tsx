@@ -24,6 +24,7 @@ import LoadingOverlay from '../../components/LoadingOverlay';
 import SafeScreen from '../../components/SafeScreen';
 import { useAuth } from '../../context/AuthContext';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
+import { getResponsiveLogoSizes, getResponsiveLogoPositions, getResponsiveSpacing } from '../../utils/logoUtils';
 import { Validator } from '../../utils';
 import ENV from '../../config/env';
 
@@ -41,6 +42,11 @@ export default function LoginScreen() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('');
+
+  // Get responsive logo sizes and positions
+  const logoSizes = getResponsiveLogoSizes();
+  const logoPositions = getResponsiveLogoPositions();
+  const logoSpacing = getResponsiveSpacing();
 
   // Load saved credentials
   useEffect(() => {
@@ -157,12 +163,7 @@ export default function LoginScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
       <LoadingOverlay visible={loading} />
 
-      {/* Connection Status */}
-      {connectionStatus ? (
-        <View style={styles.connectionStatus}>
-          <Text style={styles.connectionStatusText}>{connectionStatus}</Text>
-        </View>
-      ) : null}
+
 
       {/* Error Modal */}
       <Modal
@@ -195,34 +196,20 @@ export default function LoginScreen() {
       >
         <View style={styles.statusBar} />
         
-        {/* Greenwich Logo - Top Right */}
-        <View style={styles.greenwichLogoContainer}>
-          <Image
-            source={require('../../assets/logos/greenwich - logo.png')}
-            style={styles.greenwichLogo}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Main Logo Section - Left Aligned */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/logos/unitree - logo.png')}
-            style={styles.unitreeLogo}
-            resizeMode="contain"
-          />
-          
-          {/* Sub Logos - Greenity x GIT */}
-          <View style={styles.subLogosContainer}>
+        {/* Logos Container - Both logos on same line */}
+        <View style={[styles.logosContainer, logoPositions.logosContainer]}>
+          <View style={[styles.greenwichLogoContainer, logoPositions.greenwichLogoContainer]}>
             <Image
-              source={require('../../assets/logos/greenity - logo.png')}
-              style={styles.greenityLogo}
+              source={require('../../assets/logos/greenwich - logo.png')}
+              style={[styles.greenwichLogo, logoSizes.greenwichLogo]}
               resizeMode="contain"
             />
-            
+          </View>
+          
+          <View style={[styles.unitreeLogoContainer, logoPositions.unitreeLogoContainer]}>
             <Image
-              source={require('../../assets/logos/git - logo.png')}
-              style={styles.gitLogo}
+              source={require('../../assets/logos/unitree - logo.png')}
+              style={[styles.unitreeLogo, logoSizes.unitreeLogo]}
               resizeMode="contain"
             />
           </View>
@@ -241,10 +228,10 @@ export default function LoginScreen() {
             <Text style={styles.loginTitle}>Login</Text>
             
             {/* Mascot */}
-            <View style={styles.mascotContainer}>
+            <View style={[styles.mascotContainer, logoPositions.mascotContainer]}>
                 <Image
                   source={require('../../assets/mascots/Unitree - Mascot-1.png')}
-                  style={styles.mascotImage}
+                  style={[styles.mascotImage, logoSizes.mascot]}
                   resizeMode="contain"
                 />
             </View>
@@ -371,53 +358,32 @@ const styles = StyleSheet.create({
   // Header Section Styles
   headerSection: {
     backgroundColor: '#B7DDE6',
-    paddingBottom: rs(50),
+    paddingBottom: rs(80),
     position: 'relative',
+    minHeight: rs(150),
   },
-  greenwichLogoContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 20,
-    zIndex: 2,
+  logosContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  greenwichLogo: {
-    width: 150,
-    height: 100,
-  },
-  logoContainer: {
-    alignItems: 'flex-start',
-    marginTop: -5,
-    marginLeft: rs(20),
+  unitreeLogoContainer: {
+    // Styles will come from logoPositions
   },
   unitreeLogo: {
-    width: 200,
-    height: 90,
-    marginBottom: -10,
+    // Styles will come from logoSizes
   },
-  subLogosContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: rs(5),
-    marginLeft: rs(15),
+  greenwichLogoContainer: {
+    // Styles will come from logoPositions
   },
-  greenityLogo: {
-    width: 100,
-    height: 40,
-  },
-  gitLogo: {
-    width: 70,
-    height: 27,
-    marginBottom: rs(5)
+  greenwichLogo: {
+    // Styles will come from logoSizes
   },
   mascotContainer: {
-    position: 'absolute',
-    right: 20,
-    top: -110,
-    zIndex: 1,
+    // Styles will come from logoPositions
   },
   mascotImage: {
-    width: 160,
-    height: 160,
+    // Styles will come from logoSizes
   },
 
   // Login Section Styles
@@ -429,6 +395,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: rs(24),
     paddingTop: rs(32),
     paddingBottom: rs(20),
+    minHeight: '100%',
   },
   loginTitle: {
     fontSize: rf(32),

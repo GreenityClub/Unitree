@@ -23,10 +23,16 @@ import LoadingOverlay from '../../components/LoadingOverlay';
 import SafeScreen from '../../components/SafeScreen';
 import ENV from '../../config/env';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
+import { getResponsiveLogoSizes, getResponsiveLogoPositions, getResponsiveSpacing } from '../../utils/logoUtils';
 import { Validator } from '../../utils';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+
+  // Get responsive logo sizes and positions
+  const logoSizes = getResponsiveLogoSizes();
+  const logoPositions = getResponsiveLogoPositions();
+  const logoSpacing = getResponsiveSpacing();
 
   // Step management: 1 = email entry, 2 = verification code, 3 = new password, 4 = success
   const [currentStep, setCurrentStep] = useState(1);
@@ -282,40 +288,26 @@ export default function ForgotPasswordScreen() {
             entering={FadeInDown.delay(200)}
             style={styles.headerSection}
           >
-            <View style={styles.statusBar} />
+            {/* <View style={styles.statusBar} /> */}
             
-            {/* Greenwich Logo - Top Right */}
-            <View style={styles.greenwichLogoContainer}>
-              <Image
-                source={require('../../assets/logos/greenwich - logo.png')}
-                style={styles.greenwichLogo}
-                resizeMode="contain"
-              />
-            </View>
-
-            {/* Main Logo Section - Left Aligned */}
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/logos/unitree - logo.png')}
-                style={styles.unitreeLogo}
-                resizeMode="contain"
-              />
-              
-              {/* Sub Logos - Greenity x GIT */}
-              <View style={styles.subLogosContainer}>
-                <Image
-                  source={require('../../assets/logos/greenity - logo.png')}
-                  style={styles.greenityLogo}
-                  resizeMode="contain"
-                />
-                
-                <Image
-                  source={require('../../assets/logos/git - logo.png')}
-                  style={styles.gitLogo}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
+                    {/* Logos Container - Both logos on same line */}
+        <View style={[styles.logosContainer, logoPositions.logosContainer]}>
+          <View style={[styles.greenwichLogoContainer, logoPositions.greenwichLogoContainer]}>
+            <Image
+              source={require('../../assets/logos/greenwich - logo.png')}
+              style={[styles.greenwichLogo, logoSizes.greenwichLogo]}
+              resizeMode="contain"
+            />
+          </View>
+          
+          <View style={[styles.unitreeLogoContainer, logoPositions.unitreeLogoContainer]}>
+            <Image
+              source={require('../../assets/logos/unitree - logo.png')}
+              style={[styles.unitreeLogo, logoSizes.unitreeLogo]}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
           </Animated.View>
 
           {/* Form Section */}
@@ -338,10 +330,10 @@ export default function ForgotPasswordScreen() {
             </View>
 
             {/* Mascot */}
-            <View style={styles.mascotContainer}>
+            <View style={[styles.mascotContainer, logoPositions.mascotContainer]}>
               <Image
                 source={require('../../assets/mascots/Unitree - Mascot-3.png')}
-                style={styles.mascotImage}
+                style={[styles.mascotImage, logoSizes.mascot]}
                 resizeMode="contain"
               />
             </View>
@@ -592,43 +584,35 @@ const styles = StyleSheet.create({
   // Header Section Styles
   headerSection: {
     backgroundColor: '#B7DDE6',
-    paddingBottom: rs(90),
+    paddingTop: rs(20),
+    paddingBottom: rs(80),
     position: 'relative',
+    minHeight: rs(150),
   },
-  greenwichLogoContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 20,
-    zIndex: 2,
+  logosContainer: {
+    // Styles will come from logoPositions
   },
-  greenwichLogo: {
-    width: 150,
-    height: 100,
-  },
-  logoContainer: {
-    alignItems: 'flex-start',
-    marginTop: -5,
-    marginLeft: rs(20),
+  unitreeLogoContainer: {
+    // Styles will come from logoPositions
   },
   unitreeLogo: {
-    width: 200,
-    height: 90,
-    marginBottom: -10,
+    // Styles will come from logoSizes
   },
-  subLogosContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: rs(5),
-    marginLeft: rs(20),
+  greenwichLogoContainer: {
+    // Styles will come from logoPositions
   },
-  greenityLogo: {
-    width: 100,
-    height: 40,
+  greenwichLogo: {
+    // Styles will come from logoSizes
   },
-  gitLogo: {
-    width: 70,
-    height: 27,
-    marginBottom: rs(5)
+  mascotContainer: {
+    position: 'absolute',
+    right: 20,
+    top: -110,
+    zIndex: 1,
+  },
+  mascotImage: {
+    width: 160,
+    height: 160,
   },
   welcomeSection: {
     alignItems: 'flex-start',
@@ -659,16 +643,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: rs(24),
     paddingTop: rs(32),
     paddingBottom: rs(40),
-  },
-  mascotContainer: {
-    position: 'absolute',
-    right: 20,
-    top: -110,
-    zIndex: 1,
-  },
-  mascotImage: {
-    width: 160,
-    height: 160,
   },
   form: {
     marginTop: rs(60),

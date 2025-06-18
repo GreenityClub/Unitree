@@ -45,9 +45,20 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
+        fullname: user.fullname,
+        nickname: user.nickname,
         email: user.email,
         points: user.points,
-        treesPlanted: user.treesPlanted
+        treesPlanted: user.treesPlanted,
+        studentId: user.studentId,
+        university: user.university,
+        avatar: user.avatar,
+        role: user.role,
+        notificationSettings: {
+          achievements: true,
+          attendance: true,
+          treeHealth: true
+        }
       }
     });
   } catch (error) {
@@ -98,9 +109,20 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
+        fullname: user.fullname,
+        nickname: user.nickname,
         email: user.email,
         points: user.points,
-        treesPlanted: user.treesPlanted
+        treesPlanted: user.treesPlanted,
+        studentId: user.studentId,
+        university: user.university,
+        avatar: user.avatar,
+        role: user.role,
+        notificationSettings: {
+          achievements: true,
+          attendance: true,
+          treeHealth: true
+        }
       }
     });
   } catch (error) {

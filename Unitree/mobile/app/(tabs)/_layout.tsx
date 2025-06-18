@@ -7,9 +7,13 @@ import Animated, {
   useAnimatedStyle, 
   withSpring, 
   withTiming,
-  useSharedValue 
+  useSharedValue,
+  interpolate,
+  Extrapolate,
+  Easing
 } from 'react-native-reanimated';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTabBarContext } from '../../src/context/TabBarContext';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 import type { 
   NavigationHelpers,
@@ -59,23 +63,25 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#fef4ca',
-    borderRadius: 25,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginBottom: 6,
+    borderRadius: 28,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
     justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
-    minHeight: 52,
-    width: '85%',
-    maxWidth: 360,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
+    minHeight: 56,
+    width: '88%',
+    maxWidth: 380,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   tabItem: {
     alignItems: 'center',
@@ -118,22 +124,43 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
   const iconScale = useSharedValue(1);
   
   useEffect(() => {
-    scale.value = withSpring(isFocused ? 1.05 : 1, {
-      damping: 15,
-      stiffness: 150,
-    });
-    opacity.value = withTiming(1, { duration: 200 });
-    iconScale.value = withSpring(isFocused ? 1.1 : 1, {
+    scale.value = withSpring(isFocused ? 1.08 : 1, {
       damping: 12,
-      stiffness: 200,
+      stiffness: 180,
+      mass: 0.8,
+    });
+    opacity.value = withTiming(1, { 
+      duration: 300,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
+    iconScale.value = withSpring(isFocused ? 1.15 : 1, {
+      damping: 10,
+      stiffness: 220,
+      mass: 0.7,
     });
   }, [isFocused]);
 
   const handlePress = () => {
-    pressScale.value = withSpring(0.9, { damping: 10, stiffness: 400 });
+    // Quick press animation with bounce-back
+    pressScale.value = withSpring(0.85, { 
+      damping: 8, 
+      stiffness: 500,
+      mass: 0.5
+    });
     setTimeout(() => {
-      pressScale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    }, 100);
+      pressScale.value = withSpring(1.02, { 
+        damping: 10, 
+        stiffness: 400,
+        mass: 0.6
+      });
+      setTimeout(() => {
+        pressScale.value = withSpring(1, { 
+          damping: 12, 
+          stiffness: 300,
+          mass: 0.8
+        });
+      }, 80);
+    }, 50);
     onPress();
   };
 
@@ -146,15 +173,39 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
 
   const animatedPillStyle = useAnimatedStyle(() => ({
     backgroundColor: isFocused 
-      ? withTiming('#8BC24A', { duration: 250 })
-      : withTiming('transparent', { duration: 250 }),
+      ? withTiming('#8BC24A', { 
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+        })
+      : withTiming('transparent', { 
+          duration: 200,
+          easing: Easing.bezier(0.4, 0, 0.6, 1)
+        }),
     paddingHorizontal: isFocused 
-      ? withSpring(12, { damping: 12, stiffness: 100 })
-      : withSpring(8, { damping: 12, stiffness: 100 }),
+      ? withSpring(14, { damping: 10, stiffness: 120, mass: 0.8 })
+      : withSpring(8, { damping: 12, stiffness: 100, mass: 0.9 }),
     paddingVertical: isFocused 
-      ? withSpring(8, { damping: 12, stiffness: 100 })
-      : withSpring(6, { damping: 12, stiffness: 100 }),
+      ? withSpring(9, { damping: 10, stiffness: 120, mass: 0.8 })
+      : withSpring(6, { damping: 12, stiffness: 100, mass: 0.9 }),
+    shadowOpacity: isFocused 
+      ? withTiming(0.3, { duration: 300 })
+      : withTiming(0, { duration: 200 }),
+    shadowRadius: isFocused 
+      ? withSpring(4, { damping: 12, stiffness: 100 })
+      : withSpring(0, { damping: 12, stiffness: 100 }),
+    elevation: isFocused 
+      ? withSpring(3, { damping: 12, stiffness: 100 })
+      : withSpring(0, { damping: 12, stiffness: 100 }),
   }));
+
+  // Create static shadow styles for focused/unfocused states
+  const shadowStyle = isFocused ? {
+    shadowColor: '#8BC24A',
+    shadowOffset: { width: 0, height: 2 },
+  } : {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+  };
 
   const animatedIconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: iconScale.value }],
@@ -170,7 +221,7 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
         onPress={handlePress}
         activeOpacity={0.8}
       >
-        <Animated.View style={[styles.tabItem, animatedPillStyle]}>
+        <Animated.View style={[styles.tabItem, animatedPillStyle, shadowStyle]}>
           <Animated.View style={[styles.tabIconContainer, animatedIconStyle]}>
             <Icon
               name={iconName}
@@ -192,6 +243,7 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
 };
 
 const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigation, insets }) => {
+  const { isVisible } = useTabBarContext();
   const tabConfig: TabConfigMap = {
     wifi: { icon: 'wifi', label: 'WiFi' },
     points: { icon: 'star', label: 'Points' },
@@ -200,21 +252,46 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
     profile: { icon: 'account', label: 'Profile' }
   };
 
-  const tabBarOpacity = useSharedValue(0);
-  const tabBarTranslateY = useSharedValue(100);
+  const animatedTabBarStyle = useAnimatedStyle(() => {
+    // Smooth interpolation for transform and opacity
+    const translateY = interpolate(
+      isVisible.value,
+      [0, 1],
+      [120, 0], // More pronounced slide effect
+      Extrapolate.CLAMP
+    );
 
-  useEffect(() => {
-    tabBarOpacity.value = withTiming(1, { duration: 500 });
-    tabBarTranslateY.value = withSpring(0, { 
-      damping: 15, 
-      stiffness: 100 
-    });
-  }, []);
+    const opacity = interpolate(
+      isVisible.value,
+      [0, 0.3, 1],
+      [0, 0.5, 1], // Smoother opacity transition
+      Extrapolate.CLAMP
+    );
 
-  const animatedTabBarStyle = useAnimatedStyle(() => ({
-    opacity: tabBarOpacity.value,
-    transform: [{ translateY: tabBarTranslateY.value }],
-  }));
+    const scale = interpolate(
+      isVisible.value,
+      [0, 0.5, 1],
+      [0.85, 0.95, 1], // Subtle scale effect
+      Extrapolate.CLAMP
+    );
+
+    // Enhanced shadow opacity for depth effect
+    const shadowOpacity = interpolate(
+      isVisible.value,
+      [0, 1],
+      [0, 0.25], // Dynamic shadow opacity
+      Extrapolate.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [
+        { translateY },
+        { scale }
+      ],
+      shadowOpacity,
+    };
+  });
 
   return (
     <Animated.View 
@@ -261,17 +338,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
   );
 };
 
-export default function TabLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect href="/auth/login" />;
-  }
-
+function TabsContent() {
   return (
     <Tabs
       screenOptions={{
@@ -311,4 +378,18 @@ export default function TabLayout() {
       />
     </Tabs>
   );
+}
+
+export default function TabLayout() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/auth/login" />;
+  }
+
+  return <TabsContent />;
 }

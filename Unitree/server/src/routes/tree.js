@@ -63,9 +63,10 @@ router.post('/purchase', auth, async (req, res) => {
     const tree = new Tree({
       userId: user._id,
       species,
-      stage: 'sapling',
-      health: 100,
+      stage: 'seedling',
+      healthScore: 100,
       plantedDate: new Date(),
+      wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time
     });
 
     await tree.save();
@@ -86,24 +87,108 @@ router.post('/purchase', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const trees = await Tree.find({ userId: req.user._id });
-    res.json(trees);
+    
+    // Update each tree's status in real-time
+    const updatedTrees = await Promise.all(
+      trees.map(async (tree) => {
+        await tree.updateStage();
+        tree.updateHealthScore();
+        await tree.save();
+        return {
+          ...tree.toObject(),
+          growthProgress: tree.getGrowthProgress(),
+          healthStatus: tree.getHealthStatus()
+        };
+      })
+    );
+    
+    res.json(updatedTrees);
   } catch (error) {
     console.error('Error fetching trees:', error);
     res.status(500).json({ message: 'Error fetching trees' });
   }
 });
 
-// Get a specific tree
+// Get a specific tree with real-time status
 router.get('/:id', auth, async (req, res) => {
   try {
     const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
     if (!tree) {
       return res.status(404).json({ message: 'Tree not found' });
     }
-    res.json(tree);
+    
+    // Update tree status in real-time
+    await tree.updateStage();
+    tree.updateHealthScore();
+    await tree.save();
+    
+    res.json({
+      ...tree.toObject(),
+      growthProgress: tree.getGrowthProgress(),
+      healthStatus: tree.getHealthStatus()
+    });
   } catch (error) {
     console.error('Error fetching tree:', error);
     res.status(500).json({ message: 'Error fetching tree' });
+  }
+});
+
+// Water a tree
+router.post('/:id/water', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+
+    const waterResult = tree.water();
+    if (!waterResult.success) {
+      return res.status(400).json({ message: waterResult.message });
+    }
+
+    await tree.save();
+    
+    res.json({
+      success: true,
+      message: waterResult.message,
+      tree: {
+        ...tree.toObject(),
+        growthProgress: tree.getGrowthProgress(),
+        healthStatus: tree.getHealthStatus()
+      }
+    });
+  } catch (error) {
+    console.error('Error watering tree:', error);
+    res.status(500).json({ message: 'Error watering tree' });
+  }
+});
+
+// Get tree real-time status (for frequent updates)
+router.get('/:id/status', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+    
+    // Update tree status in real-time
+    await tree.updateStage();
+    tree.updateHealthScore();
+    await tree.save();
+    
+    res.json({
+      _id: tree._id,
+      stage: tree.stage,
+      healthScore: tree.healthScore,
+      isDead: tree.isDead,
+      growthProgress: tree.getGrowthProgress(),
+      healthStatus: tree.getHealthStatus(),
+      lastWatered: tree.lastWatered,
+      totalWifiTime: tree.totalWifiTime
+    });
+  } catch (error) {
+    console.error('Error fetching tree status:', error);
+    res.status(500).json({ message: 'Error fetching tree status' });
   }
 });
 
@@ -116,6 +201,8 @@ router.post('/', auth, async (req, res) => {
       plantedDate: new Date(),
       lastWatered: new Date(),
       healthScore: 100,
+      stage: 'seedling',
+      wifiTimeAtRedeem: req.user.totalTimeConnected || 0, // Set baseline wifi time
     });
     await tree.save();
     res.status(201).json(tree);
@@ -157,7 +244,7 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-  // Redeem a tree
+// Redeem a tree
 router.post('/redeem', auth, async (req, res) => {
   try {
     const { speciesId } = req.body;
@@ -189,7 +276,7 @@ router.post('/redeem', auth, async (req, res) => {
       });
     }
 
-    // Create new tree
+    // Create new tree with wifi time baseline
     const tree = new Tree({
       userId: user._id,
       species: speciesId,
@@ -197,7 +284,8 @@ router.post('/redeem', auth, async (req, res) => {
       plantedDate: new Date(),
       lastWatered: new Date(),
       healthScore: 100,
-      stage: 'sapling',
+      stage: 'seedling',
+      wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time when tree is redeemed
       location: {
         latitude: 0,
         longitude: 0
@@ -212,7 +300,8 @@ router.post('/redeem', auth, async (req, res) => {
       console.log('Debug - Tree saved successfully:', {
         treeId: tree._id,
         userId: tree.userId,
-        species: tree.species
+        species: tree.species,
+        wifiTimeAtRedeem: tree.wifiTimeAtRedeem
       });
     } catch (saveError) {
       console.error('Debug - Tree save error details:', {
@@ -305,19 +394,14 @@ router.post('/redeem', auth, async (req, res) => {
         treesArray: updatedUser.trees
       });
 
-      // Verify the changes were saved
-      const verifyUser = await User.findById(user._id);
-      console.log('Debug - Verification of user update:', {
-        userId: verifyUser._id,
-        points: verifyUser.points,
-        treesPlanted: verifyUser.treesPlanted,
-        treesArray: verifyUser.trees
-      });
-
       // Update the local user object to match the database
       user.points = updatedUser.points;
       user.treesPlanted = updatedUser.treesPlanted;
       user.trees = updatedUser.trees;
+
+      // Get initial tree status
+      const growthProgress = tree.getGrowthProgress();
+      const healthStatus = tree.getHealthStatus();
 
       // Send success response with complete information
       res.json({
@@ -329,7 +413,12 @@ router.post('/redeem', auth, async (req, res) => {
           name: tree.name,
           stage: tree.stage,
           healthScore: tree.healthScore,
-          plantedDate: tree.plantedDate
+          plantedDate: tree.plantedDate,
+          lastWatered: tree.lastWatered,
+          wifiTimeAtRedeem: tree.wifiTimeAtRedeem,
+          totalWifiTime: tree.totalWifiTime,
+          growthProgress,
+          healthStatus
         },
         transaction: {
           _id: pointTransaction._id,

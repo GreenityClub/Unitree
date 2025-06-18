@@ -11,6 +11,7 @@ import {
   StatusBar,
   RefreshControl,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -23,104 +24,140 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
-import { treeService } from '../../services/treeService';
+import { useTabBarContext } from '../../context/TabBarContext';
+import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
+import { treeService, Tree } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import type { WiFiSession } from '../../services/wifiService';
 import { rf, rs } from '../../utils/responsive';
 import { router } from 'expo-router';
-import type { Tree as BaseTree } from '../../services/treeService';
-
-// Define a UI-specific tree type instead of extending BaseTree
-interface Tree {
-  _id: string;
-  userId: string;
-  name?: string;
-  plantedDate: Date;
-  stage: 'sapling' | 'young' | 'mature';
-  healthScore: number;
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  lastWatered: Date;
-  currentStage: number;
-  wifiHoursAccumulated: number;
-  species: {
-    name: string;
-    hoursToNextStage: number;
-  };
-}
-
-// Define the session info type
-interface SessionInfo {
-  startTime: Date;
-  durationMinutes: number;
-}
-
-
 
 // Tree stage images from assets
-const getStageImage = (stage: number): any => {
-  const stageImages: { [key: number]: any } = {
-    0: require('../../assets/trees/stage01.png'),
-    1: require('../../assets/trees/stage02.png'),
-    2: require('../../assets/trees/stage03.png'),
-    3: require('../../assets/trees/stage04.png'),
-    4: require('../../assets/trees/stage05.png'),
-    5: require('../../assets/trees/stage06.png')
+const getStageImage = (stage: string): any => {
+  const stageImages: { [key: string]: any } = {
+    'seedling': require('../../assets/trees/stage01.png'),
+    'sprout': require('../../assets/trees/stage02.png'),
+    'sapling': require('../../assets/trees/stage03.png'),
+    'young_tree': require('../../assets/trees/stage04.png'),
+    'mature_tree': require('../../assets/trees/stage05.png'),
+    'ancient_tree': require('../../assets/trees/stage06.png')
   };
-  return stageImages[stage] || stageImages[0];
+  return stageImages[stage] || stageImages['seedling'];
 };
 
 interface TreeCardProps {
   tree: Tree;
   onPress: () => void;
-  currentSessionHours: number;
 }
 
-const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress, currentSessionHours = 0 }) => {
-  const { species, currentStage, healthScore, wifiHoursAccumulated, name } = tree;
+const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress }) => {
+  const { species, stage, healthScore, totalWifiTime, name, isDead, healthStatus, growthProgress } = tree;
+
+  const getHealthColor = (score: number) => {
+    if (score >= 80) return '#4CAF50';
+    if (score >= 60) return '#FF9800';
+    if (score >= 40) return '#FF5722';
+    return '#f44336';
+  };
+
+  const getHealthStatusText = () => {
+    if (isDead) return 'Dead';
+    if (!healthStatus) return 'Unknown';
+    return healthStatus.status.charAt(0).toUpperCase() + healthStatus.status.slice(1);
+  };
+
+  const getGrowthStatusText = () => {
+    if (!growthProgress) return 'Unknown';
+    if (growthProgress.isMaxStage) return 'Fully Grown';
+    return `${growthProgress.progressPercent.toFixed(0)}% to ${treeService.getTreeStatusText(growthProgress.nextStage || stage)}`;
+  };
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.treeCard}>
+    <TouchableOpacity onPress={onPress} style={[styles.treeCard, isDead && styles.deadTreeCard]}>
       <View style={styles.treeHeader}>
-        <Image 
-          source={getStageImage(currentStage)} 
-          style={styles.treeImage} 
-          resizeMode="contain"
-        />
+        <View style={[styles.treeImageContainer, isDead && styles.deadTreeImageContainer]}>
+          <Image 
+            source={getStageImage(stage)} 
+            style={[styles.treeImage, isDead && styles.deadTreeImage]} 
+            resizeMode="contain"
+          />
+          {isDead && (
+            <View style={styles.deadOverlay}>
+              <Icon name="skull" size={20} color="#666" />
+            </View>
+          )}
+        </View>
         <View style={styles.treeInfo}>
-          <Text style={styles.treeName}>{name || `My ${species.name}`}</Text>
-          <Text style={styles.treeStage}>Ancient Tree</Text>
+          <Text style={styles.treeName}>{name || `My ${species}`}</Text>
+          <Text style={[styles.treeStage, { color: treeService.getStageColor(stage) }]}>
+            {treeService.getTreeStatusText(stage)}
+          </Text>
+          <Text style={styles.wifiHours}>
+            {treeService.formatWifiTime(totalWifiTime)} WiFi collected
+          </Text>
         </View>
       </View>
-
-      <Text style={styles.wifiHours}>
-        {wifiHoursAccumulated.toFixed(1)}h WiFi collected {currentSessionHours > 0 && `(+${currentSessionHours.toFixed(1)}h live)`}
-      </Text>
 
       {/* Growth Progress Bar */}
       <View style={styles.metricSection}>
         <View style={styles.metricHeader}>
-          <Icon name="trending-up" size={16} color="#4CAF50" />
+          <Icon name="trending-up" size={16} color={growthProgress?.isMaxStage ? '#FFD700' : '#4CAF50'} />
           <Text style={styles.metricLabel}>Growth</Text>
-          <Text style={styles.metricStatus}>Fully Grown</Text>
+          <Text style={styles.metricStatus}>{getGrowthStatusText()}</Text>
         </View>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { backgroundColor: '#FFD700', width: '100%' }]} />
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: growthProgress?.isMaxStage ? '#FFD700' : '#4CAF50',
+                width: `${growthProgress?.progressPercent || 0}%` 
+              }
+            ]} 
+          />
         </View>
+        {!growthProgress?.isMaxStage && growthProgress?.hoursToNextStage && (
+          <Text style={styles.progressSubtext}>
+            {growthProgress.hoursToNextStage} more hour{growthProgress.hoursToNextStage !== 1 ? 's' : ''} needed
+          </Text>
+        )}
       </View>
 
       {/* Health Progress Bar */}
       <View style={styles.metricSection}>
         <View style={styles.metricHeader}>
-          <Icon name="heart" size={16} color="#4CAF50" />
+          <Icon 
+            name={isDead ? 'skull' : 'heart'} 
+            size={16} 
+            color={isDead ? '#666' : getHealthColor(healthScore)} 
+          />
           <Text style={styles.metricLabel}>Health</Text>
-          <Text style={styles.metricStatus}>100% - Excellent</Text>
+          <Text style={[styles.metricStatus, { color: isDead ? '#666' : getHealthColor(healthScore) }]}>
+            {healthScore}% - {getHealthStatusText()}
+          </Text>
         </View>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: '100%' }]} />
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: isDead ? '#666' : getHealthColor(healthScore),
+                width: `${healthScore}%` 
+              }
+            ]} 
+          />
         </View>
+        {healthStatus && !isDead && healthStatus.canWater && (
+          <Text style={styles.needsWaterText}>
+            💧 Needs watering
+          </Text>
+        )}
+        {healthStatus && !isDead && healthStatus.status === 'critical' && (
+          <Text style={styles.criticalText}>
+            ⚠️ Critical - {healthStatus.daysUntilDeath.toFixed(1)} days left!
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -128,22 +165,26 @@ const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress, currentSessionHours 
 
 const TreesScreen = () => {
   const { user } = useAuth();
-  const { currentSession } = useWiFi();
+  const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
+  const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
+  const { panGesture } = useSwipeNavigation({ currentScreen: 'trees' });
   const [trees, setTrees] = useState<Tree[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const calculateSessionDuration = (session: WiFiSession | null): number => {
-    if (!session || !session.startTime) return 0;
-    const start = new Date(session.startTime);
-    const now = new Date();
-    const durationInMinutes = (now.getTime() - start.getTime()) / (1000 * 60);
-    return durationInMinutes / 60; // Convert to hours
-  };
-
   useEffect(() => {
     loadTrees();
+  }, []);
+
+  // Real-time updates every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('TreesScreen - Real-time refresh...');
+      loadTrees();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   // Listen for tree redemption events
@@ -164,18 +205,8 @@ const TreesScreen = () => {
     try {
       setLoading(true);
       const userTrees = await treeService.getTrees();
-      // Transform the base trees into our UI-specific tree format
-      const transformedTrees: Tree[] = userTrees.map(tree => ({
-        ...tree,
-        name: tree.name, // Preserve the tree name
-        currentStage: 1, // Default to stage 1
-        wifiHoursAccumulated: 0, // Default to 0 hours
-        species: {
-          name: tree.species || 'Unknown Tree',
-          hoursToNextStage: 24, // Default to 24 hours
-        }
-      }));
-      setTrees(transformedTrees);
+      console.log('TreesScreen - Loaded trees:', userTrees);
+      setTrees(userTrees);
     } catch (error) {
       console.error('Error loading trees:', error);
       Alert.alert('Error', 'Failed to load your trees. Please try again.');
@@ -190,15 +221,21 @@ const TreesScreen = () => {
     setRefreshing(false);
   };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
+  // Calculate summary statistics
+  const totalWifiHours = trees.reduce((acc, tree) => acc + (tree.totalWifiTime / 3600), 0);
+  const aliveTrees = trees.filter(tree => !tree.isDead);
+  const deadTrees = trees.filter(tree => tree.isDead);
 
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={[styles.headerSection, { paddingTop: insets.top }]}
-      >
+  return (
+    <GestureDetector gesture={panGesture}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
+
+        {/* Fixed Header Section */}
+        <Animated.View 
+          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          onTouchStart={handleTouchStart}
+        >
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <Text style={styles.titleText}>Your Forest</Text>
@@ -210,8 +247,7 @@ const TreesScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
+        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
       >
         <ScrollView
           style={styles.scrollContainer}
@@ -223,6 +259,11 @@ const TreesScreen = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={handleTouchStart}
+          scrollEventThrottle={16}
         >
           <View style={styles.content}>
             {/* Tree Summary Card */}
@@ -234,14 +275,14 @@ const TreesScreen = () => {
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Icon name="tree" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{trees.length}</Text>
-                  <Text style={styles.statLabel}>Trees Planted</Text>
+                  <Text style={styles.statValue}>{aliveTrees.length}</Text>
+                  <Text style={styles.statLabel}>Living Trees</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Icon name="clock-outline" size={24} color="#50AF27" />
                   <Text style={styles.statValue}>
-                    {trees.reduce((acc, tree) => acc + tree.wifiHoursAccumulated, 0)}
+                    {Math.floor(totalWifiHours)}h
                   </Text>
                   <Text style={styles.statLabel}>WiFi Hours</Text>
                 </View>
@@ -249,11 +290,19 @@ const TreesScreen = () => {
                 <View style={styles.statItem}>
                   <Icon name="cloud-outline" size={24} color="#50AF27" />
                   <Text style={styles.statValue}>
-                    {trees.length * 48}
+                    {(aliveTrees.length * 48).toFixed(0)}
                   </Text>
                   <Text style={styles.statLabel}>kg CO₂/year</Text>
                 </View>
               </View>
+              {deadTrees.length > 0 && (
+                <View style={styles.deadTreesWarning}>
+                  <Icon name="skull" size={16} color="#f44336" />
+                  <Text style={styles.deadTreesText}>
+                    {deadTrees.length} tree{deadTrees.length !== 1 ? 's' : ''} died from lack of care
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Tree List */}
@@ -265,7 +314,6 @@ const TreesScreen = () => {
                   key={tree._id}
                   tree={tree}
                   onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
-                  currentSessionHours={calculateSessionDuration(currentSession)}
                 />
               ))
             ) : (
@@ -280,15 +328,16 @@ const TreesScreen = () => {
         </ScrollView>
       </Animated.View>
 
-      {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        <Image
-          source={require('../../assets/mascots/Unitree - Mascot-4.png')}
-          style={styles.mascotImage}
-          resizeMode="contain"
-        />
+        {/* Mascot */}
+        <View style={styles.mascotContainer}>
+          <Image
+            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+            style={styles.mascotImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
-    </View>
+    </GestureDetector>
   );
 };
 
@@ -433,10 +482,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: rs(12),
   },
-  treeImage: {
+  treeImageContainer: {
     width: rs(48),
     height: rs(48),
-    marginRight: rs(12),
+    borderRadius: rs(8),
+    overflow: 'hidden',
+  },
+  treeImage: {
+    width: '100%',
+    height: '100%',
   },
   treeInfo: {
     flex: 1,
@@ -486,6 +540,55 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: rs(4),
+  },
+  deadTreeCard: {
+    backgroundColor: '#f44336',
+  },
+  deadTreeImageContainer: {
+    borderWidth: 2,
+    borderColor: '#666',
+  },
+  deadTreeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  deadOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressSubtext: {
+    fontSize: rf(12),
+    color: '#666',
+    textAlign: 'center',
+    marginTop: rs(4),
+  },
+  needsWaterText: {
+    fontSize: rf(12),
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginTop: rs(4),
+  },
+  criticalText: {
+    fontSize: rf(12),
+    color: '#f44336',
+    textAlign: 'center',
+    marginTop: rs(4),
+  },
+  deadTreesWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: rs(12),
+  },
+  deadTreesText: {
+    fontSize: rf(14),
+    color: '#f44336',
+    marginLeft: rs(8),
   },
 });
 

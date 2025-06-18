@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,17 +10,22 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeInDown,
   FadeInUp,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { wifiService } from '../../services/wifiService';
 import { treeService } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
+import { pointsService } from '../../services/pointsService';
 import { useAuth } from '../../context/AuthContext';
+import { useTabBarContext } from '../../context/TabBarContext';
+import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { Formatters } from '../../utils/formatters';
 import { 
   wp, 
@@ -60,6 +65,9 @@ interface WifiStatus {
 const HomeScreen = () => {
   const { user, updateUser } = useAuth();
   const navigation = useNavigation<NavigationProp>();
+  const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
+  const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
+  const { panGesture } = useSwipeNavigation({ currentScreen: 'index' });
   const [wifiStatus, setWifiStatus] = useState<WifiStatus>({
     isConnected: false,
     sessionInfo: null
@@ -130,6 +138,22 @@ const HomeScreen = () => {
       setCurrentPoints(user.points);
     }
   }, [user?.points]);
+
+  // Sync with pointsService when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        const currentPointsFromService = pointsService.getPoints();
+        console.log('HomeScreen focus - Points from service:', currentPointsFromService);
+        console.log('HomeScreen focus - Current local points:', currentPoints);
+        
+        if (currentPointsFromService !== currentPoints) {
+          setCurrentPoints(currentPointsFromService);
+          console.log('HomeScreen focus - Updated points to:', currentPointsFromService);
+        }
+      }
+    }, [currentPoints, user])
+  );
 
   // Listen for real-time points updates
   useEffect(() => {
@@ -221,9 +245,15 @@ const HomeScreen = () => {
           sessionInfo: currentSession
         });
       }
+      
+      // Refresh points from service
+      await pointsService.refreshPoints();
+      const updatedPoints = pointsService.getPoints();
+      setCurrentPoints(updatedPoints);
+      console.log('HomeScreen refresh - Updated points to:', updatedPoints);
+      
       // Fetch actual tree count
       await fetchActualTreeCount();
-      // Points will be updated via the existing listeners
     } catch (error) {
       console.error('Error refreshing home data:', error);
     } finally {
@@ -232,30 +262,30 @@ const HomeScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
+    <GestureDetector gesture={panGesture}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
 
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={[styles.headerSection, { paddingTop: insets.top }]}
-      >
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>
-            Welcome back, {getLastName(user?.fullname)}!
-          </Text>
-          <Text style={styles.subtitleText}>
-            Track your WiFi sessions and plant more trees
-          </Text>
-        </View>
-      </Animated.View>
+        {/* Fixed Header Section */}
+        <Animated.View 
+          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          onTouchStart={handleTouchStart}
+        >
+          {/* Welcome Section */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.titleText}>
+              Welcome back, {getLastName(user?.fullname)}!
+            </Text>
+            <Text style={styles.subtitleText}>
+              Track your WiFi sessions and plant more trees
+            </Text>
+          </View>
+        </Animated.View>
 
-      {/* Scrollable Content Section */}
-      <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
-      >
+        {/* Scrollable Content Section */}
+        <Animated.View 
+          style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+        >
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
@@ -266,6 +296,11 @@ const HomeScreen = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={handleTouchStart}
+          scrollEventThrottle={16}
         >
           <View style={styles.content}>
             {/* Points Card */}
@@ -281,7 +316,7 @@ const HomeScreen = () => {
                   <Icon name="chevron-right" size={20} color="#666" />
                 </View>
               </View>
-              <Text style={styles.pointsValue}>{user?.points || 0}</Text>
+              <Text style={styles.pointsValue}>{currentPoints}</Text>
               <Text style={styles.pointsSubtext}>
                 Use your points to plant new trees!
               </Text>
@@ -356,15 +391,16 @@ const HomeScreen = () => {
         </ScrollView>
       </Animated.View>
 
-      {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        <Image
-          source={require('../../assets/mascots/Unitree - Mascot-4.png')}
-          style={styles.mascotImage}
-          resizeMode="contain"
-        />
+        {/* Mascot */}
+        <View style={styles.mascotContainer}>
+          <Image
+            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+            style={styles.mascotImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
-    </View>
+    </GestureDetector>
   );
 };
 
