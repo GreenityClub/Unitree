@@ -116,7 +116,13 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
           styles.userPoints,
           isCurrentUser && styles.currentUserPoints
         ]}>
-          {user.points || 0} Points
+          {user.allTimePoints || 0} Total Points
+        </Text>
+        <Text style={[
+          styles.userSubPoints,
+          isCurrentUser && styles.currentUserSubPoints
+        ]}>
+          {user.points || 0} Available • {user.totalWifiTimeFormatted || '0m'} Connected
         </Text>
       </View>
     </TouchableOpacity>
@@ -413,6 +419,13 @@ const styles = StyleSheet.create({
   },
   currentUserPoints: {
     color: '#E8F5E8',
+  },
+  userSubPoints: {
+    fontSize: rf(12),
+    color: '#999',
+  },
+  currentUserSubPoints: {
+    color: '#999',
   },
   levelContainer: {
     alignItems: 'center',

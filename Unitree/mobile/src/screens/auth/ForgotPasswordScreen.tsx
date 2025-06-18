@@ -79,7 +79,7 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
-    const emailValidation = Validator.validateUniversityEmail(email);
+    const emailValidation = Validator.validateEmail(email);
     if (!emailValidation.isValid) {
       setEmailError(emailValidation.error || 'Invalid email format');
       return;

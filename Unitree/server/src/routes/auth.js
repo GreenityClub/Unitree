@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
+const Student = require('../models/Student');
 const logger = require('../utils/logger');
 const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
@@ -208,6 +209,18 @@ router.post('/send-verification-code', async (req, res) => {
       });
     }
 
+    // Check if email exists in students collection
+    const studentRecord = await Student.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    });
+    if (!studentRecord) {
+      return res.status(404).json({
+        message: 'Email not found in student records. Please contact your institution.'
+      });
+    }
+
     // Generate 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
@@ -285,18 +298,37 @@ router.post('/verify-email-code', async (req, res) => {
     // Code is valid, clean up
     delete global.verificationCodes[email];
 
-    // For demo purposes, return some student data
-    const studentData = {
-      email,
-      name: email.split('@')[0], // Extract name from email
-      university: 'Greenwich Vietnam',
-      studentId: 'GW' + Math.floor(Math.random() * 100000)
-    };
+    // Look up student data in the students collection
+    try {
+      const studentData = await Student.findOne({ 
+        email: { 
+          $regex: new RegExp('^' + email + '$', 'i') 
+        }
+      });
 
-    res.json({
-      message: 'Email verified successfully',
-      studentData
-    });
+      if (!studentData) {
+        // If no student record found, return error
+        return res.status(404).json({
+          message: 'No student record found for this email address. Please contact your institution.'
+        });
+      }
+
+      logger.info(`Student data found for ${email}: ${studentData.full_name} (${studentData.student_id})`);
+
+      res.json({
+        message: 'Email verified successfully',
+        studentData: {
+          email: studentData.email,
+          full_name: studentData.full_name,
+          student_id: studentData.student_id
+        }
+      });
+    } catch (dbError) {
+      console.error('Database lookup error:', dbError);
+      return res.status(500).json({
+        message: 'Error looking up student record'
+      });
+    }
   } catch (error) {
     console.error('Verify email code error:', error);
     res.status(500).json({

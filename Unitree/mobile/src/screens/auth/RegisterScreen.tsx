@@ -48,11 +48,8 @@ export default function RegisterScreen() {
   // Step 3 - Complete registration
   const [studentData, setStudentData] = useState<any>(null);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
     password: '',
     confirmPassword: '',
-    studentId: '',
     university: '',
   });
   const [loading, setLoading] = useState(false);
@@ -90,7 +87,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    const emailValidation = Validator.validateUniversityEmail(email);
+    const emailValidation = Validator.validateEmail(email);
     if (!emailValidation.isValid) {
       setEmailError(emailValidation.error || 'Invalid email format');
       return;
@@ -199,7 +196,7 @@ export default function RegisterScreen() {
   // Step 3: Complete registration
   const handleRegister = async () => {
     // Validate form
-    if (!formData.firstName || !formData.lastName || !formData.password || !formData.confirmPassword || !formData.university) {
+    if (!studentData?.full_name || !studentData?.student_id || !formData.password || !formData.confirmPassword || !formData.university) {
       setError('Please fill in all required fields');
       return;
     }
@@ -220,10 +217,10 @@ export default function RegisterScreen() {
       setError('');
       
       const registerData = {
-        name: `${formData.firstName} ${formData.lastName}`, // Combine first and last name
-        email: studentData?.email || email,
+        name: studentData.full_name, // Use full name from student data
+        email: studentData.email || email,
         password: formData.password,
-        studentId: formData.studentId || undefined,
+        studentId: studentData.student_id, // Use student ID from student data
         university: formData.university,
       };
       
@@ -259,11 +256,8 @@ export default function RegisterScreen() {
     setVerificationCode('');
     setStudentData(null);
     setFormData({
-      firstName: '',
-      lastName: '',
       password: '',
       confirmPassword: '',
-      studentId: '',
       university: '',
     });
     setEmailError('');
@@ -276,11 +270,8 @@ export default function RegisterScreen() {
     setCurrentStep(2);
     setStudentData(null);
     setFormData({
-      firstName: '',
-      lastName: '',
       password: '',
       confirmPassword: '',
-      studentId: '',
       university: '',
     });
     setError('');
@@ -350,7 +341,7 @@ export default function RegisterScreen() {
             <Text style={styles.titleText}>Join UniTree!</Text>
             <Text style={styles.subtitleText}>
               {currentStep === 1 
-                ? "Enter your university email to get started"
+                ? "Enter your email address to get started"
                 : currentStep === 2
                 ? "Enter the verification code sent to your email"
                 : "Complete your registration"
@@ -373,13 +364,13 @@ export default function RegisterScreen() {
 
                   {/* Email Input */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>University Email</Text>
+                    <Text style={styles.inputLabel}>Email Address</Text>
                     <View style={styles.inputWrapper}>
                       <Icon name="email-outline" size={20} color="#666" style={styles.inputIcon} />
                       <TextInput
                         value={email}
                         onChangeText={setEmail}
-                        placeholder="you@university.edu.vn"
+                        placeholder="your.email@example.com"
                         autoCapitalize="none"
                         keyboardType="email-address"
                         style={styles.textInput}
@@ -492,84 +483,28 @@ export default function RegisterScreen() {
                       </View>
 
                       {/* Full Name (Read-only) */}
-                      {studentData?.fullname && (
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>Full Name</Text>
-                          <View style={[styles.inputWrapper, styles.readOnlyWrapper]}>
-                            <Icon name="account-outline" size={20} color="#999" style={styles.inputIcon} />
-                            <Text style={styles.readOnlyText}>{studentData?.fullname}</Text>
-                          </View>
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>Full Name</Text>
+                        <View style={[styles.inputWrapper, styles.readOnlyWrapper]}>
+                          <Icon name="account-outline" size={20} color="#999" style={styles.inputIcon} />
+                          <Text style={styles.readOnlyText}>{studentData.full_name}</Text>
                         </View>
-                      )}
+                      </View>
 
                       {/* Student ID (Read-only) */}
-                      {studentData?.studentId && (
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>Student ID</Text>
-                          <View style={[styles.inputWrapper, styles.readOnlyWrapper]}>
-                            <Icon name="card-account-details-outline" size={20} color="#999" style={styles.inputIcon} />
-                            <Text style={styles.readOnlyText}>{studentData?.studentId}</Text>
-                          </View>
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>Student ID</Text>
+                        <View style={[styles.inputWrapper, styles.readOnlyWrapper]}>
+                          <Icon name="card-account-details-outline" size={20} color="#999" style={styles.inputIcon} />
+                          <Text style={styles.readOnlyText}>{studentData.student_id}</Text>
                         </View>
-                      )}
+                      </View>
                     </View>
                   )}
 
                   {/* Registration Form Section */}
                   <View style={styles.additionalInfoSection}>
                     <Text style={styles.sectionTitle}>Registration Information</Text>
-
-                    {/* Name Row */}
-                    <View style={styles.nameRow}>
-                      <View style={[styles.inputContainer, styles.halfInput]}>
-                        <Text style={styles.inputLabel}>First Name *</Text>
-                        <View style={styles.inputWrapper}>
-                          <Icon name="account-outline" size={20} color="#666" style={styles.inputIcon} />
-                          <TextInput
-                            value={formData.firstName}
-                            onChangeText={(value) => updateFormData('firstName', value)}
-                            placeholder="John"
-                            style={styles.textInput}
-                            underlineColor="transparent"
-                            activeUnderlineColor="transparent"
-                            contentStyle={styles.inputContent}
-                          />
-                        </View>
-                      </View>
-
-                      <View style={[styles.inputContainer, styles.halfInput]}>
-                        <Text style={styles.inputLabel}>Last Name *</Text>
-                        <View style={styles.inputWrapper}>
-                          <Icon name="account-outline" size={20} color="#666" style={styles.inputIcon} />
-                          <TextInput
-                            value={formData.lastName}
-                            onChangeText={(value) => updateFormData('lastName', value)}
-                            placeholder="Doe"
-                            style={styles.textInput}
-                            underlineColor="transparent"
-                            activeUnderlineColor="transparent"
-                            contentStyle={styles.inputContent}
-                          />
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Student ID Input (Optional) */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Student ID (Optional)</Text>
-                      <View style={styles.inputWrapper}>
-                        <Icon name="card-account-details-outline" size={20} color="#666" style={styles.inputIcon} />
-                        <TextInput
-                          value={formData.studentId}
-                          onChangeText={(value) => updateFormData('studentId', value)}
-                          placeholder="123456"
-                          style={styles.textInput}
-                          underlineColor="transparent"
-                          activeUnderlineColor="transparent"
-                          contentStyle={styles.inputContent}
-                        />
-                      </View>
-                    </View>
 
                     {/* University Dropdown */}
                     <View style={styles.inputContainer}>

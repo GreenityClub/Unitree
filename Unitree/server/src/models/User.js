@@ -72,6 +72,43 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  
+  // WiFi tracking fields - matching database schema
+  dayTimeConnected: {
+    type: Number,
+    default: 0,
+    comment: 'Time connected today in seconds'
+  },
+  weekTimeConnected: {
+    type: Number,
+    default: 0,
+    comment: 'Time connected this week in seconds'
+  },
+  monthTimeConnected: {
+    type: Number,
+    default: 0,
+    comment: 'Time connected this month in seconds'
+  },
+  totalTimeConnected: {
+    type: Number,
+    default: 0,
+    comment: 'Total time connected to university WiFi in seconds - used for leaderboard calculation'
+  },
+  lastDayReset: {
+    type: Date,
+    default: null,
+    comment: 'Last time day stats were reset'
+  },
+  lastWeekReset: {
+    type: Date,
+    default: null,
+    comment: 'Last time week stats were reset'
+  },
+  lastMonthReset: {
+    type: Date,
+    default: null,
+    comment: 'Last time month stats were reset'
+  },
 }, {
   timestamps: true
 });

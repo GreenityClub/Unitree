@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "UniTree",
-    "slug": "unitree-mobile",
+    "slug": "unitree",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -17,7 +17,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.unitree.mobile"
+      "bundleIdentifier": "com.unitree.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs location access to detect WiFi network details for tracking university WiFi usage."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -66,7 +69,7 @@
     "extra": {
       "apiUrl": "http://192.168.1.6:3000",
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "b53a2dd3-f93c-4eb5-aa1e-3620e8834198"
       }
     }
   }

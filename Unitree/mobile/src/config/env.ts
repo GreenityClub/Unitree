@@ -18,7 +18,7 @@ const ENV = {
   UNIVERSITY_BSSID_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_BSSID_PREFIX || 'c2:74:ad:1d',
 
   // Points Configuration
-  POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '100', 10),
+  POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '60', 10), // 1 minute = 1 point (60 points per hour)
   POINTS_FOR_TREE: parseInt(process.env.EXPO_PUBLIC_POINTS_FOR_TREE || '100', 10),
 
   // WiFi Session Configuration

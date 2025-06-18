@@ -86,7 +86,7 @@ export default function LoginScreen() {
       return false;
     }
 
-    const emailValidation = Validator.validateUniversityEmail(email);
+    const emailValidation = Validator.validateEmail(email);
     if (!emailValidation.isValid) {
       setError(emailValidation.error || 'Invalid email format');
       return false;

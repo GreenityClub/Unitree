@@ -17,6 +17,48 @@ const isValidUniversitySSID = (ssid) => {
   return allowedSSIDs.includes(ssid);
 };
 
+// Helper function to check and reset time periods if needed
+const checkAndResetTimePeriods = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) return;
+
+  const now = new Date();
+  let updateFields = {};
+
+  // Check day reset (reset at midnight)
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  
+  if (!user.lastDayReset || user.lastDayReset < todayStart) {
+    updateFields.dayTimeConnected = 0;
+    updateFields.lastDayReset = now;
+  }
+
+  // Check week reset (reset on Sunday)
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  
+  if (!user.lastWeekReset || user.lastWeekReset < weekStart) {
+    updateFields.weekTimeConnected = 0;
+    updateFields.lastWeekReset = now;
+  }
+
+  // Check month reset (reset on 1st of month)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  if (!user.lastMonthReset || user.lastMonthReset < monthStart) {
+    updateFields.monthTimeConnected = 0;
+    updateFields.lastMonthReset = now;
+  }
+
+  // Apply resets if needed
+  if (Object.keys(updateFields).length > 0) {
+    await User.findByIdAndUpdate(userId, updateFields);
+    logger.info(`Reset time periods for user ${userId}:`, updateFields);
+  }
+};
+
 // Start WiFi session
 router.post('/start', auth, async (req, res) => {
   try {
@@ -30,6 +72,9 @@ router.post('/start', auth, async (req, res) => {
     if (!isValidUniversityBSSID(bssid)) {
       return res.status(400).json({ message: 'Invalid university WiFi BSSID' });
     }
+
+    // Check and reset time periods if needed
+    await checkAndResetTimePeriods(req.user._id);
 
     // Check for active session
     let activeSession = await WifiSession.findOne({
@@ -75,6 +120,9 @@ router.post('/end', auth, async (req, res) => {
       return res.status(404).json({ message: 'No active session found' });
     }
 
+    // Check and reset time periods if needed
+    await checkAndResetTimePeriods(req.user._id);
+
     // Calculate duration and points
     const endTime = new Date();
     session.endTime = endTime;
@@ -83,22 +131,42 @@ router.post('/end', auth, async (req, res) => {
     const durationSeconds = Math.floor((endTime - session.startTime) / 1000);
     session.duration = durationSeconds;
     
-    // Calculate points: 1 hour = 100 points
+    // Calculate points: 1 minute = 1 point
     const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10); // 5 minutes
-    const pointsPerHour = parseInt(process.env.POINTS_PER_HOUR || '100', 10);
     
     if (durationSeconds >= minSessionDuration) {
-      const pointsEarned = Math.floor((durationSeconds / 3600) * pointsPerHour);
+      const pointsEarned = Math.floor(durationSeconds / 60); // 1 minute = 1 point
       
-      // Update user points
+      // Update user points and all time tracking fields
       await User.findByIdAndUpdate(
         req.user._id,
-        { $inc: { points: pointsEarned } }
+        { 
+          $inc: { 
+            points: pointsEarned,
+            dayTimeConnected: durationSeconds,
+            weekTimeConnected: durationSeconds,
+            monthTimeConnected: durationSeconds,
+            totalTimeConnected: durationSeconds
+          }
+        }
       );
       
       session.pointsEarned = pointsEarned;
       
       logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned}`);
+    } else {
+      // Even if no points earned, still track the time
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { 
+          $inc: { 
+            dayTimeConnected: durationSeconds,
+            weekTimeConnected: durationSeconds,
+            monthTimeConnected: durationSeconds,
+            totalTimeConnected: durationSeconds
+          }
+        }
+      );
     }
 
     await session.save();
@@ -128,8 +196,7 @@ router.post('/update', auth, async (req, res) => {
     // Calculate current duration and potential points
     const currentTime = new Date();
     const durationSeconds = Math.floor((currentTime - session.startTime) / 1000);
-    const pointsPerHour = parseInt(process.env.POINTS_PER_HOUR || '100', 10);
-    const potentialPoints = Math.floor((durationSeconds / 3600) * pointsPerHour);
+    const potentialPoints = Math.floor(durationSeconds / 60); // 1 minute = 1 point
 
     res.json({
       ...session.toObject(),
@@ -180,58 +247,67 @@ router.get('/history', auth, async (req, res) => {
   }
 });
 
-// Get time period statistics
+// Get WiFi stats
 router.get('/stats', auth, async (req, res) => {
   try {
-    const [todayStats, weekStats, monthStats, totalStats] = await Promise.all([
-      WifiSession.getTodaysStats(req.user._id),
-      WifiSession.getWeekStats(req.user._id),
-      WifiSession.getMonthStats(req.user._id),
-      WifiSession.getTotalStats(req.user._id)
-    ]);
+    // Check and reset time periods if needed
+    await checkAndResetTimePeriods(req.user._id);
+    
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-    // Include active session in today's stats if exists
+    // Get current active session
     const activeSession = await WifiSession.findOne({
       user: req.user._id,
       isActive: true,
       endTime: null,
     });
 
-    let activeSessionDuration = 0;
-    let activeSessionPoints = 0;
-    
+    // Add current session duration to day stats if session is active
+    let currentSessionDuration = 0;
     if (activeSession) {
-      activeSessionDuration = activeSession.currentDuration;
-      const pointsPerHour = parseInt(process.env.POINTS_PER_HOUR || '100', 10);
-      activeSessionPoints = Math.floor((activeSessionDuration / 3600) * pointsPerHour);
+      currentSessionDuration = Math.floor((new Date() - activeSession.startTime) / 1000);
     }
 
     const stats = {
-      today: {
-        duration: (todayStats[0]?.totalDuration || 0) + activeSessionDuration,
-        points: (todayStats[0]?.totalPoints || 0) + activeSessionPoints,
-        sessions: (todayStats[0]?.sessionCount || 0) + (activeSession ? 1 : 0)
+      periods: {
+        today: {
+          duration: (user.dayTimeConnected || 0) + currentSessionDuration,
+          points: Math.floor(((user.dayTimeConnected || 0) + currentSessionDuration) / 60)
+        },
+        thisWeek: {
+          duration: (user.weekTimeConnected || 0) + currentSessionDuration,
+          points: Math.floor(((user.weekTimeConnected || 0) + currentSessionDuration) / 60)
+        },
+        thisMonth: {
+          duration: (user.monthTimeConnected || 0) + currentSessionDuration,
+          points: Math.floor(((user.monthTimeConnected || 0) + currentSessionDuration) / 60)
+        },
+        allTime: {
+          duration: (user.totalTimeConnected || 0) + currentSessionDuration,
+          points: Math.floor(((user.totalTimeConnected || 0) + currentSessionDuration) / 60)
+        }
       },
-      week: {
-        duration: (weekStats[0]?.totalDuration || 0) + activeSessionDuration,
-        points: (weekStats[0]?.totalPoints || 0) + activeSessionPoints,
-        sessions: (weekStats[0]?.sessionCount || 0) + (activeSession ? 1 : 0)
-      },
-      month: {
-        duration: (monthStats[0]?.totalDuration || 0) + activeSessionDuration,
-        points: (monthStats[0]?.totalPoints || 0) + activeSessionPoints,
-        sessions: (monthStats[0]?.sessionCount || 0) + (activeSession ? 1 : 0)
-      },
-      total: {
-        duration: (totalStats[0]?.totalDuration || 0) + activeSessionDuration,
-        points: (totalStats[0]?.totalPoints || 0) + activeSessionPoints,
-        sessions: (totalStats[0]?.sessionCount || 0) + (activeSession ? 1 : 0)
+      currentSession: activeSession ? {
+        duration: currentSessionDuration,
+        points: Math.floor(currentSessionDuration / 60),
+        isActive: true,
+        startTime: activeSession.startTime,
+        ssid: activeSession.ssid,
+        bssid: activeSession.bssid
+      } : null,
+      lastResets: {
+        day: user.lastDayReset,
+        week: user.lastWeekReset,
+        month: user.lastMonthReset
       }
     };
 
     res.json(stats);
   } catch (error) {
-    logger.error('Get stats error:', error);
+    logger.error('Get WiFi stats error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

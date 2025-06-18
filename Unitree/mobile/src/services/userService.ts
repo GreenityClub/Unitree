@@ -15,7 +15,10 @@ export interface LeaderboardUser {
   id: string;
   name: string;
   nickname?: string;
-  points: number;
+  points: number; // Current redeemable points
+  allTimePoints?: number; // Total points earned from WiFi time
+  totalWifiTimeSeconds?: number; // Total WiFi connection time in seconds
+  totalWifiTimeFormatted?: string; // Human-readable WiFi time format
   avatar?: string;
   email: string;
   university?: string;

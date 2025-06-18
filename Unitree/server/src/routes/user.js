@@ -260,63 +260,42 @@ router.delete('/avatar', auth, async (req, res) => {
   }
 });
 
-// Get leaderboard - top users by points
+// Get leaderboard
 router.get('/leaderboard', auth, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 50;
-    const currentUserId = req.user._id;
+    const users = await User.find({})
+      .sort({ totalTimeConnected: -1 }) // Sort by total WiFi time
+      .limit(100)
+      .select('name email avatar totalTimeConnected');
 
-    // Get top users sorted by points (descending)
-    const topUsers = await User.find({ role: 'student' })
-      .select('name nickname points avatar email university treesPlanted')
-      .sort({ points: -1 })
-      .limit(limit);
-
-    // Calculate current user's rank if not in top list
-    let userRank = null;
-    const currentUserInTop = topUsers.find(user => user._id.toString() === currentUserId.toString());
-    
-    if (!currentUserInTop) {
-      // Count users with more points than current user to determine rank
-      const currentUser = await User.findById(currentUserId).select('points');
-      if (currentUser) {
-        const usersAboveCount = await User.countDocuments({ 
-          role: 'student',
-          points: { $gt: currentUser.points }
-        });
-        userRank = usersAboveCount + 1;
-      }
-    } else {
-      // Find rank in the top list
-      userRank = topUsers.findIndex(user => user._id.toString() === currentUserId.toString()) + 1;
-    }
-
-    // Get total number of users for additional context
-    const totalUsers = await User.countDocuments({ role: 'student' });
-
-    // Format leaderboard data
-    const leaderboard = topUsers.map((user, index) => ({
-      id: user._id,
+    const leaderboard = users.map((user, index) => ({
+      rank: index + 1,
+      _id: user._id,
       name: user.name,
-      nickname: user.nickname || user.name,
-      points: user.points,
-      avatar: user.avatar,
       email: user.email,
-      university: user.university,
-      treesPlanted: user.treesPlanted,
-      rank: index + 1
+      avatar: user.avatar,
+      allTimePoints: Math.floor((user.totalTimeConnected || 0) / 60) // Convert seconds to points (1 minute = 1 point)
     }));
 
-    res.json({
-      leaderboard,
-      userRank,
-      totalUsers,
-      currentUserId: currentUserId.toString()
-    });
+    res.json(leaderboard);
   } catch (error) {
-    logger.error('Get leaderboard error:', error);
+    logger.error('Leaderboard error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Helper function to format WiFi time
+function formatWifiTime(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m`;
+  } else {
+    return `${seconds}s`;
+  }
+}
 
 module.exports = router; 

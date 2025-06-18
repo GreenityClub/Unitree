@@ -21,26 +21,37 @@ export interface StartSessionData {
   bssid: string;
 }
 
-export interface WiFiStats {
-  today: {
-    duration: number;
-    points: number;
-    sessions: number;
+export interface WifiStats {
+  periods: {
+    today: {
+      duration: number;
+      points: number;
+    };
+    thisWeek: {
+      duration: number;
+      points: number;
+    };
+    thisMonth: {
+      duration: number;
+      points: number;
+    };
+    allTime: {
+      duration: number;
+      points: number;
+    };
   };
-  week: {
+  currentSession: {
     duration: number;
     points: number;
-    sessions: number;
-  };
-  month: {
-    duration: number;
-    points: number;
-    sessions: number;
-  };
-  total: {
-    duration: number;
-    points: number;
-    sessions: number;
+    isActive: boolean;
+    startTime: string;
+    ssid: string;
+    bssid: string;
+  } | null;
+  lastResets: {
+    day: string | null;
+    week: string | null;
+    month: string | null;
   };
 }
 
@@ -74,14 +85,11 @@ class WiFiService {
 
   async getActiveSession(): Promise<WiFiSession | null> {
     try {
-      const response = await api.get('/api/wifi/active');
-      return response.data;
-    } catch (error: any) {
-      // Return null if no active session, don't throw error
-      if (error.response?.status === 404) {
-        return null;
-      }
-      throw new Error(error.response?.data?.message || 'Failed to get active session');
+      const stats = await this.getStats();
+      return stats.currentSession;
+    } catch (error) {
+      console.error('Failed to get active session:', error);
+      return null;
     }
   }
 
@@ -94,7 +102,7 @@ class WiFiService {
     }
   }
 
-  async getStats(): Promise<WiFiStats> {
+  async getStats(): Promise<WifiStats> {
     try {
       const response = await api.get('/api/wifi/stats');
       return response.data;
@@ -105,19 +113,20 @@ class WiFiService {
 
   // Utility methods for WiFi management
   isUniversityWiFi(ssid: string): boolean {
+    if (!ssid || typeof ssid !== 'string') return false;
     return ENV.UNIVERSITY_SSIDS.some(universitySSID => 
       ssid.toLowerCase().includes(universitySSID.toLowerCase())
     );
   }
 
   isValidUniversityBSSID(bssid: string): boolean {
-    if (!bssid) return false;
+    if (!bssid || typeof bssid !== 'string') return false;
     return bssid.toLowerCase().startsWith(ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase());
   }
 
   extractBSSIDPrefix(bssid: string): string {
     // Extract first 8 characters (first 4 octets) of BSSID
-    if (!bssid || bssid.length < 8) return '';
+    if (!bssid || typeof bssid !== 'string' || bssid.length < 8) return '';
     return bssid.slice(0, 8).toLowerCase();
   }
 
@@ -149,21 +158,21 @@ class WiFiService {
   }
 
   calculatePointsEarned(durationInSeconds: number): number {
-    const hours = durationInSeconds / 3600;
-    return Math.floor(hours * ENV.POINTS_PER_HOUR);
+    const minutes = Math.floor(durationInSeconds / 60);
+    return minutes; // 1 minute = 1 point
   }
 
-  calculatePointsPerPeriod(stats: WiFiStats): {
+  calculatePointsPerPeriod(stats: WifiStats): {
     todayPoints: number;
     weekPoints: number;
     monthPoints: number;
     totalPoints: number;
   } {
     return {
-      todayPoints: stats.today.points,
-      weekPoints: stats.week.points,
-      monthPoints: stats.month.points,
-      totalPoints: stats.total.points,
+      todayPoints: stats.periods.today.points,
+      weekPoints: stats.periods.thisWeek.points,
+      monthPoints: stats.periods.thisMonth.points,
+      totalPoints: stats.periods.allTime.points,
     };
   }
 
@@ -189,6 +198,41 @@ class WiFiService {
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return Math.floor((nextMonth.getTime() - now.getTime()) / 1000);
   }
+
+  formatWifiTime(seconds: number): string {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+  }
+
+  getSessionDisplayText(stats: WifiStats): string {
+    if (!stats.currentSession || !stats.currentSession.isActive) {
+      return 'No active session';
+    }
+
+    const points = Math.floor(stats.currentSession.duration / 60);
+    return `Session Active - Earning 1 point per minute`;
+  }
 }
 
-export const wifiService = new WiFiService(); 
+export const wifiService = new WiFiService();
+
+export const getWifiStats = async (): Promise<WifiStats> => {
+  try {
+    const response = await apiRequest('/api/wifi/stats', {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to get WiFi stats:', error);
+    throw error;
+  }
+}; 
