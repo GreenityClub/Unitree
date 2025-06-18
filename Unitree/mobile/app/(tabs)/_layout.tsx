@@ -11,15 +11,19 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '../../src/context/AuthContext';
 import type { EdgeInsets } from 'react-native-safe-area-context';
-import type {
-  BottomTabNavigationEventMap,
-  BottomTabDescriptorMap,
-} from '@react-navigation/bottom-tabs/lib/typescript/src/types';
-import type {
+import type { 
   NavigationHelpers,
   ParamListBase,
-  TabNavigationState,
+  TabNavigationState
 } from '@react-navigation/native';
+import type { EventArg, EventMapBase } from '@react-navigation/native';
+
+type BottomTabNavigationEventMap = EventMapBase & {
+  tabPress: {
+    data: undefined;
+    canPreventDefault: true;
+  };
+};
 
 type RouteNames = 'wifi' | 'points' | 'index' | 'trees' | 'profile';
 
@@ -37,7 +41,7 @@ interface Route {
 
 interface CustomTabBarProps {
   state: TabNavigationState<ParamListBase>;
-  descriptors: BottomTabDescriptorMap;
+  descriptors: Record<string, any>;
   navigation: NavigationHelpers<ParamListBase, BottomTabNavigationEventMap>;
   insets: EdgeInsets;
 }
@@ -237,7 +241,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
               canPreventDefault: true,
             });
 
-            if (!isFocused && !event.defaultPrevented) {
+            if (!isFocused) {
               navigation.navigate(route.name);
             }
           };

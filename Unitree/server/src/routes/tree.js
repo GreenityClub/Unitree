@@ -2,17 +2,49 @@ const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const Tree = require('../models/Tree');
+const TreeType = require('../models/TreeType');
 const User = require('../models/User');
 const Point = require('../models/Point');
 const logger = require('../utils/logger');
 
-// Get all available tree types
+// Get all available tree types (legacy endpoint for backward compatibility)
 router.get('/types', auth, async (req, res) => {
   try {
-    const types = await Tree.distinct('type');
+    const types = await Tree.distinct('species');
     res.json(types);
   } catch (error) {
     logger.error('Get tree types error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all available tree species with full details
+router.get('/species', auth, async (req, res) => {
+  try {
+    // console.log('Fetching tree species...');
+    const treeTypes = await TreeType.getActiveTreeTypes();
+    // console.log('Found tree types:', treeTypes.length);
+    // console.log('Tree types data:', treeTypes);
+    const species = treeTypes.map(treeType => treeType.getDisplayInfo());
+    // console.log('Mapped species:', species);
+    res.json(species);
+  } catch (error) {
+    console.error('Get tree species error details:', error);
+    logger.error('Get tree species error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get tree species by ID
+router.get('/species/:id', auth, async (req, res) => {
+  try {
+    const treeType = await TreeType.findByTreeId(req.params.id);
+    if (!treeType) {
+      return res.status(404).json({ message: 'Tree species not found' });
+    }
+    res.json(treeType.getDisplayInfo());
+  } catch (error) {
+    logger.error('Get tree species by ID error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -53,7 +85,7 @@ router.post('/purchase', auth, async (req, res) => {
 // Get all trees for the current user
 router.get('/', auth, async (req, res) => {
   try {
-    const trees = await Tree.find({ userId: req.user.id });
+    const trees = await Tree.find({ userId: req.user._id });
     res.json(trees);
   } catch (error) {
     console.error('Error fetching trees:', error);
@@ -64,7 +96,7 @@ router.get('/', auth, async (req, res) => {
 // Get a specific tree
 router.get('/:id', auth, async (req, res) => {
   try {
-    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user.id });
+    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
     if (!tree) {
       return res.status(404).json({ message: 'Tree not found' });
     }
@@ -80,7 +112,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const tree = new Tree({
       ...req.body,
-      userId: req.user.id,
+      userId: req.user._id,
       plantedDate: new Date(),
       lastWatered: new Date(),
       healthScore: 100,
@@ -97,7 +129,7 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const tree = await Tree.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
+      { _id: req.params.id, userId: req.user._id },
       { $set: req.body },
       { new: true }
     );
@@ -114,7 +146,7 @@ router.put('/:id', auth, async (req, res) => {
 // Delete a tree
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const tree = await Tree.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    const tree = await Tree.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
     if (!tree) {
       return res.status(404).json({ message: 'Tree not found' });
     }
@@ -125,7 +157,7 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// Redeem a tree
+  // Redeem a tree
 router.post('/redeem', auth, async (req, res) => {
   try {
     const { speciesId } = req.body;
@@ -138,12 +170,19 @@ router.post('/redeem', auth, async (req, res) => {
       return res.status(400).json({ message: 'Species ID is required' });
     }
 
+    // Get and validate tree species
+    const treeType = await TreeType.findByTreeId(speciesId);
+    if (!treeType) {
+      return res.status(400).json({ message: 'Invalid tree species selected' });
+    }
+
     // Get user from auth middleware
     const user = req.user;
     console.log('Debug - User points:', user.points);
+    console.log('Debug - Tree cost:', treeType.cost);
 
-    // Check if user has enough points
-    const TREE_COST = 100;
+    // Check if user has enough points (use cost from tree species)
+    const TREE_COST = treeType.cost;
     if (user.points < TREE_COST) {
       return res.status(400).json({ 
         message: `Insufficient points. You need ${TREE_COST} points but have ${user.points}.` 
@@ -154,7 +193,7 @@ router.post('/redeem', auth, async (req, res) => {
     const tree = new Tree({
       userId: user._id,
       species: speciesId,
-      name: `${speciesId} Tree`,
+      name: treeType.name,
       plantedDate: new Date(),
       lastWatered: new Date(),
       healthScore: 100,
@@ -196,7 +235,9 @@ router.post('/redeem', auth, async (req, res) => {
       type: 'TREE_REDEMPTION',
       metadata: {
         treeId: tree._id,
-        species: speciesId
+        species: speciesId,
+        speciesName: treeType.name,
+        scientificName: treeType.scientificName
       }
     });
 

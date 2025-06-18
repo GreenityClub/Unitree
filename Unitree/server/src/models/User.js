@@ -22,6 +22,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a name']
   },
+  fullname: {
+    type: String,
+    required: false
+  },
+  nickname: {
+    type: String
+  },
   points: {
     type: Number,
     default: 0
@@ -43,6 +50,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['student', 'admin'],
     default: 'student'
+  },
+  avatar: {
+    type: String,
+    default: null
   },
   trees: [{
     type: mongoose.Schema.Types.ObjectId,

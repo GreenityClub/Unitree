@@ -15,6 +15,19 @@ export interface Tree {
   lastWatered: Date;
 }
 
+export interface TreeSpecies {
+  id: string;
+  name: string;
+  scientificName: string;
+  description: string;
+  careLevel: string;
+  maxHeight: string;
+  lifespan: string;
+  nativeTo: string;
+  cost: number;
+  stages: string[];
+}
+
 export interface RedeemTreeData {
   speciesId: string;
 }
@@ -53,6 +66,31 @@ class TreeService {
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to get tree types');
+    }
+  }
+
+  async getTreeSpecies(): Promise<TreeSpecies[]> {
+    try {
+      console.log('Mobile: Calling /api/trees/species endpoint...');
+      const response = await api.get('/api/trees/species');
+      console.log('Mobile: API response:', response);
+      console.log('Mobile: API response data:', response.data);
+      console.log('Mobile: Species count:', response.data?.length || 0);
+      return response.data;
+    } catch (error: any) {
+      console.error('Mobile: API call failed:', error);
+      console.error('Mobile: Error response:', error.response);
+      console.error('Mobile: Error message:', error.response?.data?.message);
+      throw new Error(error.response?.data?.message || 'Failed to get tree species');
+    }
+  }
+
+  async getTreeSpeciesById(id: string): Promise<TreeSpecies> {
+    try {
+      const response = await api.get(`/api/trees/species/${id}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get tree species');
     }
   }
 

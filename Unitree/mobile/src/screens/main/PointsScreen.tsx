@@ -10,6 +10,7 @@ import {
   StatusBar,
   RefreshControl,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -31,6 +32,7 @@ import { rf, rs } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { wifiService, WiFiSession } from '../../services/wifiService';
 import { treeService, Tree, RedeemTreeData } from '../../services/treeService';
+import { pointsService, Transaction, PointsState } from '../../services/pointsService';
 import { eventService } from '../../services/eventService';
 import ENV from '../../config/env';
 // @ts-ignore
@@ -76,7 +78,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(80),
+    top: rs(105),
     zIndex: 9999,
   },
   mascotImage: {
@@ -284,11 +286,151 @@ const styles = StyleSheet.create({
     marginVertical: rs(20),
     lineHeight: rf(20),
   },
+  
+  // Tree Redemption Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: rs(20),
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: rs(16),
+    width: '100%',
+    maxWidth: rs(400),
+    maxHeight: '80%',
+    minHeight: rs(500),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: rs(20),
+    paddingBottom: rs(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: rf(20),
+    fontWeight: 'bold',
+    color: '#2e7d32',
+  },
+  modalContent: {
+    padding: rs(20),
+    paddingTop: rs(16),
+    flex: 1,
+    minHeight: rs(200),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: rf(16),
+    color: '#D32F2F',
+    marginBottom: rs(16),
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#50AF27',
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(10),
+    borderRadius: rs(8),
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: rf(14),
+    fontWeight: 'bold',
+  },
+  speciesScrollView: {
+    flex: 1,
+  },
+  noSpeciesText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: rf(16),
+    padding: rs(20),
+  },
+  treeCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: rs(12),
+    padding: rs(16),
+    marginBottom: rs(12),
+    borderWidth: 2,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  treeCardDisabled: {
+    backgroundColor: '#f0f0f0',
+    opacity: 0.6,
+  },
+  treeCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: rs(8),
+  },
+  treeInfo: {
+    flex: 1,
+  },
+  treeName: {
+    fontSize: rf(18),
+    fontWeight: 'bold',
+    color: '#2e7d32',
+    marginBottom: rs(2),
+  },
+  treeScientific: {
+    fontSize: rf(14),
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  treeCost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  costText: {
+    fontSize: rf(16),
+    fontWeight: 'bold',
+    color: '#50AF27',
+    marginRight: rs(4),
+  },
+  treeDescription: {
+    fontSize: rf(14),
+    color: '#444',
+    lineHeight: rf(20),
+    marginBottom: rs(12),
+  },
+  treeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  treeStat: {
+    fontSize: rf(12),
+    color: '#666',
+    flex: 1,
+    textAlign: 'center',
+  },
+  disabledText: {
+    color: '#999',
+  },
 });
 
-// Types
+// Types  
 type RootStackParamList = {
-  Leaderboard: undefined;
+  leaderboard: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -306,18 +448,17 @@ interface User {
 interface TreeSpecies {
   id: string;
   name: string;
+  scientificName: string;
   description: string;
-  pointsCost: number;
+  careLevel: string;
   maxHeight: string;
+  lifespan: string;
+  nativeTo: string;
+  cost: number;
+  stages: string[];
 }
 
-interface SpeciesSelectionModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (id: string) => void;
-  treeSpecies: TreeSpecies[];
-  loading: boolean;
-}
+
 
 interface PointsHistoryItemProps {
   type: string;
@@ -326,17 +467,7 @@ interface PointsHistoryItemProps {
   points: number;
 }
 
-interface Transaction {
-  id?: string;
-  _id?: string;
-  type: string;
-  amount: number;
-  createdAt: string;
-  metadata?: {
-    startTime?: string;
-    endTime?: string;
-  };
-}
+
 
 interface WifiStatus {
   isConnected: boolean;
@@ -390,28 +521,188 @@ const PointsHistoryItem: React.FC<PointsHistoryItemProps> = ({
   );
 };
 
+const TreeRedemptionModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  userPoints: number;
+  onRedeemTree: (species: TreeSpecies) => void;
+}> = ({ visible, onClose, userPoints, onRedeemTree }) => {
+  const [species, setSpecies] = useState<TreeSpecies[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      console.log('TreeRedemptionModal: Modal became visible, loading species...');
+      loadTreeSpecies();
+    }
+  }, [visible]);
+
+  const loadTreeSpecies = async () => {
+    console.log('TreeRedemptionModal: Starting to load species...');
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('TreeRedemptionModal: Calling treeService.getTreeSpecies()...');
+      const speciesData = await treeService.getTreeSpecies();
+      console.log('TreeRedemptionModal: Received species data:', speciesData);
+      console.log('TreeRedemptionModal: Species count:', speciesData?.length || 0);
+      setSpecies(speciesData || []);
+    } catch (err) {
+      console.error('TreeRedemptionModal: Error loading species:', err);
+      setError('Failed to load tree species');
+    } finally {
+      setLoading(false);
+      console.log('TreeRedemptionModal: Finished loading species');
+    }
+  };
+
+  const handleSelectTree = (selectedSpecies: TreeSpecies) => {
+    if (userPoints >= selectedSpecies.cost) {
+      onRedeemTree(selectedSpecies);
+      onClose();
+    }
+  };
+
+  const renderSpeciesCard = (treeSpecies: TreeSpecies) => {
+    const canAfford = userPoints >= treeSpecies.cost;
+    
+    return (
+      <TouchableOpacity
+        key={treeSpecies.id}
+        style={[
+          styles.treeCard,
+          !canAfford && styles.treeCardDisabled
+        ]}
+        onPress={() => handleSelectTree(treeSpecies)}
+        disabled={!canAfford}
+      >
+        <View style={styles.treeCardHeader}>
+          <View style={styles.treeInfo}>
+            <Text style={[styles.treeName, !canAfford && styles.disabledText]}>
+              {treeSpecies.name}
+            </Text>
+            <Text style={[styles.treeScientific, !canAfford && styles.disabledText]}>
+              {treeSpecies.scientificName}
+            </Text>
+          </View>
+          <View style={styles.treeCost}>
+            <Text style={[styles.costText, !canAfford && styles.disabledText]}>
+              {treeSpecies.cost} pts
+            </Text>
+            {!canAfford && <Icon name="lock" size={16} color="#999" />}
+          </View>
+        </View>
+        
+        <Text style={[styles.treeDescription, !canAfford && styles.disabledText]}>
+          {treeSpecies.description}
+        </Text>
+        
+        <View style={styles.treeStats}>
+          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
+            📏 {treeSpecies.maxHeight}
+          </Text>
+          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
+            💚 {treeSpecies.careLevel}
+          </Text>
+          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
+            ⏰ {treeSpecies.lifespan}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Choose Your Tree</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Icon name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            {(() => {
+              console.log('TreeRedemptionModal: Rendering content - loading:', loading, 'error:', error, 'species count:', species.length);
+              
+              if (loading) {
+                console.log('TreeRedemptionModal: Showing loading state');
+                return (
+                  <View style={[styles.loadingContainer, { padding: 20, justifyContent: 'center', alignItems: 'center', minHeight: 100 }]}>
+                    <Text style={[styles.loadingText, { fontSize: 16, color: '#666' }]}>Loading tree species...</Text>
+                  </View>
+                );
+              }
+              
+              if (error) {
+                console.log('TreeRedemptionModal: Showing error state:', error);
+                return (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={loadTreeSpecies}
+                    >
+                      <Text style={styles.retryText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+              
+              console.log('TreeRedemptionModal: Showing species list, count:', species.length);
+              return (
+                <ScrollView style={[styles.speciesScrollView, { flex: 1, minHeight: 150 }]}>
+                  {species.length === 0 ? (
+                    <Text style={[styles.noSpeciesText, { textAlign: 'center', color: '#666', fontSize: 16, padding: 20 }]}>
+                      No tree species available
+                    </Text>
+                  ) : (
+                    species.map(renderSpeciesCard)
+                  )}
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const PointsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, updateUser } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [pointsState, setPointsState] = useState<PointsState>({ points: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
-  const [showSpeciesModal, setShowSpeciesModal] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [sessionPoints, setSessionPoints] = useState(0);
-  const [treeSpecies, setTreeSpecies] = useState<TreeSpecies[]>([]);
-  const [speciesLoading, setSpeciesLoading] = useState(false);
-  const [currentPoints, setCurrentPoints] = useState(user?.points || 0);
   const [refreshing, setRefreshing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [showInsufficientPointsModal, setShowInsufficientPointsModal] = useState(false);
   const [modalData, setModalData] = useState({ title: '', message: '' });
   const [currentSession, setCurrentSession] = useState<WiFiSession | null>(null);
-  const [selectedSpecies, setSelectedSpecies] = useState<TreeSpecies | null>(null);
+  const [showSpeciesSelection, setShowSpeciesSelection] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     initializeData();
+    
+    // Initialize points service
+    const initPointsService = async () => {
+      await pointsService.init();
+      setPointsState(pointsService.getState());
+      setLoading(false);
+    };
+    
+    initPointsService();
     
     // Get current WiFi session
     const getCurrentSession = async () => {
@@ -435,206 +726,93 @@ const PointsScreen = () => {
       await getCurrentSession();
     });
     
-    // Listen for real-time points updates
-    const unsubscribePoints = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
-      console.log('PointsScreen - Received points update:', data);
-      if (data.points !== undefined || data.totalPoints !== undefined) {
-        const newPoints = data.totalPoints ?? data.points;
-        setCurrentPoints(newPoints ?? 0);
-        console.log('PointsScreen - Updated current points to:', newPoints);
-      }
+    // Listen for points service updates
+    const unsubscribePoints = pointsService.addListener((state: PointsState) => {
+      console.log('PointsScreen - Received points update:', state);
+      setPointsState(state);
     });
     
     return () => {
       unsubscribeWifi.remove();
-      unsubscribePoints.remove();
+      unsubscribePoints();
     };
   }, []);
 
-  // Update points when user data changes
-  useEffect(() => {
-    if (user?.points !== undefined && user.points !== currentPoints) {
-      console.log('PointsScreen - User points changed from', currentPoints, 'to', user.points);
-      setCurrentPoints(user.points);
-    }
-  }, [user?.points]);
-
   const initializeData = async () => {
     try {
-      await Promise.all([
-        fetchTransactions(),
-        initializeTreeService()
-      ]);
+      await initializeTreeService();
     } catch (error) {
       console.error('Error initializing data:', error);
     }
   };
 
   const initializeTreeService = async () => {
-    try {
-      const types = await treeService.getTreeTypes();
-      const species = types.map((type, index) => ({
-        id: index.toString(),
-        name: type,
-        description: `A beautiful ${type.toLowerCase()} tree species`,
-        pointsCost: treeService.getTreeCost(),
-        maxHeight: '20-30m'
-      }));
-      setTreeSpecies(species);
-    } catch (error) {
-      console.error('Error initializing TreeService:', error);
-      setTreeSpecies([]);
-    }
+    // This is now handled by the TreeRedemptionModal component
+    return;
   };
 
-  const fetchTransactions = async () => {
-    try {
-      if (!user?.id) {
-        console.warn('No user ID available for fetching transactions');
-        setTransactions([]);
-        return;
-      }
-      
-      const history = await wifiService.getSessionHistory();
-      const transactions = history.map(session => ({
-        id: session._id,
-        type: 'WiFi Connection',
-        amount: session.pointsEarned || 0,
-        createdAt: session.startTime.toString(),
-        metadata: {
-          startTime: session.startTime.toString(),
-          endTime: session.endTime?.toString()
-        }
-      }));
-      setTransactions(transactions);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      setModalData({
-        title: 'Error',
-        message: 'Failed to fetch transactions. Please try again later.',
-      });
-      setShowErrorModal(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleRedeem = async () => {
-    try {
-      const currentUserPoints = currentPoints;
-      const treeCost = ENV.POINTS_FOR_TREE;
-
-      if (currentUserPoints < treeCost) {
-        setModalData({
-          title: 'Not Enough Points',
-          message: `You need ${treeCost} points to redeem a tree. You currently have ${currentUserPoints} points.`
-        });
-        setShowInsufficientPointsModal(true);
-        return;
-      }
-
-      // Load tree species if not already loaded
-      if (treeSpecies.length === 0) {
-        setSpeciesLoading(true);
-        try {
-          await initializeTreeService();
-        } catch (error) {
-          console.error('Error loading tree species:', error);
-          setModalData({
-            title: 'Error',
-            message: 'Failed to load tree species. Please check your connection and try again.'
-          });
-          setShowErrorModal(true);
-          return;
-        } finally {
-          setSpeciesLoading(false);
-        }
-      }
-
-      // Show species selection modal
-      if (treeSpecies.length > 0) {
-        // Show loading state in the modal if species are still loading
-        if (speciesLoading) {
-          setModalData({
-            title: 'Loading Tree Species',
-            message: 'Please wait while we load available tree species...'
-          });
-          setShowSpeciesModal(true);
-          return;
-        }
-
-        // Show the first species in the modal
-        const firstSpecies = treeSpecies[0];
-        setSelectedSpecies(firstSpecies);
-        setShowSpeciesModal(true);
-      } else {
-        setModalData({
-          title: 'No Trees Available',
-          message: 'No tree species are currently available. Please try again later.'
-        });
-        setShowErrorModal(true);
-      }
-    } catch (error) {
-      console.error('Error in handleRedeem:', error);
-      setModalData({
-        title: 'Error',
-        message: error instanceof Error ? error.message : 'An unexpected error occurred.'
-      });
-      setShowErrorModal(true);
-    }
+    setShowSpeciesSelection(true);
   };
 
-  const handleSpeciesSelect = async (speciesId: string) => {
+  const handleRedeemTree = async (species: TreeSpecies) => {
     try {
-      // Validate species exists
-      const selectedSpecies = treeSpecies.find(species => species.id === speciesId);
-      if (!selectedSpecies) {
-        throw new Error('Selected tree species not found. Please try again.');
-      }
-
-      const data: RedeemTreeData = { speciesId };
+      console.log('Redeeming tree:', species);
+      
+      const data: RedeemTreeData = { speciesId: species.id };
       const result = await treeService.redeemTree(data);
       
-      setShowSpeciesModal(false);
-      setSelectedSpecies(null);
+      console.log('Tree redemption result:', result);
 
       // Trigger animation
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 2000);
 
-      // Update user data and local points
+      // Update user data
       if (user) {
         const updatedUser = {
           ...user,
-          points: user.points - ENV.POINTS_FOR_TREE,
+          points: pointsState.points - species.cost,
           treesPlanted: (user.treesPlanted || 0) + 1,
         };
-        setCurrentPoints(updatedUser.points || 0);
         await updateUser(updatedUser);
       }
 
-      // Refresh transactions
-      fetchTransactions();
+      // Notify other screens about the new tree
+      eventService.emit('treeRedeemed', { 
+        speciesName: species.name,
+        newTreeCount: (user?.treesPlanted || 0) + 1 
+      });
+
+      // Refresh points from service
+      await pointsService.refreshPoints();
+      setPointsState(pointsService.getState());
 
       setModalData({
-        title: 'Tree Redeemed!',
-        message: `Congratulations! Your ${result.species} tree has been planted. You now have ${user?.treesPlanted || 0} trees!`,
+        title: 'Tree Planted!',
+        message: `Congratulations! Your ${species.name} (${species.scientificName}) has been planted successfully!`,
       });
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error redeeming tree:', error);
       setModalData({
         title: 'Error',
-        message: error instanceof Error ? error.message : 'Failed to redeem tree. Please try again.',
+        message: error instanceof Error ? error.message : 'Failed to plant tree. Please try again.',
       });
       setShowErrorModal(true);
     }
   };
 
+
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await initializeData();
+      await pointsService.refreshPoints();
+      setPointsState(pointsService.getState());
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -687,10 +865,7 @@ const PointsScreen = () => {
     );
   };
 
-  const handleCloseModal = () => {
-    setShowSpeciesModal(false);
-    setSelectedSpecies(null);
-  };
+
 
   return (
     <View style={styles.container}>
@@ -736,7 +911,7 @@ const PointsScreen = () => {
                     <Icon name="star" size={24} color="#50AF27" />
                     <Text style={styles.cardTitle}>Total Points</Text>
                   </View>
-                  <Text style={styles.pointsValue}>{currentPoints}</Text>
+                  <Text style={styles.pointsValue}>{pointsState.points}</Text>
                   {sessionPoints > 0 && (
                     <View style={styles.sessionContainer}>
                       <Text style={styles.sessionPoints}>
@@ -755,7 +930,7 @@ const PointsScreen = () => {
                 {/* Right Side - Leaderboard */}
                 <TouchableOpacity 
                   style={styles.leaderboardSection}
-                  onPress={() => navigation.navigate('Leaderboard')}
+                  onPress={() => navigation.navigate('leaderboard')}
                   activeOpacity={0.7}
                 >
                   <View style={styles.cardHeader}>
@@ -777,19 +952,15 @@ const PointsScreen = () => {
                 <Text style={styles.cardTitle}>Plant a Tree</Text>
               </View>
               <Text style={styles.redeemText}>
-                Use 100 points to plant a tree and help the environment!
+                Choose from multiple tree species and help the environment!
               </Text>
               <TouchableOpacity
-                style={[
-                  styles.redeemButton,
-                  currentPoints < 100 && styles.redeemButtonDisabled
-                ]}
+                style={styles.redeemButton}
                 onPress={handleRedeem}
-                disabled={currentPoints < 100}
               >
                 <Icon name="plus-circle" size={20} color="#fff" />
                 <Text style={styles.redeemButtonText}>
-                  Redeem Tree (100 pts)
+                  Choose Tree Species
                 </Text>
               </TouchableOpacity>
             </View>
@@ -799,9 +970,9 @@ const PointsScreen = () => {
               <Text style={styles.historyTitle}>Recent Activity</Text>
               {loading ? (
                 <Text style={styles.loadingText}>Loading...</Text>
-              ) : transactions.length > 0 ? (
+              ) : pointsState.transactions.length > 0 ? (
                 <FlatList
-                  data={transactions.slice(0, 5)} // Show only recent 5
+                  data={pointsState.transactions.slice(0, 5)} // Show only recent 5
                   renderItem={renderTransaction}
                   keyExtractor={(item, index) => {
                     const key = item.id || item._id || `${item.createdAt}-${index}` || `transaction-${index}`;
@@ -828,29 +999,13 @@ const PointsScreen = () => {
         />
       </View>
 
-      {/* Modals */}
-      {selectedSpecies && (
-        <CustomModal
-          visible={showSpeciesModal}
-          onClose={handleCloseModal}
-          title="Choose Your Tree"
-          message={`${selectedSpecies.description}\n\nHeight: ${selectedSpecies.maxHeight}\nCost: ${selectedSpecies.pointsCost} points`}
-          iconName="tree"
-          iconColor="#50AF27"
-          type="default"
-          buttons={[
-            {
-              text: 'Cancel',
-              onPress: handleCloseModal
-            },
-            {
-              text: 'Plant Tree',
-              onPress: () => handleSpeciesSelect(selectedSpecies.id),
-              style: 'primary'
-            }
-          ]}
-        />
-      )}
+      {/* Tree Redemption Modal */}
+      <TreeRedemptionModal
+        visible={showSpeciesSelection}
+        onClose={() => setShowSpeciesSelection(false)}
+        userPoints={pointsState.points}
+        onRedeemTree={handleRedeemTree}
+      />
 
       <CustomModal
         visible={showSuccessModal}
@@ -882,20 +1037,7 @@ const PointsScreen = () => {
         ]}
       />
 
-      <CustomModal
-        visible={showInsufficientPointsModal}
-        onClose={() => setShowInsufficientPointsModal(false)}
-        title={modalData.title}
-        message={modalData.message}
-        type="warning"
-        buttons={[
-          {
-            text: 'OK',
-            onPress: () => setShowInsufficientPointsModal(false),
-            style: 'primary'
-          }
-        ]}
-      />
+
     </View>
   );
 };

@@ -13,10 +13,17 @@ const ENV = {
 
   // University WiFi Networks
   UNIVERSITY_SSIDS: (process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS || 'UniversityWiFi,Campus-Net,EduWiFi,eduroam').split(','),
+  
+  // WiFi BSSID Configuration (first 8 digits for tracking)
+  UNIVERSITY_BSSID_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_BSSID_PREFIX || 'c2:74:ad:1d',
 
   // Points Configuration
   POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '100', 10),
   POINTS_FOR_TREE: parseInt(process.env.EXPO_PUBLIC_POINTS_FOR_TREE || '100', 10),
+
+  // WiFi Session Configuration
+  MIN_SESSION_DURATION: parseInt(process.env.EXPO_PUBLIC_MIN_SESSION_DURATION || '300', 10), // 5 minutes in seconds
+  SESSION_UPDATE_INTERVAL: parseInt(process.env.EXPO_PUBLIC_SESSION_UPDATE_INTERVAL || '60', 10), // 1 minute in seconds
 
   // Feature Flags
   ENABLE_LOCATION_TRACKING: process.env.EXPO_PUBLIC_ENABLE_LOCATION_TRACKING === 'true',
@@ -48,8 +55,11 @@ export interface EnvironmentConfig {
   APP_VERSION: string;
   APP_SCHEME: string;
   UNIVERSITY_SSIDS: string[];
+  UNIVERSITY_BSSID_PREFIX: string;
   POINTS_PER_HOUR: number;
   POINTS_FOR_TREE: number;
+  MIN_SESSION_DURATION: number;
+  SESSION_UPDATE_INTERVAL: number;
   ENABLE_LOCATION_TRACKING: boolean;
   ENABLE_BACKGROUND_SYNC: boolean;
   ENABLE_NOTIFICATIONS: boolean;

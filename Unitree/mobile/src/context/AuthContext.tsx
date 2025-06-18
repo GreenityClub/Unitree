@@ -4,12 +4,20 @@ import { authAPI } from '../config/api';
 
 interface User {
   id: string;
-  name: string;
+  fullname: string;
+  nickname: string;
   email: string;
   points: number;
   treesPlanted: number;
   studentId?: string;
   university?: string;
+  avatar?: string;
+  role: string;
+  notificationSettings: {
+    achievements: boolean;
+    attendance: boolean;
+    treeHealth: boolean;
+  };
 }
 
 interface AuthContextType {

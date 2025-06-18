@@ -1,238 +1,320 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import SafeScreen from '../../components/SafeScreen';
-import { colors, spacing } from '../../theme';
-import { Card, IconSymbol } from '../../components';
-import { useAuth } from '../../contexts/AuthContext';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, Card, TextInput, Button, List } from 'react-native-paper';
+import { router } from 'expo-router';
+import { useAuth } from '../../context/AuthContext';
+import { theme } from '../../theme';
+import userService from '../../services/userService';
+import { rf, rs } from '../../utils/responsive';
 
-interface UserProfile {
-  name: string;
-  email: string;
-  phone: string;
-  location: string;
-  notifications: boolean;
-}
+const UserSettingsScreen = () => {
+  const { user, updateUser } = useAuth();
+  const [nickname, setNickname] = useState(user?.nickname || '');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-export default function UserSettingsScreen() {
-  const { user } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState<UserProfile>({
-    name: user?.displayName || '',
-    email: user?.email || '',
-    phone: '+1 (555) 123-4567', // Mock data
-    location: 'San Francisco, CA', // Mock data
-    notifications: true,
-  });
-
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     try {
-      // In a real app, make API call to update user profile
-      setIsEditing(false);
+      // Only allow nickname updates
+      await userService.updateProfile({ nickname });
+      await updateUser({ ...user, nickname });
+      setIsEditingProfile(false);
       Alert.alert('Success', 'Profile updated successfully');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating user settings:', error);
       Alert.alert('Error', 'Failed to update profile');
     }
   };
 
-  const renderField = (label: string, value: string, field: keyof UserProfile) => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {isEditing && field !== 'email' ? (
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={(text) => setProfile({ ...profile, [field]: text })}
-          placeholder={`Enter your ${label.toLowerCase()}`}
-          placeholderTextColor={colors.textTertiary}
-        />
-      ) : (
-        <Text style={styles.fieldValue}>{value}</Text>
-      )}
-    </View>
-  );
+  const validatePassword = (password: string) => {
+    if (password.length < 8 || password.length > 16) {
+      return 'Password must be between 8-16 characters long';
+    }
+    
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSymbol) {
+      return 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one symbol';
+    }
+    
+    return null;
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      Alert.alert('Error', passwordError);
+      return;
+    }
+
+    try {
+      await userService.changePassword({ currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsChangingPassword(false);
+      Alert.alert('Success', 'Password changed successfully');
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      Alert.alert('Error', error.message || 'Failed to change password');
+    }
+  };
 
   return (
-    <SafeScreen backgroundColor={colors.background}>
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>User Settings</Text>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-          >
-            <Text style={styles.editButtonText}>
-              {isEditing ? 'Save' : 'Edit'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Card style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <IconSymbol name="user" size={48} color={colors.primary} />
-            </View>
-            {isEditing && (
-              <TouchableOpacity style={styles.changeAvatarButton}>
-                <Text style={styles.changeAvatarText}>Change Photo</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {renderField('Name', profile.name, 'name')}
-          {renderField('Email', profile.email, 'email')}
-          {renderField('Phone', profile.phone, 'phone')}
-          {renderField('Location', profile.location, 'location')}
-        </Card>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Security</Text>
-          <Card style={styles.securityCard}>
-            <TouchableOpacity style={styles.securityButton}>
-              <View style={styles.securityButtonContent}>
-                <IconSymbol name="lock" size={24} color={colors.primary} />
-                <Text style={styles.securityButtonText}>Change Password</Text>
+    <ScrollView style={styles.container}>
+      <Card style={styles.card} mode="elevated">
+        <Card.Content>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
+            Personal Information
+          </Text>
+          
+          {isEditingProfile ? (
+            <>
+              <TextInput
+                label="Nickname"
+                value={nickname}
+                onChangeText={setNickname}
+                style={styles.input}
+                mode="outlined"
+                outlineColor={theme.colors.border}
+                activeOutlineColor={theme.colors.primary}
+              />
+              <View style={styles.buttonContainer}>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setNickname(user?.nickname || '');
+                    setIsEditingProfile(false);
+                  }}
+                  style={styles.button}
+                  textColor={theme.colors.textPrimary}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={handleSaveProfile}
+                  style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                  textColor={theme.colors.white}
+                >
+                  Save
+                </Button>
               </View>
-              <IconSymbol name="chevron-right" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <List.Item
+                title="Nickname"
+                description={user?.nickname || 'Not set'}
+                left={props => <List.Icon {...props} icon="account" color={theme.colors.primary} />}
+              />
+              <List.Item
+                title="Full Name"
+                description={user?.fullname || 'Not set'}
+                left={props => <List.Icon {...props} icon="account-circle" color={theme.colors.primary} />}
+              />
+              <List.Item
+                title="Email"
+                description={user?.email || 'Not set'}
+                left={props => <List.Icon {...props} icon="email" color={theme.colors.primary} />}
+              />
+              <List.Item
+                title="University"
+                description={user?.university || 'Not set'}
+                left={props => <List.Icon {...props} icon="school" color={theme.colors.primary} />}
+              />
+              <Button
+                mode="contained"
+                onPress={() => setIsEditingProfile(true)}
+                style={[styles.editButton, { backgroundColor: theme.colors.primary }]}
+                textColor={theme.colors.white}
+              >
+                Edit Nickname
+              </Button>
+            </>
+          )}
+        </Card.Content>
+      </Card>
 
-            <TouchableOpacity style={styles.securityButton}>
-              <View style={styles.securityButtonContent}>
-                <IconSymbol name="shield" size={24} color={colors.primary} />
-                <Text style={styles.securityButtonText}>Two-Factor Authentication</Text>
+      <Card style={styles.card} mode="elevated">
+        <Card.Content>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
+            Account Information
+          </Text>
+          
+          {isChangingPassword ? (
+            <>
+              <TextInput
+                label="Current Password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                style={styles.input}
+                mode="outlined"
+                secureTextEntry={!showCurrentPassword}
+                outlineColor={theme.colors.border}
+                activeOutlineColor={theme.colors.primary}
+                right={<TextInput.Icon 
+                  icon={showCurrentPassword ? "eye-off" : "eye"} 
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                />}
+              />
+              <TextInput
+                label="New Password"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                style={styles.input}
+                mode="outlined"
+                secureTextEntry={!showNewPassword}
+                outlineColor={theme.colors.border}
+                activeOutlineColor={theme.colors.primary}
+                right={<TextInput.Icon 
+                  icon={showNewPassword ? "eye-off" : "eye"} 
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                />}
+              />
+              <TextInput
+                label="Confirm New Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                style={styles.input}
+                mode="outlined"
+                secureTextEntry={!showConfirmPassword}
+                outlineColor={theme.colors.border}
+                activeOutlineColor={theme.colors.primary}
+                right={<TextInput.Icon 
+                  icon={showConfirmPassword ? "eye-off" : "eye"} 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                />}
+              />
+              <Text style={styles.passwordHint}>
+                Password must be 8-16 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one symbol.
+              </Text>
+              <View style={styles.buttonContainer}>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setIsChangingPassword(false);
+                  }}
+                  style={styles.button}
+                  textColor={theme.colors.textPrimary}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={handleChangePassword}
+                  style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                  textColor={theme.colors.white}
+                >
+                  Change Password
+                </Button>
               </View>
-              <IconSymbol name="chevron-right" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </Card>
-        </View>
+            </>
+          ) : (
+            <>
+              <List.Item
+                title="Change Password"
+                description="Update your account password"
+                left={props => <List.Icon {...props} icon="lock" color={theme.colors.primary} />}
+                right={props => <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />}
+                onPress={() => setIsChangingPassword(true)}
+              />
+              <List.Item
+                title="Forgot Password?"
+                description="Reset password via email verification"
+                left={props => <List.Icon {...props} icon="email-lock" color={theme.colors.primary} />}
+                right={props => <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />}
+                onPress={() => router.push('/auth/forgot-password')}
+              />
+            </>
+          )}
+        </Card.Content>
+      </Card>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy</Text>
-          <Card style={styles.privacyCard}>
-            <TouchableOpacity style={styles.privacyButton}>
-              <Text style={styles.privacyButtonText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.privacyButton}>
-              <Text style={styles.privacyButtonText}>Terms of Service</Text>
-            </TouchableOpacity>
-          </Card>
-        </View>
-      </ScrollView>
-    </SafeScreen>
+      <Card style={styles.card} mode="elevated">
+        <Card.Content>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
+            Account Preferences
+          </Text>
+          <List.Item
+            title="Language"
+            description="English"
+            left={props => <List.Icon {...props} icon="translate" color={theme.colors.primary} />}
+            right={props => <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />}
+            onPress={() => {/* Handle language selection */}}
+          />
+          <List.Item
+            title="Theme"
+            description="Light"
+            left={props => <List.Icon {...props} icon="theme-light-dark" color={theme.colors.primary} />}
+            right={props => <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />}
+            onPress={() => {/* Handle theme selection */}}
+          />
+        </Card.Content>
+      </Card>
+    </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+    padding: rs(16),
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.component.screenPadding,
-    paddingTop: spacing.component.screenPaddingVertical,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  editButton: {
-    paddingHorizontal: spacing.component.md,
-    paddingVertical: spacing.component.sm,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-  },
-  editButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  profileCard: {
-    margin: spacing.component.screenPadding,
-    padding: spacing.component.lg,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.component.lg,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.component.sm,
-  },
-  changeAvatarButton: {
-    padding: spacing.component.sm,
-  },
-  changeAvatarText: {
-    color: colors.primary,
-    fontSize: 16,
-  },
-  fieldContainer: {
-    marginBottom: spacing.component.md,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  fieldValue: {
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  input: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing.component.xs,
-  },
-  section: {
-    padding: spacing.component.screenPadding,
-    paddingTop: 0,
+  card: {
+    marginBottom: rs(16),
+    backgroundColor: theme.colors.white,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    color: theme.colors.textPrimary,
+    marginBottom: rs(16),
     fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.component.sm,
   },
-  securityCard: {
-    padding: 0,
-    overflow: 'hidden',
+  input: {
+    marginBottom: rs(16),
+    backgroundColor: theme.colors.white,
   },
-  securityButton: {
+  buttonContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.component.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    justifyContent: 'flex-end',
+    gap: 8,
   },
-  securityButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  button: {
+    minWidth: 100,
   },
-  securityButtonText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    marginLeft: spacing.component.md,
+  editButton: {
+    marginTop: rs(16),
   },
-  privacyCard: {
-    padding: 0,
-    overflow: 'hidden',
+  passwordHint: {
+    fontSize: rf(12),
+    color: theme.colors.textSecondary,
+    marginBottom: rs(16),
+    lineHeight: rf(16),
   },
-  privacyButton: {
-    padding: spacing.component.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  privacyButtonText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-}); 
+});
+
+export default UserSettingsScreen; 

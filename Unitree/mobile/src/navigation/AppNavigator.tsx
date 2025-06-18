@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createNavigationContainerRef, CommonActions } from '@react-navigation/native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
 
 // Import Navigators
@@ -20,7 +20,7 @@ import ForgotPasswordFromProfileScreen from '../screens/auth/ForgotPasswordFromP
 type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-  TreeDetail: { id: string };
+  TreeDetail: { treeId: string };
   Leaderboard: undefined;
   UserSettingsScreen: undefined;
   NotificationSettingsScreen: undefined;

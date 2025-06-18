@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 
@@ -17,8 +17,13 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
   return (
     <SafeAreaView 
       style={[styles.safeArea, { backgroundColor }]} 
-      edges={['top']}
+      edges={['left', 'right']}
     >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
       <View style={[styles.container, style]}>
         {children}
       </View>

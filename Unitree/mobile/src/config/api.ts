@@ -88,11 +88,17 @@ export const wifiAPI = {
   endSession: () =>
     api.post('/api/wifi/end'),
   
+  updateSession: () =>
+    api.post('/api/wifi/update'),
+  
   getActiveSession: () =>
     api.get('/api/wifi/active'),
   
   getHistory: () =>
     api.get('/api/wifi/history'),
+  
+  getStats: () =>
+    api.get('/api/wifi/stats'),
 };
 
 export const pointsAPI = {
@@ -101,6 +107,9 @@ export const pointsAPI = {
   
   addAttendancePoints: (duration: number, startTime: Date, endTime: Date) =>
     api.post('/api/points/attendance', { duration, startTime, endTime }),
+
+  syncPoints: (points: number, source: string) =>
+    api.post('/api/points/sync', { points, source }),
 };
 
 export const treeAPI = {
@@ -123,4 +132,7 @@ export const userAPI = {
   
   updateProfile: (userData: any) =>
     api.put('/api/users/profile', userData),
+
+  getLeaderboard: (limit: number = 50) =>
+    api.get(`/api/users/leaderboard?limit=${limit}`),
 }; 

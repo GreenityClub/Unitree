@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,8 +7,9 @@ import {
   StatusBar,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
-import { Text, ProgressBar } from 'react-native-paper';
+import { Text, ProgressBar, Card, Chip } from 'react-native-paper';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -18,525 +19,494 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
 import { wifiService } from '../../services/wifiService';
-import type { WiFiSession } from '../../services/wifiService';
+import type { WiFiStats } from '../../services/wifiService';
 import { formatSessionDuration, formatMinutesToHHMMSS } from '../../utils/timeUtils';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
-
-interface Stats {
-  today: { duration: number; points: number };
-  week: { duration: number; points: number };
-  month: { duration: number; points: number };
-  total: { duration: number; points: number };
-}
-
-interface TimeTracking {
-  timeTracking: {
-    total: {
-      minutes: number;
-      hours: number;
-    };
-  };
-  pointsFromTotalTime: number;
-}
+import ENV from '../../config/env';
 
 interface StatItemProps {
   label: string;
   duration: number;
   points: number;
+  sessions: number;
   icon: string;
+  resetTime?: string;
 }
 
-interface TotalTimeStatItemProps {
-  timeTracking: TimeTracking | null;
-}
-
-const StatItem: React.FC<StatItemProps> = ({ label, duration, points, icon }) => (
-  <View style={styles.statItem}>
+const StatItem: React.FC<StatItemProps> = ({ label, duration, points, sessions, icon, resetTime }) => (
+  <Card style={styles.statCard}>
     <View style={styles.statHeader}>
-      <Icon name={icon} size={20} color="#50AF27" />
+      <Icon name={icon} size={24} color="#50AF27" />
       <Text style={styles.statLabel}>{label}</Text>
+      {resetTime && <Chip style={styles.resetChip} textStyle={styles.resetText}>{resetTime}</Chip>}
     </View>
     <View style={styles.statDetails}>
-      <Text style={styles.statText}>Connected: {formatMinutesToHHMMSS(duration)}</Text>
-      <Text style={styles.statText}>Hours: {Math.floor(duration / 60)}h {Math.floor(duration % 60)}m</Text>
-      <Text style={styles.statText}>Points: {points}</Text>
+      <View style={styles.statRow}>
+        <Icon name="clock-outline" size={16} color="#666" />
+        <Text style={styles.statText}>Time: {wifiService.formatDurationHuman(duration)}</Text>
+      </View>
+      <View style={styles.statRow}>
+        <Icon name="star-outline" size={16} color="#666" />
+        <Text style={styles.statText}>Points: {points}</Text>
+      </View>
+      <View style={styles.statRow}>
+        <Icon name="wifi" size={16} color="#666" />
+        <Text style={styles.statText}>Sessions: {sessions}</Text>
+      </View>
     </View>
-  </View>
-);
-
-const TotalTimeStatItem: React.FC<TotalTimeStatItemProps> = ({ timeTracking }) => (
-  <View style={styles.statItem}>
-    <View style={styles.statHeader}>
-      <Icon name="clock-outline" size={20} color="#50AF27" />
-      <Text style={styles.statLabel}>Total Time Connected</Text>
-    </View>
-    <View style={styles.statDetails}>
-      <Text style={styles.statText}>Connected: {timeTracking ? formatMinutesToHHMMSS(timeTracking.timeTracking.total.minutes) : '00:00:00'}</Text>
-      <Text style={styles.statText}>Hours: {timeTracking ? `${timeTracking.timeTracking.total.hours}h ${Math.floor(timeTracking.timeTracking.total.minutes % 60)}m` : '0h 0m'}</Text>
-      <Text style={styles.statText}>Points: {timeTracking ? timeTracking.pointsFromTotalTime : 0}</Text>
-    </View>
-  </View>
+  </Card>
 );
 
 const WifiStatusScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { isConnected, currentSession, currentSSID } = useWiFi();
-  const [stats, setStats] = useState<Stats>({
-    today: { duration: 0, points: 0 },
-    week: { duration: 0, points: 0 },
-    month: { duration: 0, points: 0 },
-    total: { duration: 0, points: 0 }
-  });
-  const [timeTracking, setTimeTracking] = useState<TimeTracking | null>(null);
+  const { 
+    isConnected, 
+    currentSession, 
+    currentSSID, 
+    currentBSSID,
+    wifiStats,
+    sessionDuration,
+    potentialPoints,
+    refreshStats,
+    checkWiFiStatus 
+  } = useWiFi();
+  
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-
-    const fetchStats = async () => {
-      try {
-        // Here you would call your API to get the stats
-        // For now using placeholder data
-        setStats({
-          today: { duration: 120, points: 200 },
-          week: { duration: 840, points: 1400 },
-          month: { duration: 3600, points: 6000 },
-          total: { duration: 7200, points: 12000 }
-        });
-
-        // Fetch time tracking data
-        // This would be replaced with actual API call
-        setTimeTracking({
-          timeTracking: {
-            total: {
-              minutes: 7200,
-              hours: 120
-            }
-          },
-          pointsFromTotalTime: 12000
-        });
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      }
-    };
-
-    fetchStats();
-    
-    // Update time every second
+    // Update time every second for real-time display
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [user]);
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        checkWiFiStatus(),
+        refreshStats(),
+      ]);
+    } catch (error) {
+      console.error('Error refreshing WiFi status data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [checkWiFiStatus, refreshStats]);
 
   const getWifiStatusIcon = () => {
     return isConnected ? 'wifi' : 'wifi-off';
   };
 
-  const getConnectionTime = () => {
-    if (isConnected && currentSession?.startTime) {
-      return wifiService.formatSessionDuration(wifiService.calculateSessionDuration(new Date(currentSession.startTime), currentTime));
-    }
-    return '00:00:00';
+  const getWifiStatusColor = () => {
+    return isConnected ? '#50AF27' : '#FF6B6B';
   };
 
-  const getSessionProgressInfo = () => {
-    if (isConnected && currentSession && timeTracking) {
-      // This would be replaced with actual logic to calculate progress
+  const getConnectionStatus = () => {
+    if (isConnected && currentSSID) {
+      return `Connected to ${currentSSID}`;
+    }
+    return 'Not connected to university WiFi';
+  };
+
+  const getBSSIDStatus = () => {
+    if (currentBSSID) {
+      const prefix = wifiService.extractBSSIDPrefix(currentBSSID);
+      const isValid = wifiService.isValidUniversityBSSID(currentBSSID);
       return {
-        minutesToNext: 30,
-        progress: 50,
-        potentialPoints: 100
+        bssid: currentBSSID,
+        prefix,
+        isValid,
       };
     }
     return null;
   };
 
   const getHourProgressInfo = () => {
-    if (!isConnected || !currentSession) {
+    if (!currentSession || sessionDuration === 0) {
       return {
         progress: 0,
         minutesToNext: 60,
-        nextPoints: 100,
-        totalMinutes: 0,
+        nextPoints: ENV.POINTS_PER_HOUR,
+        currentMinutes: 0,
         currentHourProgress: 0
       };
     }
 
-    const sessionDuration = wifiService.calculateSessionDuration(new Date(currentSession.startTime), currentTime);
-    const minutesInCurrentHour = Math.floor((sessionDuration % 3600) / 60);
+    const currentMinutes = Math.floor(sessionDuration / 60);
+    const minutesInCurrentHour = currentMinutes % 60;
     const progress = minutesInCurrentHour / 60;
     const minutesToNext = 60 - minutesInCurrentHour;
 
     return {
       progress,
       minutesToNext,
-      nextPoints: 100,
-      totalMinutes: Math.floor(sessionDuration / 60),
+      nextPoints: ENV.POINTS_PER_HOUR,
+      currentMinutes,
       currentHourProgress: minutesInCurrentHour
     };
   };
 
+  const getResetTimes = () => {
+    return {
+      dayReset: wifiService.formatDurationHuman(wifiService.getTimeUntilDayReset()),
+      weekReset: wifiService.formatDurationHuman(wifiService.getTimeUntilWeekReset()),
+      monthReset: wifiService.formatDurationHuman(wifiService.getTimeUntilMonthReset()),
+    };
+  };
+
+  const hourProgress = getHourProgressInfo();
+  const bssidStatus = getBSSIDStatus();
+  const resetTimes = getResetTimes();
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
-
-      {/* Fixed Header Section */}
-      <Animated.View 
-        entering={FadeInDown.delay(200)}
-        style={[styles.headerSection, { paddingTop: insets.top }]}
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor="#50AF27" />
+      
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>
-            Hello, {user?.name || 'Student'}!
-          </Text>
-          <Text style={styles.subtitleText}>
-            {isConnected 
-              ? 'Keep connected to earn more points!'
-              : 'Connect to university WiFi to start earning'}
-          </Text>
-        </View>
-      </Animated.View>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.delay(100)} style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>WiFi Tracking</Text>
+            <Text style={styles.headerSubtitle}>Real-time connection monitoring</Text>
+          </View>
+        </Animated.View>
 
-      {/* Content Section */}
-      <Animated.View 
-        entering={FadeInUp.delay(400)}
-        style={[styles.contentSection, { paddingBottom: insets.bottom }]}
-      >
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            {/* WiFi Status Card */}
-            <View style={styles.statusCard}>
-              <View style={styles.cardHeader}>
-                <Icon 
-                  name={getWifiStatusIcon()} 
-                  size={28} 
-                  color={isConnected ? "#50AF27" : "#FFA79D"} 
-                />
-                <Text style={styles.cardTitle}>WiFi Status</Text>
+        {/* Current Status */}
+        <Animated.View entering={FadeInDown.delay(200)}>
+          <Card style={styles.statusCard}>
+            <View style={styles.statusHeader}>
+              <Icon 
+                name={getWifiStatusIcon()} 
+                size={32} 
+                color={getWifiStatusColor()} 
+              />
+              <View style={styles.statusInfo}>
+                <Text style={styles.statusTitle}>{getConnectionStatus()}</Text>
+                {bssidStatus && (
+                  <View style={styles.bssidContainer}>
+                    <Text style={styles.bssidText}>
+                      BSSID: {bssidStatus.prefix}:xx:xx
+                    </Text>
+                    <Chip 
+                      style={[
+                        styles.validationChip,
+                        { backgroundColor: bssidStatus.isValid ? '#E8F5E8' : '#FFF0F0' }
+                      ]}
+                      textStyle={{
+                        color: bssidStatus.isValid ? '#50AF27' : '#FF6B6B',
+                        fontSize: 12
+                      }}
+                    >
+                      {bssidStatus.isValid ? 'Valid' : 'Invalid'}
+                    </Chip>
+                  </View>
+                )}
               </View>
-              <Text style={[
-                styles.statusText,
-                isConnected ? styles.connectedText : styles.disconnectedText
-              ]}>
-                {isConnected ? 'CONNECTED' : 'NOT CONNECTED'}
-              </Text>
-              {isConnected && currentSession && (
-                <View style={styles.sessionInfo}>
-                  <Text style={styles.sessionText}>
-                    Current session: {getConnectionTime()}
-                  </Text>
-                  {(() => {
-                    const progressInfo = getSessionProgressInfo();
-                    return progressInfo && progressInfo.minutesToNext && (
-                      <Text style={styles.sessionText}>
-                        Next reward in: {progressInfo.minutesToNext} minutes
-                      </Text>
-                    );
-                  })()}
-                </View>
-              )}
             </View>
-
-            {/* Current Points Card with Progress Bar */}
-            <View style={styles.pointsCard}>
-              <View style={styles.cardHeader}>
-                <Icon name="star" size={28} color="#50AF27" />
-                <Text style={styles.cardTitle}>Total Points</Text>
-              </View>
-              <Text style={styles.pointsValue}>{user?.points || 0}</Text>
-              
-              {/* Progress toward next hour milestone */}
-              {(() => {
-                const hourProgress = getHourProgressInfo();
-                return (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                      <Text style={styles.progressLabel}>Progress to next 100 points</Text>
-                      <Text style={styles.progressTime}>
-                        {hourProgress.currentHourProgress}min / 60min ({Math.floor(hourProgress.progress * 100)}%)
-                      </Text>
-                    </View>
-                    <ProgressBar 
-                      progress={hourProgress.progress} 
-                      color="#50AF27"
-                      style={styles.progressBar}
-                    />
-                    <Text style={styles.progressSubtext}>
-                      {hourProgress.minutesToNext} minutes until next 100 points
-                      {isConnected && (
-                        <Text style={styles.activeSessionText}> • Session Active</Text>
-                      )}
+            
+            {currentSession && (
+              <View style={styles.sessionInfo}>
+                <View style={styles.sessionRow}>
+                  <Text style={styles.sessionLabel}>Session Time:</Text>
+                  <Text style={styles.sessionValue}>
+                    {wifiService.formatSessionDuration(sessionDuration)}
+                  </Text>
+                </View>
+                <View style={styles.sessionRow}>
+                  <Text style={styles.sessionLabel}>Potential Points:</Text>
+                  <Text style={styles.sessionValue}>{potentialPoints}</Text>
+                </View>
+                
+                {/* Hour Progress */}
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressHeader}>
+                    <Text style={styles.progressLabel}>
+                      Progress to next {ENV.POINTS_PER_HOUR} points
+                    </Text>
+                    <Text style={styles.progressTime}>
+                      {hourProgress.minutesToNext}m remaining
                     </Text>
                   </View>
-                );
-              })()}
-            </View>
-
-            {/* Stats Summary Card */}
-            <View style={styles.summaryCard}>
-              <View style={styles.cardHeader}>
-                <Icon name="chart-bar" size={28} color="#50AF27" />
-                <Text style={styles.cardTitle}>Connection Statistics</Text>
+                  <ProgressBar 
+                    progress={hourProgress.progress} 
+                    color="#50AF27" 
+                    style={styles.progressBar}
+                  />
+                  <Text style={styles.progressDetails}>
+                    {hourProgress.currentHourProgress} of 60 minutes completed
+                  </Text>
+                </View>
               </View>
-              
-              <StatItem 
-                label="Today" 
-                duration={stats.today.duration}
-                points={stats.today.points}
+            )}
+          </Card>
+        </Animated.View>
+
+        {/* Statistics */}
+        <Animated.View entering={FadeInDown.delay(300)} style={styles.statsContainer}>
+          <Text style={styles.sectionTitle}>Time Period Statistics</Text>
+          
+          {wifiStats ? (
+            <>
+              <StatItem
+                label="Today"
+                duration={wifiStats.today.duration}
+                points={wifiStats.today.points}
+                sessions={wifiStats.today.sessions}
                 icon="calendar-today"
+                resetTime={`Resets in ${resetTimes.dayReset}`}
               />
-              <View style={styles.divider} />
               
-              <StatItem 
-                label="This Week" 
-                duration={stats.week.duration}
-                points={stats.week.points}
+              <StatItem
+                label="This Week"
+                duration={wifiStats.week.duration}
+                points={wifiStats.week.points}
+                sessions={wifiStats.week.sessions}
                 icon="calendar-week"
+                resetTime={`Resets in ${resetTimes.weekReset}`}
               />
-              <View style={styles.divider} />
               
-              <StatItem 
-                label="This Month" 
-                duration={stats.month.duration}
-                points={stats.month.points}
+              <StatItem
+                label="This Month"
+                duration={wifiStats.month.duration}
+                points={wifiStats.month.points}
+                sessions={wifiStats.month.sessions}
                 icon="calendar-month"
+                resetTime={`Resets in ${resetTimes.monthReset}`}
               />
-              <View style={styles.divider} />
+              
+              <StatItem
+                label="Total Time"
+                duration={wifiStats.total.duration}
+                points={wifiStats.total.points}
+                sessions={wifiStats.total.sessions}
+                icon="clock-outline"
+              />
+            </>
+          ) : (
+            <Card style={styles.loadingCard}>
+              <Text style={styles.loadingText}>Loading statistics...</Text>
+            </Card>
+          )}
+        </Animated.View>
 
-              <TotalTimeStatItem timeTracking={timeTracking} />
+        {/* WiFi Configuration Info */}
+        <Animated.View entering={FadeInDown.delay(400)} style={styles.configContainer}>
+          <Text style={styles.sectionTitle}>Configuration</Text>
+          <Card style={styles.configCard}>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>Points per Hour:</Text>
+              <Text style={styles.configValue}>{ENV.POINTS_PER_HOUR}</Text>
             </View>
-          </View>
-        </ScrollView>
-      </Animated.View>
-
-      {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        <Image
-          source={require('../../assets/mascots/Unitree - Mascot-1.png')}
-          style={styles.mascotImage}
-          resizeMode="contain"
-        />
-      </View>
-    </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>Required BSSID Prefix:</Text>
+              <Text style={styles.configValue}>{ENV.UNIVERSITY_BSSID_PREFIX}:xx:xx</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>Update Interval:</Text>
+              <Text style={styles.configValue}>{ENV.SESSION_UPDATE_INTERVAL}s</Text>
+            </View>
+          </Card>
+        </Animated.View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFCED2',
+    backgroundColor: '#F8F9FA',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: rs(90),
-  },
-  
-  // Header Section Styles
-  headerSection: {
-    backgroundColor: '#FFCED2',
-    paddingBottom: rs(90),
-    paddingTop: rs(10),
-  },
-  welcomeSection: {
-    alignItems: 'flex-start',
-    paddingHorizontal: rs(20),
-    marginTop: rs(10),
-  },
-  titleText: {
-    fontSize: rf(28),
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: rs(10),
-    textAlign: 'center',
-  },
-  subtitleText: {
-    fontSize: rf(16),
-    color: '#fff',
-    opacity: 0.9,
-    textAlign: 'center',
-    lineHeight: rf(24),
-  },
-
-  // Content Section Styles
-  contentSection: {
+  content: {
     flex: 1,
-    backgroundColor: '#98D56D',
-    borderTopLeftRadius: rs(30),
-    borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
-    paddingTop: rs(32),
+    padding: 16,
   },
-  mascotContainer: {
-    position: 'absolute',
-    right: rs(20),
-    top: deviceValue(
-      rs(80),  // small
-      rs(90),  // medium
-      rs(100)  // large
-    ),
-    zIndex: 9999,
-    transform: [{ scale: deviceValue(
-      0.8,  // small
-      0.9,  // medium
-      1.0   // large
-    )}],
+  header: {
+    marginBottom: 20,
   },
-  mascotImage: {
-    ...getImageSize(160, 160),
-  },
-  scrollContainer: {
-    flex: 1,
-    marginTop: rs(40),
-    borderRadius: rs(16),
-  },
-  content: {},
-  
-  // Card Styles
-  statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(16),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  pointsCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(16),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  headerContent: {
     alignItems: 'center',
   },
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: rs(12),
-    justifyContent: 'center',
-  },
-  cardTitle: {
-    fontSize: rf(20),
+  headerTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    marginLeft: rs(8),
+    marginBottom: 4,
   },
-  statusText: {
-    fontSize: rf(24),
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: rs(12),
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666',
   },
-  connectedText: {
-    color: '#50AF27',
+  statusCard: {
+    marginBottom: 20,
+    padding: 16,
+    elevation: 4,
+    borderRadius: 12,
   },
-  disconnectedText: {
-    color: '#FFA79D',
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  bssidContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bssidText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+  validationChip: {
+    height: 24,
   },
   sessionInfo: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: rs(12),
-    padding: rs(16),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    paddingTop: 16,
   },
-  sessionText: {
-    fontSize: rf(14),
+  sessionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sessionLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  sessionValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  progressContainer: {
+    marginTop: 16,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  progressTime: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#50AF27',
-    fontWeight: '500',
-    marginBottom: rs(4),
   },
-  pointsValue: {
-    fontSize: rf(48),
-    fontWeight: 'bold',
-    color: '#50AF27',
-    marginVertical: rs(8),
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E0E0E0',
   },
-  statItem: {
-    paddingVertical: rs(12),
+  progressDetails: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  statsContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  statCard: {
+    marginBottom: 12,
+    padding: 16,
+    elevation: 2,
+    borderRadius: 8,
   },
   statHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(8),
+    marginBottom: 12,
   },
   statLabel: {
-    fontSize: rf(16),
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
-    marginLeft: rs(8),
+    marginLeft: 8,
+    flex: 1,
+  },
+  resetChip: {
+    backgroundColor: '#E8F5E8',
+    height: 28,
+  },
+  resetText: {
+    fontSize: 12,
+    color: '#50AF27',
   },
   statDetails: {
-    marginLeft: rs(28),
+    gap: 8,
   },
-  statText: {
-    fontSize: rf(14),
-    color: '#666',
-    marginBottom: rs(2),
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E0E0E0',
-    marginVertical: rs(8),
-  },
-  progressContainer: {
-    marginTop: rs(16),
-    width: '100%',
-  },
-  progressHeader: {
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  statText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  loadingCard: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  configContainer: {
+    marginBottom: 20,
+  },
+  configCard: {
+    padding: 16,
+    elevation: 2,
+    borderRadius: 8,
+  },
+  configRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: rs(8),
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  progressLabel: {
-    fontSize: rf(16),
-    fontWeight: 'bold',
+  configLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  configValue: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
-  },
-  progressTime: {
-    fontSize: rf(14),
-    color: '#666',
-  },
-  progressBar: {
-    height: 12,
-    borderRadius: rs(6),
-    backgroundColor: '#E0E0E0',
-  },
-  progressSubtext: {
-    fontSize: rf(14),
-    color: '#666',
-    marginTop: rs(8),
-  },
-  activeSessionText: {
-    fontSize: rf(14),
-    color: '#50AF27',
-    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
 });
 

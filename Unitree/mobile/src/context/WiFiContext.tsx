@@ -1,29 +1,24 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { wifiAPI } from '../config/api';
+import { wifiService, WiFiSession, WiFiStats } from '../services/wifiService';
 import { useAuth } from './AuthContext';
 import ENV from '../config/env';
-
-interface WiFiSession {
-  _id: string;
-  user: string;
-  ssid: string;
-  bssid?: string;
-  startTime: Date;
-  endTime?: Date;
-  pointsEarned?: number;
-}
 
 interface WiFiContextType {
   currentSession: WiFiSession | null;
   isConnected: boolean;
   currentSSID: string | null;
+  currentBSSID: string | null;
   connectionType: string | null;
   sessionHistory: WiFiSession[];
+  wifiStats: WiFiStats | null;
+  sessionDuration: number;
+  potentialPoints: number;
   startTracking: () => Promise<void>;
   stopTracking: () => Promise<void>;
   checkWiFiStatus: () => Promise<void>;
   refreshHistory: () => Promise<void>;
+  refreshStats: () => Promise<void>;
 }
 
 const WiFiContext = createContext<WiFiContextType | undefined>(undefined);
@@ -44,52 +39,116 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   const [currentSession, setCurrentSession] = useState<WiFiSession | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [currentSSID, setCurrentSSID] = useState<string | null>(null);
+  const [currentBSSID, setCurrentBSSID] = useState<string | null>(null);
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [sessionHistory, setSessionHistory] = useState<WiFiSession[]>([]);
-  const { isAuthenticated, updateUser } = useAuth();
+  const [wifiStats, setWifiStats] = useState<WiFiStats | null>(null);
+  const [sessionDuration, setSessionDuration] = useState(0);
+  const [potentialPoints, setPotentialPoints] = useState(0);
+  
+  const { isAuthenticated, updateUser, logout } = useAuth();
+  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
-      checkWiFiStatus();
-      loadActiveSession();
-      refreshHistory();
-
-      // Subscribe to network state changes
-      const unsubscribe = NetInfo.addEventListener(state => {
-        handleNetworkStateChange(state);
-      });
-
+      initializeWiFiTracking();
+      
       return () => {
-        unsubscribe();
+        if (updateIntervalRef.current) {
+          clearInterval(updateIntervalRef.current);
+        }
       };
+    } else {
+      // Clean up when user logs out
+      stopTracking();
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
     }
   }, [isAuthenticated]);
+
+  const initializeWiFiTracking = async () => {
+    await checkWiFiStatus();
+    await loadActiveSession();
+    await refreshHistory();
+    await refreshStats();
+
+    // Subscribe to network state changes
+    const unsubscribe = NetInfo.addEventListener(state => {
+      handleNetworkStateChange(state);
+    });
+
+    // Start real-time updates if there's an active session
+    startRealTimeUpdates();
+
+    // Cleanup function
+    return () => {
+      unsubscribe();
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  };
+
+  const startRealTimeUpdates = () => {
+    if (updateIntervalRef.current) {
+      clearInterval(updateIntervalRef.current);
+    }
+
+    updateIntervalRef.current = setInterval(async () => {
+      if (currentSession && isAuthenticated) {
+        try {
+          const updatedSession = await wifiService.updateSession();
+          setCurrentSession(updatedSession);
+          setSessionDuration(updatedSession.currentDuration || 0);
+          setPotentialPoints(updatedSession.potentialPoints || 0);
+          
+          // Refresh stats periodically
+          await refreshStats();
+        } catch (error) {
+          console.error('Real-time update error:', error);
+        }
+      }
+    }, ENV.SESSION_UPDATE_INTERVAL * 1000); // Convert to milliseconds
+  };
 
   const handleNetworkStateChange = async (state: any) => {
     const { type, isConnected: netIsConnected, details } = state;
     
     setConnectionType(type);
     
-    if (type === 'wifi' && netIsConnected && details?.ssid) {
+    if (type === 'wifi' && netIsConnected && details) {
       const ssid = details.ssid;
+      const bssid = details.bssid;
+      
       setCurrentSSID(ssid);
+      setCurrentBSSID(bssid);
       
-      // Check if this is a university WiFi network
-      const isUniversityWiFi = ENV.UNIVERSITY_SSIDS.some((universitySSID: string) => 
-        ssid.toLowerCase().includes(universitySSID.toLowerCase())
-      );
+      // Check if this is a valid university WiFi network
+      const isValidSSID = wifiService.isUniversityWiFi(ssid);
+      const isValidBSSID = wifiService.isValidUniversityBSSID(bssid);
       
-      if (isUniversityWiFi) {
+      if (ENV.DEBUG_MODE) {
+        console.log('WiFi Network Details:', {
+          ssid,
+          bssid,
+          isValidSSID,
+          isValidBSSID,
+          universityBSSIDPrefix: ENV.UNIVERSITY_BSSID_PREFIX,
+        });
+      }
+      
+      if (isValidSSID && isValidBSSID) {
         setIsConnected(true);
         
         // Auto-start session if not already active
-        if (!currentSession) {
+        if (!currentSession && isAuthenticated) {
           await startTracking();
         }
       } else {
         setIsConnected(false);
         
-        // End session if connected to non-university WiFi
+        // End session if connected to invalid WiFi
         if (currentSession) {
           await stopTracking();
         }
@@ -98,6 +157,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
       // Not connected to WiFi or no connection
       setIsConnected(false);
       setCurrentSSID(null);
+      setCurrentBSSID(null);
       
       // End session if disconnected
       if (currentSession) {
@@ -117,9 +177,12 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
 
   const loadActiveSession = async () => {
     try {
-      const response = await wifiAPI.getActiveSession();
-      if (response.data) {
-        setCurrentSession(response.data);
+      const session = await wifiService.getActiveSession();
+      if (session) {
+        setCurrentSession(session);
+        setSessionDuration(session.currentDuration || 0);
+        setPotentialPoints(session.potentialPoints || 0);
+        startRealTimeUpdates();
       }
     } catch (error) {
       console.error('Load active session error:', error);
@@ -127,13 +190,26 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   };
 
   const startTracking = async () => {
-    if (!isConnected || !currentSSID || currentSession) {
+    if (!isConnected || !currentSSID || !currentBSSID || currentSession || !isAuthenticated) {
       return;
     }
 
     try {
-      const response = await wifiAPI.startSession(currentSSID, 'auto-detected');
-      setCurrentSession(response.data);
+      const session = await wifiService.startSession({
+        ssid: currentSSID,
+        bssid: currentBSSID,
+      });
+      
+      setCurrentSession(session);
+      setSessionDuration(0);
+      setPotentialPoints(0);
+      
+      // Start real-time updates
+      startRealTimeUpdates();
+      
+      if (ENV.DEBUG_MODE) {
+        console.log('WiFi session started:', session);
+      }
     } catch (error: any) {
       console.error('Start tracking error:', error);
       // Don't throw error to avoid disrupting user experience
@@ -146,26 +222,53 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     }
 
     try {
-      const response = await wifiAPI.endSession();
+      const endedSession = await wifiService.endSession();
       
       // Update user points if points were earned
-      if (response.data.pointsEarned) {
-        updateUser({ points: (response.data.pointsEarned || 0) });
+      if (endedSession.pointsEarned && endedSession.pointsEarned > 0) {
+        updateUser({ points: endedSession.pointsEarned });
       }
       
       setCurrentSession(null);
+      setSessionDuration(0);
+      setPotentialPoints(0);
+      
+      // Stop real-time updates
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+        updateIntervalRef.current = null;
+      }
+      
       await refreshHistory();
+      await refreshStats();
+      
+      if (ENV.DEBUG_MODE) {
+        console.log('WiFi session ended:', endedSession);
+      }
     } catch (error: any) {
       console.error('Stop tracking error:', error);
     }
   };
 
   const refreshHistory = async () => {
+    if (!isAuthenticated) return;
+    
     try {
-      const response = await wifiAPI.getHistory();
-      setSessionHistory(response.data);
+      const history = await wifiService.getSessionHistory();
+      setSessionHistory(history);
     } catch (error) {
       console.error('Refresh history error:', error);
+    }
+  };
+
+  const refreshStats = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const stats = await wifiService.getStats();
+      setWifiStats(stats);
+    } catch (error) {
+      console.error('Refresh stats error:', error);
     }
   };
 
@@ -173,12 +276,17 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     currentSession,
     isConnected,
     currentSSID,
+    currentBSSID,
     connectionType,
     sessionHistory,
+    wifiStats,
+    sessionDuration,
+    potentialPoints,
     startTracking,
     stopTracking,
     checkWiFiStatus,
     refreshHistory,
+    refreshStats,
   };
 
   return (

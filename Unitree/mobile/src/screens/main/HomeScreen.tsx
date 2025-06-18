@@ -7,6 +7,7 @@ import {
   StatusBar,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, {
@@ -35,10 +36,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Types
 type RootStackParamList = {
-  Points: undefined;
-  Trees: undefined;
-  Profile: undefined;
-  WifiStatus: undefined;
+  points: undefined;
+  trees: undefined;
+  profile: undefined;
+  wifi: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -65,7 +66,16 @@ const HomeScreen = () => {
   });
   const [currentPoints, setCurrentPoints] = useState<number>(user?.points || 0);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [refreshing, setRefreshing] = useState(false);
+  const [actualTreeCount, setActualTreeCount] = useState<number>(0);
   const insets = useSafeAreaInsets();
+
+  // Get last name from full name
+  const getLastName = (fullname: string | undefined): string => {
+    if (!fullname) return 'User';
+    const nameParts = fullname.trim().split(' ');
+    return nameParts[nameParts.length - 1];
+  };
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
@@ -87,6 +97,9 @@ const HomeScreen = () => {
           isConnected: !!currentSession,
           sessionInfo: currentSession
         });
+
+        // Fetch actual tree count
+        await fetchActualTreeCount();
 
         // Add connection change listener
         const subscription = eventService.addListener('wifi', (status: WifiStatus) => {
@@ -122,7 +135,7 @@ const HomeScreen = () => {
   useEffect(() => {
     if (!user) return;
 
-    const subscription = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
+    const pointsSubscription = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
       console.log('HomeScreen - Received points update:', data);
       if (data.points !== undefined || data.totalPoints !== undefined) {
         const newPoints = data.totalPoints ?? data.points;
@@ -131,8 +144,14 @@ const HomeScreen = () => {
       }
     });
 
+    const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
+      console.log('HomeScreen - Tree redeemed:', data);
+      fetchActualTreeCount(); // Refresh actual tree count from API
+    });
+
     return () => {
       eventService.removeAllListeners('points');
+      eventService.removeAllListeners('treeRedeemed');
     };
   }, [user?.id]);
 
@@ -161,23 +180,59 @@ const HomeScreen = () => {
 
   // Navigation handlers
   const navigateToPoints = () => {
-    navigation.navigate('Points');
+    navigation.navigate('points');
   };
 
   const navigateToTrees = () => {
-    navigation.navigate('Trees');
+    navigation.navigate('trees');
   };
 
   const navigateToProfile = () => {
-    navigation.navigate('Profile');
+    navigation.navigate('profile');
   };
 
   const navigateToWifi = () => {
-    navigation.navigate('WifiStatus');
+    navigation.navigate('wifi');
+  };
+
+  const fetchActualTreeCount = async () => {
+    try {
+      if (user) {
+        const trees = await treeService.getTrees();
+        setActualTreeCount(trees.length);
+        // Also update the user context to keep it in sync
+        updateUser({ treesPlanted: trees.length });
+      }
+    } catch (error) {
+      console.error('Error fetching tree count:', error);
+      // Fallback to user.treesPlanted if API call fails
+      setActualTreeCount(user?.treesPlanted || 0);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh WiFi status
+      if (user) {
+        const currentSession = await wifiService.getActiveSession();
+        setWifiStatus({
+          isConnected: !!currentSession,
+          sessionInfo: currentSession
+        });
+      }
+      // Fetch actual tree count
+      await fetchActualTreeCount();
+      // Points will be updated via the existing listeners
+    } catch (error) {
+      console.error('Error refreshing home data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
 
       {/* Fixed Header Section */}
@@ -188,7 +243,7 @@ const HomeScreen = () => {
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <Text style={styles.titleText}>
-            Welcome back, {user?.name || 'User'}!
+            Welcome back, {getLastName(user?.fullname)}!
           </Text>
           <Text style={styles.subtitleText}>
             Track your WiFi sessions and plant more trees
@@ -208,6 +263,9 @@ const HomeScreen = () => {
             { paddingBottom: insets.bottom + rs(90) }
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <View style={styles.content}>
             {/* Points Card */}
@@ -218,13 +276,15 @@ const HomeScreen = () => {
             >
               <View style={styles.cardHeader}>
                 <Icon name="star" size={24} color="#50AF27" />
-                <Text style={styles.cardTitle}>Your Points</Text>
+                <Text style={styles.cardTitle}>Available Points</Text>
                 <View style={styles.cardArrow}>
                   <Icon name="chevron-right" size={20} color="#666" />
                 </View>
               </View>
-              <Text style={styles.pointsValue}>{currentPoints}</Text>
-              <Text style={styles.pointsSubtext}>Keep connecting to earn more!</Text>
+              <Text style={styles.pointsValue}>{user?.points || 0}</Text>
+              <Text style={styles.pointsSubtext}>
+                Use your points to plant new trees!
+              </Text>
             </TouchableOpacity>
 
             {/* WiFi Status Card */}
@@ -287,16 +347,16 @@ const HomeScreen = () => {
                   <Icon name="chevron-right" size={20} color="#666" />
                 </View>
               </View>
-              <Text style={styles.treeCount}>{user?.treesPlanted || 0}</Text>
+              <Text style={styles.treeCount}>{actualTreeCount}</Text>
               <Text style={styles.co2Text}>
-                You've helped reduce CO₂ by approximately {(user?.treesPlanted || 0) * 48}kg per year!
+                You've helped reduce CO₂ by approximately {(actualTreeCount * 48)}kg per year!
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </Animated.View>
 
-      {/* Mascot - Positioned to appear on top */}
+      {/* Mascot */}
       <View style={styles.mascotContainer}>
         <Image
           source={require('../../assets/mascots/Unitree - Mascot-4.png')}
@@ -304,34 +364,27 @@ const HomeScreen = () => {
           resizeMode="contain"
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#B7DDE6',
-  },
   container: {
     flex: 1,
     backgroundColor: '#B7DDE6',
   },
-  
-  // Header Section Styles
   headerSection: {
     backgroundColor: '#B7DDE6',
-    paddingBottom: rs(80),
+    paddingBottom: rs(90),
     paddingTop: rs(10),
   },
-
   welcomeSection: {
     alignItems: 'flex-start',
     paddingHorizontal: rs(20),
     marginTop: rs(10),
   },
   titleText: {
-    fontSize: rf(28),
+    fontSize: rf(32),
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: rs(10),
@@ -344,8 +397,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     lineHeight: rf(24),
   },
-
-  // Content Section Styles
   contentSection: {
     flex: 1,
     backgroundColor: '#98D56D',
@@ -353,33 +404,26 @@ const styles = StyleSheet.create({
     borderTopRightRadius: rs(30),
     paddingHorizontal: rs(24),
     paddingTop: rs(32),
-    minHeight: '100%',
   },
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(80),
+    top: rs(105),
     zIndex: 9999,
   },
   mascotImage: {
-    width: wp(40),
-    height: wp(40),
+    width: rs(160),
+    height: rs(160),
   },
   scrollContainer: {
     flex: 1,
     marginTop: rs(40),
     borderRadius: rs(16),
-    width: '100%',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: rs(80),
   },
-  content: {
-    width: '100%',
-  },
-  
-  // Card Styles
+  content: {},
   pointsCard: {
     backgroundColor: '#fff',
     borderRadius: rs(16),

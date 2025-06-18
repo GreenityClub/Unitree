@@ -30,6 +30,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files for avatar uploads
+app.use('/uploads', express.static('uploads'));
+
 // Connect to MongoDB
 console.log('Connecting to MongoDB...');
 mongoose.connect(process.env.MONGODB_URI)

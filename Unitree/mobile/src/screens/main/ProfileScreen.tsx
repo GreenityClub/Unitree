@@ -6,6 +6,8 @@ import {
   Image,
   StatusBar,
   TouchableOpacity,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, {
@@ -13,23 +15,44 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { rf, rs, deviceValue } from '../../utils/responsive';
-
-type RootStackParamList = {
-  UserSettingsScreen: undefined;
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'UserSettingsScreen'>;
+import userService from '../../services/userService';
+import { treeService } from '../../services/treeService';
+import { eventService } from '../../services/eventService';
+import { getAvatarUrl, handleAvatarError } from '../../utils/imageUtils';
 
 const ProfileScreen = () => {
-  const { user, logout } = useAuth();
-  const navigation = useNavigation<NavigationProp>();
+  const { user, logout, updateUser } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [avatarError, setAvatarError] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [actualTreeCount, setActualTreeCount] = React.useState<number>(0);
   const insets = useSafeAreaInsets();
+
+  React.useEffect(() => {
+    if (user) {
+      fetchActualTreeCount();
+    }
+  }, [user?.id]);
+
+  // Listen for tree redemption events
+  React.useEffect(() => {
+    if (!user) return;
+
+    const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
+      console.log('ProfileScreen - Tree redeemed:', data);
+      fetchActualTreeCount(); // Refresh actual tree count from API
+    });
+
+    return () => {
+      eventService.removeAllListeners('treeRedeemed');
+    };
+  }, [user?.id]);
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -53,6 +76,141 @@ const ProfileScreen = () => {
     }
   };
 
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to make this work!'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const pickImage = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    Alert.alert(
+      'Select Avatar',
+      'Choose an option',
+      [
+        {
+          text: 'Camera',
+          onPress: () => openImagePicker('camera'),
+        },
+        {
+          text: 'Gallery',
+          onPress: () => openImagePicker('gallery'),
+        },
+        {
+          text: 'Remove Avatar',
+          onPress: () => removeAvatar(),
+          style: 'destructive',
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const openImagePicker = async (type: 'camera' | 'gallery') => {
+    try {
+      let result;
+      
+      if (type === 'camera') {
+        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+        if (cameraPermission.status !== 'granted') {
+          Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+          return;
+        }
+        
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const uploadAvatar = async (imageUri: string) => {
+    setIsUploading(true);
+    try {
+      const response = await userService.uploadAvatar(imageUri);
+      updateUser({ avatar: response.avatar });
+      setAvatarError(false); // Reset avatar error state on successful upload
+      Alert.alert('Success', 'Avatar updated successfully!');
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      Alert.alert('Error', error.message || 'Failed to upload avatar');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setIsUploading(true);
+    try {
+      await userService.deleteAvatar();
+      updateUser({ avatar: undefined });
+      Alert.alert('Success', 'Avatar removed successfully!');
+    } catch (error: any) {
+      console.error('Avatar removal error:', error);
+      Alert.alert('Error', error.message || 'Failed to remove avatar');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const fetchActualTreeCount = async () => {
+    try {
+      if (user) {
+        const trees = await treeService.getTrees();
+        setActualTreeCount(trees.length);
+        // Also update the user context to keep it in sync
+        updateUser({ treesPlanted: trees.length });
+      }
+    } catch (error) {
+      console.error('Error fetching tree count:', error);
+      // Fallback to user.treesPlanted if API call fails
+      setActualTreeCount(user?.treesPlanted || 0);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Profile data is mostly managed by the auth context
+      // Reset avatar error state on refresh
+      setAvatarError(false);
+      // Fetch actual tree count
+      await fetchActualTreeCount();
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
@@ -64,15 +222,39 @@ const ProfileScreen = () => {
       >
         {/* Profile Header */}
         <View style={styles.profileHeaderSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLabel}>{user?.name?.charAt(0) || 'U'}</Text>
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={pickImage}
+            disabled={isUploading}
+          >
+            <View style={styles.avatar}>
+              {user?.avatar && getAvatarUrl(user.avatar) && !avatarError ? (
+                <Image 
+                  source={{ uri: getAvatarUrl(user.avatar)! }} 
+                  style={styles.avatarImage}
+                  onError={handleAvatarError(() => setAvatarError(true))}
+                />
+              ) : (
+                <Text style={styles.avatarLabel}>{user?.fullname?.charAt(0) || 'U'}</Text>
+              )}
+              {isUploading && (
+                <View style={styles.avatarOverlay}>
+                  <Icon name="loading" size={24} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={styles.avatarEditIcon}>
+              <Icon name="camera" size={16} color="#fff" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.profileInfoContainer}>
+            <Text style={styles.profileName}>
+              {user?.fullname || 'User'}
+            </Text>
+            <Text style={styles.profileEmail}>
+              {user?.email || 'No email provided'}
+            </Text>
           </View>
-          <Text style={styles.profileName}>
-            {user?.name || 'User'}
-          </Text>
-          <Text style={styles.profileEmail}>
-            {user?.email || 'No email provided'}
-          </Text>
         </View>
       </Animated.View>
 
@@ -88,6 +270,9 @@ const ProfileScreen = () => {
             { paddingBottom: insets.bottom + rs(90) }
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <View style={styles.content}>
             {/* Stats Card */}
@@ -102,13 +287,13 @@ const ProfileScreen = () => {
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Icon name="tree" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{user?.treesPlanted || 0}</Text>
+                  <Text style={styles.statValue}>{actualTreeCount}</Text>
                   <Text style={styles.statLabel}>Trees</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Icon name="cloud-outline" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{(user?.treesPlanted || 0) * 48}</Text>
+                  <Text style={styles.statValue}>{actualTreeCount * 48}</Text>
                   <Text style={styles.statLabel}>kg CO₂/year</Text>
                 </View>
               </View>
@@ -120,7 +305,7 @@ const ProfileScreen = () => {
               
               <TouchableOpacity
                 style={styles.settingsItem}
-                onPress={() => navigation.navigate('UserSettingsScreen')}
+                onPress={() => router.push('/user-settings')}
               >
                 <View style={styles.settingsItemLeft}>
                   <Icon name="account-settings-outline" size={24} color="#50AF27" />
@@ -184,29 +369,69 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#E8F2CD',
-    paddingBottom: rs(90),
+    paddingBottom: rs(45),
     paddingTop: rs(10),
   },
   profileHeaderSection: {
     alignItems: 'center',
+    display: 'flex',
+    flexDirection: 'row',
     paddingHorizontal: rs(20),
     marginTop: rs(30),
+    paddingTop: rs(30),
+  },
+  avatarContainer: {
+    position: 'relative',
   },
   avatar: {
-    width: rs(80),
-    height: rs(80),
-    borderRadius: rs(40),
+    width: rs(90),
+    height: rs(90),
+    borderRadius: rs(50),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginBottom: rs(16),
     borderWidth: 2,
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: rs(50),
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: rs(50),
+  },
+  avatarEditIcon: {
+    position: 'absolute',
+    bottom: rs(16),
+    right: 0,
+    backgroundColor: '#50AF27',
+    borderRadius: rs(12),
+    padding: rs(4),
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   avatarLabel: {
     fontSize: rf(36),
     color: '#fff',
     fontWeight: 'bold',
+  },
+  profileInfoContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginLeft: rs(20),
+    marginBottom: rs(10),
   },
   profileName: {
     fontSize: rf(24),
@@ -232,7 +457,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: deviceValue(150, 160, 170),
+    top: deviceValue(115, 125, 135),
     zIndex: 9999,
   },
   mascotImage: {

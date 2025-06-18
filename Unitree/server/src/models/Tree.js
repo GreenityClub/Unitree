@@ -8,8 +8,8 @@ const treeSchema = new mongoose.Schema({
   },
   species: {
     type: String,
-    required: true,
-    enum: ['oak', 'maple', 'pine']  // Match the species IDs from the mobile app
+    required: true
+    // Removed enum restriction to allow any species ID from TreeType collection
   },
   name: {
     type: String,

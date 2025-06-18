@@ -24,16 +24,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
 import { treeService } from '../../services/treeService';
+import { eventService } from '../../services/eventService';
 import type { WiFiSession } from '../../services/wifiService';
 import { rf, rs } from '../../utils/responsive';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { router } from 'expo-router';
 import type { Tree as BaseTree } from '../../services/treeService';
 
 // Define a UI-specific tree type instead of extending BaseTree
 interface Tree {
   _id: string;
   userId: string;
+  name?: string;
   plantedDate: Date;
   stage: 'sapling' | 'young' | 'mature';
   healthScore: number;
@@ -56,11 +57,7 @@ interface SessionInfo {
   durationMinutes: number;
 }
 
-type RootStackParamList = {
-  TreeDetail: { treeId: string };
-};
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TreeDetail'>;
 
 // Tree stage images from assets
 const getStageImage = (stage: number): any => {
@@ -82,7 +79,7 @@ interface TreeCardProps {
 }
 
 const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress, currentSessionHours = 0 }) => {
-  const { species, currentStage, healthScore, wifiHoursAccumulated } = tree;
+  const { species, currentStage, healthScore, wifiHoursAccumulated, name } = tree;
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.treeCard}>
@@ -93,7 +90,7 @@ const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress, currentSessionHours 
           resizeMode="contain"
         />
         <View style={styles.treeInfo}>
-          <Text style={styles.treeName}>{species.name}</Text>
+          <Text style={styles.treeName}>{name || `My ${species.name}`}</Text>
           <Text style={styles.treeStage}>Ancient Tree</Text>
         </View>
       </View>
@@ -132,7 +129,6 @@ const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress, currentSessionHours 
 const TreesScreen = () => {
   const { user } = useAuth();
   const { currentSession } = useWiFi();
-  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [trees, setTrees] = useState<Tree[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -150,6 +146,20 @@ const TreesScreen = () => {
     loadTrees();
   }, []);
 
+  // Listen for tree redemption events
+  useEffect(() => {
+    if (!user) return;
+
+    const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
+      console.log('TreesScreen - Tree redeemed:', data);
+      loadTrees(); // Refresh trees list
+    });
+
+    return () => {
+      eventService.removeAllListeners('treeRedeemed');
+    };
+  }, [user?.id]);
+
   const loadTrees = async () => {
     try {
       setLoading(true);
@@ -157,10 +167,11 @@ const TreesScreen = () => {
       // Transform the base trees into our UI-specific tree format
       const transformedTrees: Tree[] = userTrees.map(tree => ({
         ...tree,
+        name: tree.name, // Preserve the tree name
         currentStage: 1, // Default to stage 1
         wifiHoursAccumulated: 0, // Default to 0 hours
         species: {
-          name: tree.species,
+          name: tree.species || 'Unknown Tree',
           hoursToNextStage: 24, // Default to 24 hours
         }
       }));
@@ -190,7 +201,7 @@ const TreesScreen = () => {
       >
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>Your Trees</Text>
+          <Text style={styles.titleText}>Your Forest</Text>
           <Text style={styles.subtitleText}>
             Watch your forest grow with each WiFi connection
           </Text>
@@ -253,7 +264,7 @@ const TreesScreen = () => {
                 <TreeCard
                   key={tree._id}
                   tree={tree}
-                  onPress={() => navigation.navigate('TreeDetail', { treeId: tree._id })}
+                  onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
                   currentSessionHours={calculateSessionDuration(currentSession)}
                 />
               ))
@@ -284,10 +295,10 @@ const TreesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFCED2',
   },
   headerSection: {
-    backgroundColor: '#E8F2CD',
+    backgroundColor: '#FFCED2',
     paddingBottom: rs(90),
     paddingTop: rs(10),
   },
@@ -317,11 +328,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: rs(30),
     paddingHorizontal: rs(24),
     paddingTop: rs(32),
+    
   },
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(80),
+    top: rs(105),
     zIndex: 9999,
   },
   mascotImage: {
