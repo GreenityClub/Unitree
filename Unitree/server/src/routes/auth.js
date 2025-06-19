@@ -12,7 +12,7 @@ const bcrypt = require('bcryptjs');
 // Register user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, studentId, university } = req.body;
+    const { email, password, fullname, nickname, studentId, university } = req.body;
 
     // Check if user already exists
     let user = await User.findOne({ 
@@ -30,7 +30,8 @@ router.post('/register', async (req, res) => {
     user = new User({
       email,
       password,
-      name,
+      fullname,
+      nickname,
       studentId,
       university
     });
@@ -44,7 +45,6 @@ router.post('/register', async (req, res) => {
       token,
       user: {
         id: user._id,
-        name: user.name,
         fullname: user.fullname,
         nickname: user.nickname,
         email: user.email,
@@ -108,7 +108,6 @@ router.post('/login', async (req, res) => {
       token,
       user: {
         id: user._id,
-        name: user.name,
         fullname: user.fullname,
         nickname: user.nickname,
         email: user.email,

@@ -83,7 +83,7 @@ class WiFiService {
     }
   }
 
-  async getActiveSession(): Promise<WiFiSession | null> {
+  async getActiveSession(): Promise<WifiStats['currentSession']> {
     try {
       const stats = await this.getStats();
       return stats.currentSession;
@@ -121,13 +121,15 @@ class WiFiService {
 
   isValidUniversityBSSID(bssid: string): boolean {
     if (!bssid || typeof bssid !== 'string') return false;
-    return bssid.toLowerCase().startsWith(ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase());
+    return this.extractBSSIDPrefix(bssid) === ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase();
   }
 
   extractBSSIDPrefix(bssid: string): string {
-    // Extract first 8 characters (first 4 octets) of BSSID
-    if (!bssid || typeof bssid !== 'string' || bssid.length < 8) return '';
-    return bssid.slice(0, 8).toLowerCase();
+    // Extract the first four octets (e.g. "24:43:e2:92" from "24:43:e2:92:ab:cd")
+    if (!bssid || typeof bssid !== 'string') return '';
+    const parts = bssid.split(':');
+    if (parts.length < 4) return '';
+    return parts.slice(0, 4).join(':').toLowerCase();
   }
 
   calculateSessionDuration(startTime: Date, endTime?: Date): number {
@@ -224,15 +226,3 @@ class WiFiService {
 }
 
 export const wifiService = new WiFiService();
-
-export const getWifiStats = async (): Promise<WifiStats> => {
-  try {
-    const response = await apiRequest('/api/wifi/stats', {
-      method: 'GET',
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Failed to get WiFi stats:', error);
-    throw error;
-  }
-}; 

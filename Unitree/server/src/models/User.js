@@ -18,10 +18,6 @@ const userSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
-  name: {
-    type: String,
-    required: [true, 'Please provide a name']
-  },
   fullname: {
     type: String,
     required: false

@@ -15,7 +15,8 @@ async function seedData() {
 
     // Create a test user
     const user = await User.create({
-      name: 'Test User',
+      fullname: 'Test User',
+      nickname: 'testuser',
       email: 'test@university.edu',
       password: 'password123',
       university: 'Test University',

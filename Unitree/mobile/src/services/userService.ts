@@ -13,7 +13,7 @@ export interface PasswordChangeData {
 
 export interface LeaderboardUser {
   id: string;
-  name: string;
+  fullname: string;
   nickname?: string;
   points: number; // Current redeemable points
   allTimePoints?: number; // Total points earned from WiFi time

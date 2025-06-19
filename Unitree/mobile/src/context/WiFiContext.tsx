@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { wifiService, WifiStats } from '../services/wifiService';
+import WifiMonitor from '../services/WifiMonitor';
 import { useAuth } from './AuthContext';
 import ENV from '../config/env';
 
@@ -14,6 +15,7 @@ interface WiFiContextType {
   stats: WifiStats | null;
   refreshStats: () => Promise<void>;
   error: string | null;
+  wifiMonitor: typeof WifiMonitor;
 }
 
 const WiFiContext = createContext<WiFiContextType | undefined>(undefined);
@@ -40,6 +42,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   const [currentSessionDuration, setCurrentSessionDuration] = useState(0);
   const [stats, setStats] = useState<WifiStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const wifiMonitorListenerRef = useRef<(() => void) | null>(null);
 
   const refreshStats = async () => {
     if (!isAuthenticated) return;
@@ -162,6 +165,76 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     manageSession();
   }, [isAuthenticated, isUniversityWifi, isSessionActive]);
 
+  // WiFi Monitor integration
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Stop monitoring and reset state when not authenticated
+      if (WifiMonitor.isRunning()) {
+        WifiMonitor.stop();
+      }
+      WifiMonitor.resetSessionState();
+      
+      // Remove listener if exists
+      if (wifiMonitorListenerRef.current) {
+        wifiMonitorListenerRef.current();
+        wifiMonitorListenerRef.current = null;
+      }
+      
+      setIsSessionActive(false);
+      setCurrentSessionDuration(0);
+      return;
+    }
+
+    // Start monitoring when authenticated
+    const startWifiMonitoring = async () => {
+      try {
+        // Add listener for WiFi Monitor events
+        wifiMonitorListenerRef.current = WifiMonitor.addListener('connectionChange', (data) => {
+          console.log('WiFi Monitor connection change:', data);
+          setIsConnected(data.isConnected);
+          
+          if (data.sessionInfo) {
+            setIsSessionActive(true);
+            setCurrentSessionDuration(data.sessionInfo.durationMinutes || 0);
+            setSsid(data.sessionInfo.ssid);
+            setBssid(data.sessionInfo.bssid);
+            
+            // Check if it's university WiFi based on BSSID
+            const isUniWifi = data.sessionInfo.bssid ? 
+              data.sessionInfo.bssid.toLowerCase().startsWith(ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase()) :
+              false;
+            setIsUniversityWifi(isUniWifi);
+          } else {
+            setIsSessionActive(false);
+            setCurrentSessionDuration(0);
+            setIsUniversityWifi(false);
+          }
+        });
+
+        // Start the monitor with points earned callback
+        await WifiMonitor.start((points, data) => {
+          console.log('Points earned from WiFi Monitor:', points, data);
+          // Refresh stats when points are earned
+          refreshStats();
+        });
+
+      } catch (error) {
+        console.error('Failed to start WiFi monitoring:', error);
+        setError('Failed to start WiFi monitoring');
+      }
+    };
+
+    startWifiMonitoring();
+
+    // Cleanup on unmount or when authentication changes
+    return () => {
+      if (wifiMonitorListenerRef.current) {
+        wifiMonitorListenerRef.current();
+        wifiMonitorListenerRef.current = null;
+      }
+    };
+  }, [isAuthenticated]);
+
   // Periodic stats refresh
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -185,7 +258,8 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     currentSessionDuration,
     stats,
     refreshStats,
-    error
+    error,
+    wifiMonitor: WifiMonitor
   };
 
   return (

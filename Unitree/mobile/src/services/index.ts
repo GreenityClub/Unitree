@@ -1,5 +1,7 @@
 export { authService } from './authService';
 export { wifiService } from './wifiService';
+export { default as WifiMonitor } from './WifiMonitor';
+export { default as ApiService } from './ApiService';
 export { treeService } from './treeService';
 export { eventService } from './eventService';
 export { pointsService } from './pointsService';

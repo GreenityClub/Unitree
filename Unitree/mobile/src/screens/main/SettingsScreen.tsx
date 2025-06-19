@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import SafeScreen from '../../components/SafeScreen';
 import { colors, spacing } from '../../theme';
-import { Card, IconSymbol } from '../../components';
-import { useAuth } from '../../contexts/AuthContext';
+import { Card } from '../../components';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../context/AuthContext';
 
 interface SettingsSection {
   id: string;
@@ -69,25 +70,36 @@ const settingsSections: SettingsSection[] = [
 ];
 
 export default function SettingsScreen() {
-  const { signOut } = useAuth();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      await logout();
     } catch (error) {
       console.error('Error logging out:', error);
     }
+  };
+
+  const getIconName = (iconName: string) => {
+    const iconMap: { [key: string]: string } = {
+      'user': 'account',
+      'bell': 'bell',
+      'wifi': 'wifi',
+      'log-out': 'logout',
+      'chevron-right': 'chevron-right'
+    };
+    return iconMap[iconName] || 'help-circle';
   };
 
   const renderSettingsItem = (item: SettingsItem) => {
     const content = (
       <View style={styles.settingsItem}>
         <View style={styles.settingsItemLeft}>
-          <IconSymbol name={item.icon} size={24} color={colors.primary} />
+          <Icon name={getIconName(item.icon)} size={24} color={colors.primary} />
           <Text style={styles.settingsItemTitle}>{item.title}</Text>
         </View>
         {item.showArrow && (
-          <IconSymbol name="chevron-right" size={24} color={colors.textSecondary} />
+          <Icon name="chevron-right" size={24} color={colors.textSecondary} />
         )}
       </View>
     );
@@ -101,11 +113,9 @@ export default function SettingsScreen() {
     }
 
     return (
-      <Link key={item.id} href={item.route} asChild>
-        <TouchableOpacity>
+      <TouchableOpacity key={item.id} onPress={() => router.push(item.route as any)}>
           {content}
         </TouchableOpacity>
-      </Link>
     );
   };
 
@@ -150,8 +160,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
-    marginBottom: spacing.component.sm,
-    paddingHorizontal: spacing.component.sm,
+    marginBottom: spacing.component.paddingSM,
+    paddingHorizontal: spacing.component.paddingSM,
   },
   sectionCard: {
     padding: 0,
@@ -161,7 +171,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.component.md,
+    padding: spacing.component.paddingMD,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -172,6 +182,6 @@ const styles = StyleSheet.create({
   settingsItemTitle: {
     fontSize: 16,
     color: colors.textPrimary,
-    marginLeft: spacing.component.md,
+    marginLeft: spacing.component.paddingMD,
   },
 }); 

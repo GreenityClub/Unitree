@@ -18,7 +18,7 @@ import Animated, {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { wifiService } from '../../services/wifiService';
+import { wifiService, WifiStats } from '../../services/wifiService';
 import { treeService } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import { pointsService } from '../../services/pointsService';
@@ -51,15 +51,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface WifiStatus {
   isConnected: boolean;
-  sessionInfo: {
-    startTime?: Date;
-    pendingPoints?: number;
-    completeHours?: number;
-    progressPercent?: number;
-    minutesToNextHour?: number;
-    transaction?: any;
-    newTotalPoints?: number;
-  } | null;
+  sessionInfo: WifiStats['currentSession'];
 }
 
 const HomeScreen = () => {
@@ -192,7 +184,7 @@ const HomeScreen = () => {
 
   const getWifiStatusText = () => {
     if (wifiStatus.isConnected && wifiStatus.sessionInfo?.startTime) {
-      const duration = wifiService.calculateSessionDuration(wifiStatus.sessionInfo.startTime);
+      const duration = wifiService.calculateSessionDuration(new Date(wifiStatus.sessionInfo.startTime));
       return `Connected to university WiFi\nSession duration: ${wifiService.formatSessionDuration(duration)}`;
     }
     return 'Not connected to university WiFi';
@@ -348,14 +340,10 @@ const HomeScreen = () => {
               {wifiStatus.isConnected && wifiStatus.sessionInfo && (
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionText}>
-                    Pending points: {wifiStatus.sessionInfo.pendingPoints || 0}
+                    Points earned: {wifiStatus.sessionInfo.points || 0}
                   </Text>
                   <Text style={styles.sessionText}>
-                    Complete hours: {wifiStatus.sessionInfo.completeHours || 0}
-                  </Text>
-                  <Text style={styles.sessionText}>
-                    Progress to next hour: {wifiStatus.sessionInfo.progressPercent || 0}% 
-                    ({wifiStatus.sessionInfo.minutesToNextHour || 60} min remaining)
+                    Duration: {wifiService.formatWifiTime(wifiStatus.sessionInfo.duration || 0)}
                   </Text>
                   <Text style={styles.tapHintText}>
                     Tap to view WiFi details
@@ -394,7 +382,7 @@ const HomeScreen = () => {
         {/* Mascot */}
         <View style={styles.mascotContainer}>
           <Image
-            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+            source={require('../../assets/mascots/Unitree - Mascot-5.png')}
             style={styles.mascotImage}
             resizeMode="contain"
           />

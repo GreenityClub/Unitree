@@ -45,7 +45,7 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
       if (fullAvatarUrl) {
         // Debug logging for development
         if (__DEV__) {
-          console.log(`Loading avatar for ${user.nickname || user.name}: ${fullAvatarUrl}`);
+          console.log(`Loading avatar for ${user.nickname || user.fullname}: ${fullAvatarUrl}`);
         }
         return { uri: fullAvatarUrl };
       }
@@ -54,7 +54,7 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
   };
 
   const getInitials = (user: LeaderboardUser) => {
-    const name = user.nickname || user.name || 'U';
+    const name = user.nickname || user.fullname || 'U';
     return name.charAt(0).toUpperCase();
   };
 
@@ -110,7 +110,7 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
           styles.userName,
           isCurrentUser && styles.currentUserName
         ]}>
-          {user.nickname || user.name || 'Anonymous'}
+          {user.nickname || user.fullname || 'Anonymous'}
         </Text>
         <Text style={[
           styles.userPoints,

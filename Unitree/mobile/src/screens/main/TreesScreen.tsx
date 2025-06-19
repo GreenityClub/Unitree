@@ -229,7 +229,7 @@ const TreesScreen = () => {
   return (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
+        <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
 
         {/* Fixed Header Section */}
         <Animated.View 

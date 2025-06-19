@@ -54,6 +54,7 @@ export default function RegisterScreen() {
   // Step 3 - Complete registration
   const [studentData, setStudentData] = useState<any>(null);
   const [formData, setFormData] = useState({
+    nickname: '',
     password: '',
     confirmPassword: '',
     university: '',
@@ -202,7 +203,7 @@ export default function RegisterScreen() {
   // Step 3: Complete registration
   const handleRegister = async () => {
     // Validate form
-    if (!studentData?.full_name || !studentData?.student_id || !formData.password || !formData.confirmPassword || !formData.university) {
+    if (!studentData?.full_name || !studentData?.student_id || !formData.nickname || !formData.password || !formData.confirmPassword || !formData.university) {
       setError('Please fill in all required fields');
       return;
     }
@@ -223,7 +224,8 @@ export default function RegisterScreen() {
       setError('');
       
       const registerData = {
-        name: studentData.full_name, // Use full name from student data
+        fullname: studentData.full_name, // Use full name from student data
+        nickname: formData.nickname,
         email: studentData.email || email,
         password: formData.password,
         studentId: studentData.student_id, // Use student ID from student data
@@ -262,6 +264,7 @@ export default function RegisterScreen() {
     setVerificationCode('');
     setStudentData(null);
     setFormData({
+      nickname: '',
       password: '',
       confirmPassword: '',
       university: '',
@@ -276,6 +279,7 @@ export default function RegisterScreen() {
     setCurrentStep(2);
     setStudentData(null);
     setFormData({
+      nickname: '',
       password: '',
       confirmPassword: '',
       university: '',
@@ -497,6 +501,23 @@ export default function RegisterScreen() {
                   {/* Registration Form Section */}
                   <View style={styles.additionalInfoSection}>
                     <Text style={styles.sectionTitle}>Registration Information</Text>
+
+                    {/* Nickname Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Nickname *</Text>
+                      <View style={styles.inputWrapper}>
+                        <Icon name="account-circle-outline" size={20} color="#666" style={styles.inputIcon} />
+                        <TextInput
+                          value={formData.nickname}
+                          onChangeText={(value) => updateFormData('nickname', value)}
+                          placeholder="Enter your nickname"
+                          style={styles.textInput}
+                          underlineColor="transparent"
+                          activeUnderlineColor="transparent"
+                          contentStyle={styles.inputContent}
+                        />
+                      </View>
+                    </View>
 
                     {/* University Dropdown */}
                     <View style={styles.inputContainer}>

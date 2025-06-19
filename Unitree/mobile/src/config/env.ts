@@ -15,7 +15,7 @@ const ENV = {
   UNIVERSITY_SSIDS: (process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS || 'UniversityWiFi,Campus-Net,EduWiFi,eduroam').split(','),
   
   // WiFi BSSID Configuration (first 8 digits for tracking)
-  UNIVERSITY_BSSID_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_BSSID_PREFIX || 'c2:74:ad:1d',
+  UNIVERSITY_BSSID_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_BSSID_PREFIX || '24:43:e2:92',
 
   // Points Configuration
   POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '60', 10), // 1 minute = 1 point (60 points per hour)

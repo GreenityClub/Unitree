@@ -34,7 +34,7 @@ import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { formatDistanceToNow } from 'date-fns';
 import { rf, rs } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
-import { wifiService, WiFiSession } from '../../services/wifiService';
+import { wifiService, WiFiSession, WifiStats } from '../../services/wifiService';
 import { treeService, Tree, RedeemTreeData } from '../../services/treeService';
 import { pointsService, Transaction, PointsState } from '../../services/pointsService';
 import { eventService } from '../../services/eventService';
@@ -441,7 +441,8 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface User {
   id: string;
-  name: string;
+  fullname: string;
+  nickname: string;
   email: string;
   points: number;
   treesPlanted: number;
@@ -695,7 +696,7 @@ const PointsScreen = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalData, setModalData] = useState({ title: '', message: '' });
-  const [currentSession, setCurrentSession] = useState<WiFiSession | null>(null);
+  const [currentSession, setCurrentSession] = useState<WifiStats['currentSession']>(null);
   const [showSpeciesSelection, setShowSpeciesSelection] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -717,7 +718,7 @@ const PointsScreen = () => {
         const session = await wifiService.getActiveSession();
         setCurrentSession(session);
         if (session) {
-          const duration = wifiService.calculateSessionDuration(session.startTime);
+          const duration = wifiService.calculateSessionDuration(new Date(session.startTime));
           const points = wifiService.calculatePointsEarned(duration);
           setSessionPoints(points);
         }

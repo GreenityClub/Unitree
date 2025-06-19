@@ -136,14 +136,13 @@ router.get('/profile', auth, async (req, res) => {
 // Update user profile
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, fullname, nickname, university } = req.body;
+    const { fullname, nickname, university } = req.body;
     const user = await User.findById(req.user._id);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (name) user.name = name;
     if (fullname) user.fullname = fullname;
     if (nickname) user.nickname = nickname;
     if (university) user.university = university;
@@ -266,12 +265,13 @@ router.get('/leaderboard', auth, async (req, res) => {
     const users = await User.find({})
       .sort({ totalTimeConnected: -1 }) // Sort by total WiFi time
       .limit(100)
-      .select('name email avatar totalTimeConnected');
+      .select('fullname nickname email avatar totalTimeConnected');
 
     const leaderboard = users.map((user, index) => ({
       rank: index + 1,
       _id: user._id,
-      name: user.name,
+      fullname: user.fullname,
+      nickname: user.nickname,
       email: user.email,
       avatar: user.avatar,
       allTimePoints: Math.floor((user.totalTimeConnected || 0) / 60) // Convert seconds to points (1 minute = 1 point)
