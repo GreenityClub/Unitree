@@ -1,10 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../models/User');
-const Achievement = require('../models/Achievement');
-
 const Point = require('../models/Point');
-const RedemptionRequest = require('../models/RedemptionRequest');
 const Tree = require('../models/Tree');
 
 async function seedData() {
@@ -26,60 +23,26 @@ async function seedData() {
 
     // Create a test tree
     const tree = await Tree.create({
-      owner: user._id,
-      type: 'Oak',
-      stage: 'sapling',
-      health: 100,
+      userId: user._id,
+      species: 'oak-001',
+      name: 'Oak Tree',
       plantedDate: new Date(),
-      growthProgress: 10
+      lastWatered: new Date(),
+      stage: 'seedling',
+      healthScore: 100
     });
     console.log('Created test tree');
 
-    // Create test achievement
-    const achievement = await Achievement.create({
-      user: user._id,
-      type: 'FIRST_TREE',
-      title: 'First Tree Planted!',
-      description: 'You planted your first tree',
-      points: 50,
-      metadata: {
-        treeCount: 1
-      }
-    });
-    console.log('Created test achievement');
-
-
-
     // Create test point transaction
     await Point.create({
-      user: user._id,
+      userId: user._id,
       amount: 50,
-      type: 'ACHIEVEMENT',
-      description: 'First Tree Achievement Bonus',
-      reference: {
-        type: 'achievement',
-        id: achievement._id
+      type: 'BONUS',
+      metadata: {
+        description: 'Welcome bonus points'
       }
     });
     console.log('Created test point transaction');
-
-    // Create test redemption request
-    await RedemptionRequest.create({
-      user: user._id,
-      tree: tree._id,
-      status: 'pending',
-      shippingDetails: {
-        name: 'Test User',
-        address: '123 University St',
-        city: 'College Town',
-        state: 'ST',
-        zipCode: '12345',
-        country: 'United States',
-        phone: '123-456-7890'
-      },
-      notes: 'Please deliver on weekdays'
-    });
-    console.log('Created test redemption request');
 
     console.log('Database seeded successfully!');
   } catch (error) {
