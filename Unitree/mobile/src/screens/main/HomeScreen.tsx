@@ -124,24 +124,22 @@ const HomeScreen = () => {
     };
   }, [user?.id]); // Reinitialize when user changes
 
-  // Update points when user data changes
+  // Update points when user data changes or when user logs in
   useEffect(() => {
     if (user?.points !== undefined) {
       setCurrentPoints(user.points);
+      // Also update pointsService to keep it in sync
+      pointsService.handlePointsUpdate({ points: user.points });
     }
-  }, [user?.points]);
+  }, [user?.points, user?.id]); // Also depend on user.id to trigger on login
 
   // Sync with pointsService when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (user) {
         const currentPointsFromService = pointsService.getPoints();
-        console.log('HomeScreen focus - Points from service:', currentPointsFromService);
-        console.log('HomeScreen focus - Current local points:', currentPoints);
-        
         if (currentPointsFromService !== currentPoints) {
           setCurrentPoints(currentPointsFromService);
-          console.log('HomeScreen focus - Updated points to:', currentPointsFromService);
         }
       }
     }, [currentPoints, user])
@@ -152,16 +150,13 @@ const HomeScreen = () => {
     if (!user) return;
 
     const pointsSubscription = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
-      console.log('HomeScreen - Received points update:', data);
       if (data.points !== undefined || data.totalPoints !== undefined) {
         const newPoints = data.totalPoints ?? data.points;
         setCurrentPoints(newPoints ?? 0);
-        console.log('HomeScreen - Updated current points to:', newPoints);
       }
     });
 
     const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
-      console.log('HomeScreen - Tree redeemed:', data);
       fetchActualTreeCount(); // Refresh actual tree count from API
     });
 
@@ -242,7 +237,6 @@ const HomeScreen = () => {
       await pointsService.refreshPoints();
       const updatedPoints = pointsService.getPoints();
       setCurrentPoints(updatedPoints);
-      console.log('HomeScreen refresh - Updated points to:', updatedPoints);
       
       // Fetch actual tree count
       await fetchActualTreeCount();

@@ -143,6 +143,7 @@ router.post('/end', auth, async (req, res) => {
         { 
           $inc: { 
             points: pointsEarned,
+            allTimePoints: pointsEarned, // Add to all-time points 
             dayTimeConnected: durationSeconds,
             weekTimeConnected: durationSeconds,
             monthTimeConnected: durationSeconds,

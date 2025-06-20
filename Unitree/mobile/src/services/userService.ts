@@ -15,8 +15,8 @@ export interface LeaderboardUser {
   id: string;
   fullname: string;
   nickname?: string;
-  points: number; // Current redeemable points
-  allTimePoints?: number; // Total points earned from WiFi time
+  points?: number; // Current redeemable points (deprecated for leaderboard)
+  allTimePoints: number; // Total lifetime points earned - used for leaderboard ranking
   totalWifiTimeSeconds?: number; // Total WiFi connection time in seconds
   totalWifiTimeFormatted?: string; // Human-readable WiFi time format
   avatar?: string;

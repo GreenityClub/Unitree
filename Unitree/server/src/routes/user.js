@@ -263,21 +263,32 @@ router.delete('/avatar', auth, async (req, res) => {
 router.get('/leaderboard', auth, async (req, res) => {
   try {
     const users = await User.find({})
-      .sort({ totalTimeConnected: -1 }) // Sort by total WiFi time
+      .sort({ allTimePoints: -1 }) // Sort by all-time points earned
       .limit(100)
-      .select('fullname nickname email avatar totalTimeConnected');
+      .select('fullname nickname email avatar allTimePoints totalTimeConnected');
 
     const leaderboard = users.map((user, index) => ({
       rank: index + 1,
+      id: user._id.toString(), // Convert ObjectId to string for mobile app
       _id: user._id,
       fullname: user.fullname,
       nickname: user.nickname,
       email: user.email,
       avatar: user.avatar,
-      allTimePoints: Math.floor((user.totalTimeConnected || 0) / 60) // Convert seconds to points (1 minute = 1 point)
+      allTimePoints: user.allTimePoints || 0,
+      totalWifiTimeSeconds: user.totalTimeConnected || 0,
+      totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
     }));
 
-    res.json(leaderboard);
+    // Find current user's rank
+    const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
+
+    res.json({
+      leaderboard,
+      userRank: currentUserRank > 0 ? currentUserRank : null,
+      totalUsers: users.length,
+      currentUserId: req.user._id.toString()
+    });
   } catch (error) {
     logger.error('Leaderboard error:', error);
     res.status(500).json({ message: 'Server error' });

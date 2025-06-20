@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
+import { useTabBarContext } from '../context/TabBarContext';
 
 // Define the screen order based on navbar
 const SCREEN_ORDER = ['wifi', 'points', 'index', 'trees', 'profile'] as const;
@@ -15,6 +16,7 @@ interface SwipeNavigationOptions {
 
 export const useSwipeNavigation = (options: SwipeNavigationOptions) => {
   const navigation = useNavigation();
+  const { showTabBar } = useTabBarContext();
   const { 
     currentScreen, 
     sensitivity = 50, 
@@ -28,10 +30,12 @@ export const useSwipeNavigation = (options: SwipeNavigationOptions) => {
   const navigateToScreen = useCallback((screenName: ScreenName) => {
     try {
       navigation.navigate(screenName as never);
+      // Show tab bar whenever navigation occurs via swipe
+      showTabBar();
     } catch (error) {
       console.error('Navigation error:', error);
     }
-  }, [navigation]);
+  }, [navigation, showTabBar]);
 
   const handleSwipeLeft = useCallback(() => {
     const currentIndex = getCurrentIndex();

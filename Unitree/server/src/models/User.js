@@ -29,6 +29,11 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  allTimePoints: {
+    type: Number,
+    default: 0,
+    comment: 'Total lifetime points earned - never decreases, used for leaderboard'
+  },
   treesPlanted: {
     type: Number,
     default: 0
@@ -105,6 +110,30 @@ const userSchema = new mongoose.Schema({
     default: null,
     comment: 'Last time month stats were reset'
   },
+  
+  // Session management for single device login
+  activeSession: {
+    token: {
+      type: String,
+      default: null,
+      select: false
+    },
+    deviceInfo: {
+      type: String,
+      default: null,
+      select: false
+    },
+    loginTime: {
+      type: Date,
+      default: null,
+      select: false
+    },
+    lastActivity: {
+      type: Date,
+      default: null,
+      select: false
+    }
+  }
 }, {
   timestamps: true
 });
@@ -139,11 +168,47 @@ userSchema.methods.toJSON = function() {
   return user;
 };
 
-// Update points method
+// Update points method - adds to both current points and all-time points
 userSchema.methods.updatePoints = async function(points) {
   this.points += points;
+  // Only add to all-time points if adding points (not subtracting)
+  if (points > 0) {
+    this.allTimePoints += points;
+  }
   await this.save();
   return this.points;
+};
+
+// Session management methods
+userSchema.methods.setActiveSession = async function(token, deviceInfo = 'Unknown Device') {
+  this.activeSession = {
+    token: token,
+    deviceInfo: deviceInfo,
+    loginTime: new Date(),
+    lastActivity: new Date()
+  };
+  await this.save();
+};
+
+userSchema.methods.clearActiveSession = async function() {
+  this.activeSession = {
+    token: null,
+    deviceInfo: null,
+    loginTime: null,
+    lastActivity: null
+  };
+  await this.save();
+};
+
+userSchema.methods.hasActiveSession = function() {
+  return this.activeSession && this.activeSession.token && this.activeSession.token.trim() !== '';
+};
+
+userSchema.methods.updateLastActivity = async function() {
+  if (this.activeSession && this.activeSession.token && this.activeSession.token.trim() !== '') {
+    this.activeSession.lastActivity = new Date();
+    await this.save();
+  }
 };
 
 const User = mongoose.model('User', userSchema);

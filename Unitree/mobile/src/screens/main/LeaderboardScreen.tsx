@@ -12,6 +12,11 @@ import { Text } from 'react-native-paper';
 import Animated, {
   FadeInDown,
   FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  interpolate,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -27,6 +32,80 @@ interface LeaderboardItemProps {
   onPress?: (user: LeaderboardUser) => void;
 }
 
+// Sparkle effect component for top 3 users
+const SparkleEffect: React.FC<{ rank: number }> = ({ rank }) => {
+  const sparkle1 = useSharedValue(0);
+  const sparkle2 = useSharedValue(0);
+  const sparkle3 = useSharedValue(0);
+
+  useEffect(() => {
+    const startSparkles = () => {
+      sparkle1.value = withRepeat(
+        withTiming(1, { duration: 1000 }),
+        -1,
+        true
+      );
+      sparkle2.value = withRepeat(
+        withTiming(1, { duration: 1200 }),
+        -1,
+        true
+      );
+      sparkle3.value = withRepeat(
+        withTiming(1, { duration: 800 }),
+        -1,
+        true
+      );
+    };
+
+    if (rank <= 3) {
+      startSparkles();
+    }
+  }, [rank]);
+
+  const sparkle1Style = useAnimatedStyle(() => {
+    const opacity = interpolate(sparkle1.value, [0, 0.5, 1], [0.3, 1, 0.3]);
+    const scale = interpolate(sparkle1.value, [0, 0.5, 1], [0.5, 1.2, 0.5]);
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  const sparkle2Style = useAnimatedStyle(() => {
+    const opacity = interpolate(sparkle2.value, [0, 0.5, 1], [0.2, 0.8, 0.2]);
+    const scale = interpolate(sparkle2.value, [0, 0.5, 1], [0.3, 1, 0.3]);
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  const sparkle3Style = useAnimatedStyle(() => {
+    const opacity = interpolate(sparkle3.value, [0, 0.5, 1], [0.4, 1, 0.4]);
+    const scale = interpolate(sparkle3.value, [0, 0.5, 1], [0.6, 1.1, 0.6]);
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  if (rank > 3) return null;
+
+  return (
+    <View style={styles.sparkleContainer}>
+      <Animated.View style={[styles.sparkle, styles.sparkle1, sparkle1Style]}>
+        <Icon name="star-four-points" size={12} color="#FFD700" />
+      </Animated.View>
+      <Animated.View style={[styles.sparkle, styles.sparkle2, sparkle2Style]}>
+        <Icon name="star-four-points" size={8} color="#FFA500" />
+      </Animated.View>
+      <Animated.View style={[styles.sparkle, styles.sparkle3, sparkle3Style]}>
+        <Icon name="star-four-points" size={10} color="#FFD700" />
+      </Animated.View>
+    </View>
+  );
+};
+
 // Custom error type to handle API errors
 interface ApiError extends Error {
   code?: string;
@@ -38,6 +117,50 @@ interface ApiError extends Error {
 
 const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrentUser, onPress }) => {
   const [avatarError, setAvatarError] = useState(false);
+  
+  // Animation values for top 3 special effects
+  const glowValue = useSharedValue(0);
+  const pulseValue = useSharedValue(1);
+
+  useEffect(() => {
+    if (rank <= 3) {
+      // Glow animation for top 3
+      glowValue.value = withRepeat(
+        withTiming(1, { duration: 2000 }),
+        -1,
+        true
+      );
+      
+      // Pulse animation for #1
+      if (rank === 1) {
+        pulseValue.value = withRepeat(
+          withTiming(1.05, { duration: 1500 }),
+          -1,
+          true
+        );
+      }
+    }
+  }, [rank]);
+
+  const animatedGlowStyle = useAnimatedStyle(() => {
+    if (rank > 3) return {};
+    
+    const opacity = interpolate(glowValue.value, [0, 1], [0.3, 0.8]);
+    const scale = interpolate(glowValue.value, [0, 1], [1, 1.02]);
+    
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  const animatedPulseStyle = useAnimatedStyle(() => {
+    if (rank !== 1) return {};
+    
+    return {
+      transform: [{ scale: pulseValue.value }],
+    };
+  });
 
   const getDisplayAvatarUri = (user: LeaderboardUser) => {
     if (user.avatar && !avatarError) {
@@ -64,68 +187,194 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
     return level;
   };
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.leaderboardItem,
-        isCurrentUser && styles.currentUserItem
-      ]}
-      onPress={() => onPress && onPress(user)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.rankContainer}>
-        <Text style={[
-          styles.rankText,
-          isCurrentUser && styles.currentUserRankText
-        ]}>
-          {rank}
-        </Text>
-      </View>
+  const getTopRankIcon = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return 'crown';
+      case 2:
+        return 'medal-outline';
+      case 3:
+        return 'medal-outline';
+      default:
+        return null;
+    }
+  };
 
-      <View style={styles.avatarContainer}>
-        {getDisplayAvatarUri(user) ? (
-          <Image
-            source={getDisplayAvatarUri(user)!}
-            style={styles.avatar}
-            resizeMode="cover"
-            onError={handleAvatarError(() => setAvatarError(true))}
-          />
-        ) : (
+  const getTopRankIconColor = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return '#FFD700'; // Gold
+      case 2:
+        return '#C0C0C0'; // Silver
+      case 3:
+        return '#CD7F32'; // Bronze
+      default:
+        return '#666';
+    }
+  };
+
+  const getTopRankStyle = (rank: number) => {
+    if (rank > 3) return null;
+    
+    switch (rank) {
+      case 1:
+        return styles.firstPlaceItem;
+      case 2:
+        return styles.secondPlaceItem;
+      case 3:
+        return styles.thirdPlaceItem;
+      default:
+        return null;
+    }
+  };
+
+  const getTopRankGlowStyle = (rank: number) => {
+    if (rank > 3) return null;
+    
+    switch (rank) {
+      case 1:
+        return styles.firstPlaceGlow;
+      case 2:
+        return styles.secondPlaceGlow;
+      case 3:
+        return styles.thirdPlaceGlow;
+      default:
+        return null;
+    }
+  };
+
+  const topRankIcon = getTopRankIcon(rank);
+  const topRankStyle = getTopRankStyle(rank);
+  const topRankGlowStyle = getTopRankGlowStyle(rank);
+
+  return (
+    <View style={styles.itemWrapper}>
+      {/* Glow effect background for top 3 */}
+      {rank <= 3 && (
+        <Animated.View
+          style={[
+            styles.glowBackground,
+            topRankGlowStyle,
+            animatedGlowStyle,
+          ]}
+        />
+      )}
+      
+      <Animated.View style={rank === 1 ? animatedPulseStyle : {}}>
+        <TouchableOpacity
+          style={[
+            styles.leaderboardItem,
+            topRankStyle,
+            isCurrentUser && styles.currentUserItem
+          ]}
+          onPress={() => onPress && onPress(user)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.rankContainer}>
+            {topRankIcon ? (
+              <View style={styles.rankWithIcon}>
+                <Icon 
+                  name={topRankIcon} 
+                  size={rank === 1 ? 28 : 24} 
+                  color={getTopRankIconColor(rank)} 
+                />
+                <Text style={[
+                  styles.rankText,
+                  styles.topRankText,
+                  rank === 1 && styles.firstPlaceRankText,
+                  isCurrentUser && styles.currentUserRankText
+                ]}>
+                  {rank}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[
+                styles.rankText,
+                isCurrentUser && styles.currentUserRankText
+              ]}>
+                {rank}
+              </Text>
+            )}
+          </View>
+
           <View style={[
-            styles.defaultAvatar,
-            isCurrentUser && styles.currentUserDefaultAvatar
+            styles.avatarContainer,
+            rank <= 3 && styles.topRankAvatarContainer
           ]}>
+            {getDisplayAvatarUri(user) ? (
+              <Image
+                source={getDisplayAvatarUri(user)!}
+                style={[
+                  styles.avatar,
+                  rank <= 3 && styles.topRankAvatar
+                ]}
+                resizeMode="cover"
+                onError={handleAvatarError(() => setAvatarError(true))}
+              />
+            ) : (
+              <View style={[
+                styles.defaultAvatar,
+                rank <= 3 && styles.topRankAvatar,
+                isCurrentUser && styles.currentUserDefaultAvatar
+              ]}>
+                <Text style={[
+                  styles.avatarInitials,
+                  isCurrentUser && styles.currentUserAvatarInitials
+                ]}>
+                  {getInitials(user)}
+                </Text>
+              </View>
+            )}
+            
+            {/* Crown overlay for #1 */}
+            {rank === 1 && (
+              <View style={styles.crownOverlay}>
+                <Icon name="crown" size={20} color="#FFD700" />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.userInfo}>
             <Text style={[
-              styles.avatarInitials,
-              isCurrentUser && styles.currentUserAvatarInitials
+              styles.userName,
+              rank <= 3 && styles.topRankUserName,
+              isCurrentUser && styles.currentUserName
             ]}>
-              {getInitials(user)}
+              {user.nickname || user.fullname || 'Anonymous'}
+            </Text>
+            <Text style={[
+              styles.userPoints,
+              rank <= 3 && styles.topRankUserPoints,
+              isCurrentUser && styles.currentUserPoints
+            ]}>
+              {user.allTimePoints || 0} Total Points
             </Text>
           </View>
-        )}
-      </View>
 
-      <View style={styles.userInfo}>
-        <Text style={[
-          styles.userName,
-          isCurrentUser && styles.currentUserName
-        ]}>
-          {user.nickname || user.fullname || 'Anonymous'}
-        </Text>
-        <Text style={[
-          styles.userPoints,
-          isCurrentUser && styles.currentUserPoints
-        ]}>
-          {user.allTimePoints || 0} Total Points
-        </Text>
-        <Text style={[
-          styles.userSubPoints,
-          isCurrentUser && styles.currentUserSubPoints
-        ]}>
-          {user.points || 0} Available • {user.totalWifiTimeFormatted || '0m'} Connected
-        </Text>
-      </View>
-    </TouchableOpacity>
+                     {/* Special badge for top 3 */}
+           {rank <= 3 && (
+             <View style={styles.specialBadgeContainer}>
+               <View style={[
+                 styles.specialBadge,
+                 rank === 1 && styles.firstPlaceBadge,
+                 rank === 2 && styles.secondPlaceBadge,
+                 rank === 3 && styles.thirdPlaceBadge,
+               ]}>
+                 <Text style={[
+                   styles.specialBadgeText,
+                   rank === 1 && styles.firstPlaceBadgeText,
+                 ]}>
+                   {rank === 1 ? 'CHAMPION' : rank === 2 ? 'RUNNER-UP' : 'TOP 3'}
+                 </Text>
+               </View>
+             </View>
+           )}
+
+           {/* Sparkle effects for top 3 */}
+           <SparkleEffect rank={rank} />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -343,7 +592,7 @@ const styles = StyleSheet.create({
   leaderboardItem: {
     backgroundColor: '#fff',
     borderRadius: rs(16),
-    padding: rs(20),
+    padding: rs(15),
     marginBottom: rs(12),
     flexDirection: 'row',
     alignItems: 'center',
@@ -413,7 +662,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   userPoints: {
-    fontSize: rf(14),
+    fontSize: rf(17),
     color: '#98D56D',
     fontWeight: '500',
   },
@@ -449,6 +698,164 @@ const styles = StyleSheet.create({
   },
   currentUserLevelText: {
     color: '#fff',
+  },
+  itemWrapper: {
+    position: 'relative',
+  },
+  glowBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.2,
+  },
+  firstPlaceItem: {
+    backgroundColor: '#FFD700',
+    borderWidth: 2,
+    borderColor: '#FFA500',
+    elevation: 8,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    transform: [{ scale: 1.02 }],
+  },
+  secondPlaceItem: {
+    backgroundColor: '#C0C0C0',
+    borderWidth: 2,
+    borderColor: '#A8A8A8',
+    elevation: 6,
+    shadowColor: '#C0C0C0',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    transform: [{ scale: 1.01 }],
+  },
+  thirdPlaceItem: {
+    backgroundColor: '#CD7F32',
+    borderWidth: 2,
+    borderColor: '#B8860B',
+    elevation: 4,
+    shadowColor: '#CD7F32',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  firstPlaceGlow: {
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
+    borderRadius: rs(20),
+    marginHorizontal: -rs(4),
+    marginVertical: -rs(2),
+  },
+  secondPlaceGlow: {
+    backgroundColor: 'rgba(192, 192, 192, 0.25)',
+    borderRadius: rs(18),
+    marginHorizontal: -rs(3),
+    marginVertical: -rs(1.5),
+  },
+  thirdPlaceGlow: {
+    backgroundColor: 'rgba(205, 127, 50, 0.2)',
+    borderRadius: rs(17),
+    marginHorizontal: -rs(2),
+    marginVertical: -rs(1),
+  },
+  rankWithIcon: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topRankText: {
+    fontWeight: 'bold',
+  },
+  firstPlaceRankText: {
+    color: '#FFD700',
+  },
+  secondPlaceRankText: {
+    color: '#C0C0C0',
+  },
+  thirdPlaceRankText: {
+    color: '#CD7F32',
+  },
+  topRankUserName: {
+    color: '#fff',
+  },
+  topRankUserPoints: {
+    color: '#E8F5E8',
+  },
+  specialBadgeContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: rs(8),
+  },
+  specialBadge: {
+    backgroundColor: '#fff',
+    paddingHorizontal: rs(4),
+    paddingVertical: rs(2),
+    borderRadius: rs(4),
+  },
+  specialBadgeText: {
+    fontSize: rf(12),
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  firstPlaceBadge: {
+    backgroundColor: '#FFD700',
+  },
+  firstPlaceBadgeText: {
+    color: '#fff',
+  },
+  secondPlaceBadge: {
+    backgroundColor: '#C0C0C0',
+  },
+  thirdPlaceBadge: {
+    backgroundColor: '#CD7F32',
+  },
+  crownOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: rs(4),
+  },
+  topRankAvatarContainer: {
+    marginLeft: rs(16),
+    marginRight: rs(16),
+  },
+  topRankAvatar: {
+    width: 55,
+    height: 55,
+    borderRadius: rs(27.5),
+    borderWidth: 3,
+    borderColor: '#fff',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  sparkleContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
+  sparkle: {
+    position: 'absolute',
+  },
+  sparkle1: {
+    top: rs(15),
+    right: rs(25),
+  },
+  sparkle2: {
+    top: rs(35),
+    left: rs(15),
+  },
+  sparkle3: {
+    bottom: rs(20),
+    right: rs(45),
   },
 });
 

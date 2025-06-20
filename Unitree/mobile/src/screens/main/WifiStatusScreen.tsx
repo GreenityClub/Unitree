@@ -245,23 +245,7 @@ const WifiStatusScreen: React.FC = () => {
               </View>
             )}
 
-            {/* WiFi Monitor Debug Info (Development Mode) */}
-            {__DEV__ && (
-              <View style={styles.debugCard}>
-                <View style={styles.cardHeader}>
-                  <Icon name="bug" size={28} color="#4CAF50" />
-                  <Text style={styles.cardTitle}>WiFi Monitor Debug</Text>
-                </View>
-                <View style={styles.debugInfo}>
-                  <Text style={styles.debugText}>
-                    Monitor Running: {wifiMonitor.isRunning() ? '✅' : '❌'}
-                  </Text>
-                  <Text style={styles.debugText}>
-                    Session Info: {JSON.stringify(wifiMonitor.getSessionInfo(), null, 2)}
-                  </Text>
-                </View>
-              </View>
-            )}
+            
           </View>
         </ScrollView>
       </Animated.View>
@@ -478,29 +462,7 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     textAlign: 'center',
     fontWeight: '500',
-  },
-  debugCard: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginTop: rs(16),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  debugInfo: {
-    backgroundColor: '#ffffff',
-    borderRadius: rs(8),
-    padding: rs(12),
-  },
-  debugText: {
-    fontSize: rf(12),
-    color: '#333',
-    fontFamily: 'monospace',
-    marginBottom: rs(4),
-  },
+  }
 }); 
 
 export default WifiStatusScreen; 

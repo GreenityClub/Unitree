@@ -26,13 +26,27 @@ const auth = async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // Get user from token
-      req.user = await User.findById(decoded.id);
+      // Get user from token with session data
+      req.user = await User.findById(decoded.id).select('+activeSession.token +activeSession.deviceInfo +activeSession.loginTime +activeSession.lastActivity');
       
       if (!req.user) {
         return res.status(401).json({
           message: 'User no longer exists'
         });
+      }
+
+      // Check if the session is still valid (token matches stored session)
+      // Skip session validation if user doesn't have activeSession set (for backward compatibility)
+      if (req.user.activeSession && req.user.activeSession.token) {
+        if (req.user.activeSession.token !== token) {
+          return res.status(401).json({
+            message: 'Session invalid - please login again',
+            code: 'SESSION_INVALID'
+          });
+        }
+        
+        // Update last activity for users with active sessions
+        await req.user.updateLastActivity();
       }
 
       next();

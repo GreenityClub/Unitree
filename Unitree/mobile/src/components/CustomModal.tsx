@@ -61,10 +61,6 @@ const CustomModal: React.FC<CustomModalProps> = ({
     }
   }, [visible]);
 
-  const animatedBackdropStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
   const animatedModalStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
@@ -117,10 +113,8 @@ const CustomModal: React.FC<CustomModalProps> = ({
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.backdrop, animatedBackdropStyle]} />
-        
         <Animated.View style={[styles.modalContainer, animatedModalStyle]}>
-          <View style={[styles.modal, { borderTopColor: typeStyles.borderColor }]}>
+          <View style={styles.modal}>
             {/* Header with Icon */}
             <View style={styles.header}>
               <View style={[styles.iconContainer, { backgroundColor: `${typeStyles.iconColor}15` }]}>
@@ -181,14 +175,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: rs(20),
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'transparent',
   },
   modalContainer: {
     width: '100%',
@@ -197,12 +184,13 @@ const styles = StyleSheet.create({
   modal: {
     backgroundColor: '#fff',
     borderRadius: rs(16),
-    borderTopWidth: 4,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
   },
   header: {
     alignItems: 'center',

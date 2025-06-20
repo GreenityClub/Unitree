@@ -41,6 +41,12 @@ router.post('/register', async (req, res) => {
     // Generate token
     const token = user.getSignedJwtToken();
 
+    // Get device info from User-Agent header or default
+    const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+
+    // Set active session for registration
+    await user.setActiveSession(token, deviceInfo);
+
     res.status(201).json({
       token,
       user: {
@@ -49,6 +55,7 @@ router.post('/register', async (req, res) => {
         nickname: user.nickname,
         email: user.email,
         points: user.points,
+        allTimePoints: user.allTimePoints || 0,
         treesPlanted: user.treesPlanted,
         studentId: user.studentId,
         university: user.university,
@@ -81,12 +88,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check for user
+    // Check for user - include session data to check for active sessions
     const user = await User.findOne({ 
       email: { 
         $regex: new RegExp('^' + email + '$', 'i') 
       }
-    }).select('+password');
+    }).select('+password +activeSession.token +activeSession.deviceInfo +activeSession.loginTime');
+    
     if (!user) {
       return res.status(401).json({
         message: 'Invalid credentials'
@@ -101,8 +109,24 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check for active session on another device
+    if (user.hasActiveSession()) {
+      return res.status(409).json({
+        message: 'Account is already logged in on another device. Please logout from the other device first.',
+        code: 'ACCOUNT_ALREADY_LOGGED_IN',
+        deviceInfo: user.activeSession.deviceInfo,
+        loginTime: user.activeSession.loginTime
+      });
+    }
+
     // Generate token
     const token = user.getSignedJwtToken();
+
+    // Get device info from User-Agent header or default
+    const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+
+    // Set active session
+    await user.setActiveSession(token, deviceInfo);
 
     res.json({
       token,
@@ -112,6 +136,7 @@ router.post('/login', async (req, res) => {
         nickname: user.nickname,
         email: user.email,
         points: user.points,
+        allTimePoints: user.allTimePoints || 0,
         treesPlanted: user.treesPlanted,
         studentId: user.studentId,
         university: user.university,
@@ -545,6 +570,9 @@ router.post('/reset-password', async (req, res) => {
       runValidators: false 
     });
 
+    // Clear active session for security (user needs to login again)
+    await user.clearActiveSession();
+
     // Clean up reset code
     delete global.resetCodes[email];
 
@@ -604,6 +632,72 @@ router.post('/resend-reset-code', async (req, res) => {
     console.error('Resend reset code error:', error);
     res.status(500).json({
       message: 'Error resending reset code'
+    });
+  }
+});
+
+// Logout user
+router.post('/logout', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (user) {
+      await user.clearActiveSession();
+    }
+    
+    res.json({
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      message: 'Error during logout'
+    });
+  }
+});
+
+// Force logout - allows user to logout from other device
+router.post('/force-logout', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate email & password
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Please provide email and password to force logout'
+      });
+    }
+
+    // Check for user
+    const user = await User.findOne({ 
+      email: { 
+        $regex: new RegExp('^' + email + '$', 'i') 
+      }
+    }).select('+password');
+    
+    if (!user) {
+      return res.status(401).json({
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if password matches
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        message: 'Wrong password'
+      });
+    }
+
+    // Clear active session
+    await user.clearActiveSession();
+
+    res.json({
+      message: 'Successfully logged out from other device'
+    });
+  } catch (error) {
+    console.error('Force logout error:', error);
+    res.status(500).json({
+      message: 'Error during force logout'
     });
   }
 });

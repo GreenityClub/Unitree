@@ -42,10 +42,15 @@ router.post('/attendance', auth, async (req, res) => {
 
     await pointTransaction.save();
 
-    // Update user's total points
+    // Update user's total points and all-time points
     await User.findByIdAndUpdate(
       req.user._id,
-      { $inc: { points: pointsEarned } }
+      { 
+        $inc: { 
+          points: pointsEarned,
+          allTimePoints: pointsEarned 
+        } 
+      }
     );
 
     res.json({

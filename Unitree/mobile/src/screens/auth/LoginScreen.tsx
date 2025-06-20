@@ -10,7 +10,9 @@ import {
   Image,
   StatusBar,
   Modal,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -22,6 +24,7 @@ import { useRouter } from 'expo-router';
 
 import LoadingOverlay from '../../components/LoadingOverlay';
 import SafeScreen from '../../components/SafeScreen';
+import CustomModal from '../../components/CustomModal';
 import { useAuth } from '../../context/AuthContext';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
 import { getResponsiveLogoSizes, getResponsiveLogoPositions, getResponsiveSpacing } from '../../utils/logoUtils';
@@ -40,8 +43,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showMultiDeviceModal, setShowMultiDeviceModal] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('');
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
 
   // Get responsive logo sizes and positions
   const logoSizes = getResponsiveLogoSizes();
@@ -120,8 +125,15 @@ export default function LoginScreen() {
       await login(email.trim().toLowerCase(), password);
       router.replace('/(tabs)');
     } catch (err: any) {
-      setError(err.message || 'Login failed');
-      setShowErrorModal(true);
+      // Check if it's a multi-device login error
+      if (err.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
+        setShowMultiDeviceModal(true);
+      } else {
+        // Handle different error message formats
+        const errorMessage = err.response?.data?.message || err.message || 'Login failed';
+        setError(errorMessage);
+        setShowErrorModal(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -138,6 +150,31 @@ export default function LoginScreen() {
 
   const handleSignUp = () => {
     router.push('/auth/register');
+  };
+
+  const handleForceLogout = async () => {
+    try {
+      setForceLogoutLoading(true);
+      
+      // Import authAPI dynamically to avoid circular dependency
+      const { authAPI } = await import('../../config/api');
+      
+      // Force logout from the other device
+      await authAPI.forceLogout(email.trim().toLowerCase(), password);
+      
+      // Close the modal
+      setShowMultiDeviceModal(false);
+      
+      // Now attempt to login normally
+      await handleLogin();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to logout from other device';
+      setError(errorMessage);
+      setShowMultiDeviceModal(false);
+      setShowErrorModal(true);
+    } finally {
+      setForceLogoutLoading(false);
+    }
   };
 
   const testConnection = async () => {
@@ -158,43 +195,91 @@ export default function LoginScreen() {
     }
   };
 
+  // Handle iOS alerts - only show once and reset state
+  useEffect(() => {
+    if (Platform.OS === 'ios' && showErrorModal) {
+      Alert.alert(
+        'Login Failed',
+        error,
+        [{ text: 'OK', onPress: () => setShowErrorModal(false) }],
+        { cancelable: false }
+      );
+      // Immediately reset to prevent double alerts
+      setShowErrorModal(false);
+    }
+  }, [showErrorModal, error]);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios' && showMultiDeviceModal) {
+      Alert.alert(
+        'Account Already Logged In',
+        'Your account is currently logged in on another device. Would you like to logout from the other device to continue?',
+        [
+          { text: 'Cancel', onPress: () => setShowMultiDeviceModal(false) },
+          { 
+            text: forceLogoutLoading ? 'Logging out...' : 'Logout Other Device', 
+            onPress: handleForceLogout 
+          }
+        ],
+        { cancelable: true }
+      );
+      // Immediately reset to prevent double alerts
+      setShowMultiDeviceModal(false);
+    }
+  }, [showMultiDeviceModal, forceLogoutLoading]);
+
   return (
-    <SafeScreen backgroundColor="#B7DDE6">
-      <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" translucent />
       <LoadingOverlay visible={loading} />
 
+      {/* Error Modal - Android only */}
+      {Platform.OS !== 'ios' && (
+        <CustomModal
+          visible={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          title="Login Failed"
+          message={error}
+          type="error"
+          buttons={[
+            {
+              text: 'OK',
+              onPress: () => setShowErrorModal(false),
+              style: 'primary'
+            }
+          ]}
+        />
+      )}
 
-
-      {/* Error Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showErrorModal}
-        onRequestClose={() => setShowErrorModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Icon name="alert-circle" size={24} color="#FF6B6B" />
-              <Text style={styles.modalTitle}>Login Failed</Text>
-            </View>
-            <Text style={styles.modalText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowErrorModal(false)}
-            >
-              <Text style={styles.modalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Multi-Device Login Modal - Android only */}
+      {Platform.OS !== 'ios' && (
+        <CustomModal
+          visible={showMultiDeviceModal}
+          onClose={() => setShowMultiDeviceModal(false)}
+          title="Account Already Logged In"
+          message="Your account is currently logged in on another device. Would you like to logout from the other device to continue?"
+          type="warning"
+          buttons={[
+            {
+              text: 'Cancel',
+              onPress: () => setShowMultiDeviceModal(false),
+            },
+            {
+              text: forceLogoutLoading ? 'Logging out...' : 'Logout Other Device',
+              onPress: handleForceLogout,
+              style: 'primary'
+            }
+          ]}
+        />
+      )}
 
       {/* Header Section */}
       <Animated.View 
         entering={FadeInDown.delay(200)}
         style={styles.headerSection}
       >
-        <View style={styles.statusBar} />
+        {/* Extended status bar background for iOS */}
+        <View style={styles.statusBarBackground} />
         
         {/* Logos Container - Both logos on same line */}
         <View style={[styles.logosContainer, logoPositions.logosContainer]}>
@@ -298,10 +383,10 @@ export default function LoginScreen() {
                     <Icon name="check" size={14} color="#50AF27" />
                   )}
                 </View>
-                <Text style={styles.rememberMeText}>Remember Me</Text>
+                <Text style={styles.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity
+              <TouchableOpacity 
                 onPress={handleForgotPassword}
                 style={styles.forgotPassword}
               >
@@ -311,20 +396,21 @@ export default function LoginScreen() {
 
             {/* Login Button */}
             <TouchableOpacity
-              onPress={handleLogin}
               style={styles.loginButton}
-              disabled={loading}
+              onPress={handleLogin}
+              activeOpacity={0.8}
             >
-              <Text style={styles.loginButtonText}>Login with Email</Text>
+              <Text style={styles.loginButtonText}>Login</Text>
             </TouchableOpacity>
 
-            {/* OR Divider */}
-            <Text style={styles.orText}>OR</Text>
+            {/* Or Divider */}
+            <Text style={styles.orText}>or</Text>
 
             {/* Google Sign In Button */}
             <TouchableOpacity
-              onPress={handleGoogleSignIn}
               style={styles.googleButton}
+              onPress={handleGoogleSignIn}
+              activeOpacity={0.8}
             >
               <Icon name="google" size={20} color="#fff" style={styles.googleIcon} />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
@@ -334,16 +420,24 @@ export default function LoginScreen() {
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpText}>Don't have an account? </Text>
               <TouchableOpacity onPress={handleSignUp}>
-                <Text style={styles.signUpLink}>Sign up</Text>
+                <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
         </Animated.View>
       </KeyboardAvoidingView>
-    </SafeScreen>
+
+      {/* Connection Status Debug */}
+      {connectionStatus && ENV.DEBUG_MODE && (
+        <View style={styles.connectionStatus}>
+          <Text style={styles.connectionStatusText}>{connectionStatus}</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // Main Layout Styles
   container: {
     flex: 1,
     backgroundColor: '#B7DDE6',
@@ -351,39 +445,48 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
-  statusBar: {
-    height: 20,
-  },
   
   // Header Section Styles
   headerSection: {
     backgroundColor: '#B7DDE6',
     paddingBottom: rs(80),
-    position: 'relative',
-    minHeight: rs(150),
+    // Extend to cover status bar on iOS
+    marginTop: Platform.OS === 'ios' ? -50 : 0,
+    paddingTop: Platform.OS === 'ios' ? rs(70) : rs(20),
+  },
+  statusBarBackground: {
+    // Remove this as SafeAreaView with edges=[] handles it
+    height: 0,
   },
   logosContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  unitreeLogoContainer: {
-    // Styles will come from logoPositions
-  },
-  unitreeLogo: {
-    // Styles will come from logoSizes
+    justifyContent: 'space-between',
+    paddingHorizontal: rs(20),
+    marginTop: rs(20),
   },
   greenwichLogoContainer: {
-    // Styles will come from logoPositions
+    flex: 1,
+    alignItems: 'flex-start',
   },
   greenwichLogo: {
-    // Styles will come from logoSizes
+    resizeMode: 'contain',
+  },
+  unitreeLogoContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  unitreeLogo: {
+    resizeMode: 'contain',
   },
   mascotContainer: {
-    // Styles will come from logoPositions
+    position: 'absolute',
+    right: rs(20),
+    top: rs(-60),
+    zIndex: 10,
   },
   mascotImage: {
-    // Styles will come from logoSizes
+    resizeMode: 'contain',
   },
 
   // Login Section Styles
@@ -527,48 +630,6 @@ const styles = StyleSheet.create({
     fontSize: rf(14),
     fontWeight: '600',
     textDecorationLine: 'underline',
-  },
-  // Add new styles for the modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: rs(16),
-    padding: rs(24),
-    width: '80%',
-    alignItems: 'center',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: rs(16),
-  },
-  modalTitle: {
-    fontSize: rf(18),
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: rs(8),
-  },
-  modalText: {
-    fontSize: rf(16),
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: rs(24),
-  },
-  modalButton: {
-    backgroundColor: '#50AF27',
-    paddingVertical: rs(12),
-    paddingHorizontal: rs(24),
-    borderRadius: rs(8),
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: rf(16),
-    fontWeight: 'bold',
   },
   connectionStatus: {
     position: 'absolute',

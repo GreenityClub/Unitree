@@ -13,10 +13,14 @@ const Index = () => {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
+    console.log('🔄 Auth state changed - User:', !!user, 'Loading:', isLoading);
+    
     if (!isLoading) {
       if (user) {
+        console.log('✅ User authenticated, navigating to tabs');
         router.replace('/(tabs)');
       } else {
+        console.log('❌ No user, navigating to login');
         router.replace('/auth/login');
       }
     }

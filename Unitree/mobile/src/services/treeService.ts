@@ -131,11 +131,7 @@ class TreeService {
 
   async getTreeSpecies(): Promise<TreeSpecies[]> {
     try {
-      console.log('Mobile: Calling /api/trees/species endpoint...');
       const response = await api.get('/api/trees/species');
-      console.log('Mobile: API response:', response);
-      console.log('Mobile: API response data:', response.data);
-      console.log('Mobile: Species count:', response.data?.length || 0);
       return response.data;
     } catch (error: any) {
       console.error('Mobile: API call failed:', error);

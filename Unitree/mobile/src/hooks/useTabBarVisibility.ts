@@ -15,7 +15,7 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
 
   const isVisible = useSharedValue(1);
   const lastScrollY = useRef(0);
-  const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimer = useRef<NodeJS.Timeout | number | null>(null);
   const isScrolling = useRef(false);
 
   const hideTabBar = () => {
@@ -32,6 +32,15 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
 
   const showTabBar = () => {
     'worklet';
+    // Clear any existing inactivity timer when showing manually
+    if (inactivityTimer.current) {
+      runOnJS(() => {
+        if (inactivityTimer.current) {
+          clearTimeout(inactivityTimer.current as any);
+        }
+      })();
+    }
+    
     isVisible.value = withSpring(1, { 
       damping: 12,
       stiffness: 150,
@@ -40,11 +49,14 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
       restSpeedThreshold: 0.001,
       restDisplacementThreshold: 0.001
     });
+    
+    // Reset inactivity timer after showing
+    runOnJS(resetInactivityTimer)();
   };
 
   const resetInactivityTimer = () => {
     if (inactivityTimer.current) {
-      clearTimeout(inactivityTimer.current);
+      clearTimeout(inactivityTimer.current as any);
     }
     
     inactivityTimer.current = setTimeout(() => {
@@ -76,7 +88,7 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
   const handleScrollBeginDrag = () => {
     isScrolling.current = true;
     if (inactivityTimer.current) {
-      clearTimeout(inactivityTimer.current);
+      clearTimeout(inactivityTimer.current as any);
     }
   };
 
@@ -95,7 +107,7 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
     resetInactivityTimer();
     return () => {
       if (inactivityTimer.current) {
-        clearTimeout(inactivityTimer.current);
+        clearTimeout(inactivityTimer.current as any);
       }
     };
   }, []);

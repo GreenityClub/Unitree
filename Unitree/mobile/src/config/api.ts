@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ENV from './env';
+import { authEvents, AUTH_EVENTS } from '../utils/authEvents';
 
 // API Configuration using environment variables
 const api = axios.create({
@@ -19,10 +20,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Add debug logging in development
-    if (ENV.DEBUG_MODE) {
-      console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    }
+    // Debug logging removed
     
     return config;
   },
@@ -37,24 +35,42 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    // Add debug logging in development
-    if (ENV.DEBUG_MODE) {
-      console.log(`✅ API Response: ${response.status} ${response.config.url}`);
-    }
+    // Debug logging removed
     return response;
   },
   async (error) => {
     if (ENV.DEBUG_MODE) {
-      console.error(`❌ API Response Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
+      // Don't log expected behaviors as errors
+      if (error.response?.status === 409 && error.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
+        console.log(`🔐 Multi-device login blocked: ${error.config?.url}`, error.response?.data);
+      } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
+        console.log(`🔑 Session invalidated: ${error.config?.url}`, error.response?.data);
+      } else if (error.response?.status === 401) {
+        console.log(`🔓 Authentication required: ${error.config?.url}`);
+      } else {
+        console.error(`❌ API Response Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
+      }
     }
     
     if (error.response?.status === 401) {
-      // Token expired, clear storage and redirect to login
-      await AsyncStorage.multiRemove(['authToken', 'user']);
+      const errorCode = error.response?.data?.code;
       
-      // You could add navigation logic here or emit an event
-      if (ENV.DEBUG_MODE) {
-        console.log('🔑 Token expired, clearing auth data');
+      if (errorCode === 'SESSION_INVALID') {
+        // Session invalid - user was logged out from another device
+        await AsyncStorage.multiRemove(['authToken', 'user']);
+        authEvents.emit(AUTH_EVENTS.SESSION_INVALID);
+        
+        if (ENV.DEBUG_MODE) {
+          console.log('🔑 Session invalidated - user logged out from another device');
+        }
+      } else {
+        // Regular token expired, clear storage and redirect to login
+        await AsyncStorage.multiRemove(['authToken', 'user']);
+        authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
+        
+        if (ENV.DEBUG_MODE) {
+          console.log('🔓 Authentication expired - clearing auth data');
+        }
       }
     }
     return Promise.reject(error);
@@ -79,6 +95,12 @@ export const authAPI = {
   
   getMe: () =>
     api.get('/api/auth/me'),
+  
+  logout: () =>
+    api.post('/api/auth/logout'),
+  
+  forceLogout: (email: string, password: string) =>
+    api.post('/api/auth/force-logout', { email, password }),
 };
 
 export const wifiAPI = {
