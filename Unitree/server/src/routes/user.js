@@ -262,33 +262,116 @@ router.delete('/avatar', auth, async (req, res) => {
 // Get leaderboard
 router.get('/leaderboard', auth, async (req, res) => {
   try {
-    const users = await User.find({})
-      .sort({ allTimePoints: -1 }) // Sort by all-time points earned
-      .limit(100)
-      .select('fullname nickname email avatar allTimePoints totalTimeConnected');
+    const { period = 'all-time' } = req.query; // Default to all-time
+    
+    if (period === 'monthly') {
+      // Monthly leaderboard logic
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
 
-    const leaderboard = users.map((user, index) => ({
-      rank: index + 1,
-      id: user._id.toString(), // Convert ObjectId to string for mobile app
-      _id: user._id,
-      fullname: user.fullname,
-      nickname: user.nickname,
-      email: user.email,
-      avatar: user.avatar,
-      allTimePoints: user.allTimePoints || 0,
-      totalWifiTimeSeconds: user.totalTimeConnected || 0,
-      totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
-    }));
+      const endOfMonth = new Date();
+      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+      endOfMonth.setDate(0);
+      endOfMonth.setHours(23, 59, 59, 999);
 
-    // Find current user's rank
-    const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
+      // Aggregate points for this month from Point model
+      const Point = require('../models/Point');
+      const monthlyPoints = await Point.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: startOfMonth,
+              $lte: endOfMonth
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$userId',
+            monthlyPoints: { $sum: '$amount' }
+          }
+        },
+        {
+          $sort: { monthlyPoints: -1 }
+        },
+        {
+          $limit: 100
+        }
+      ]);
 
-    res.json({
-      leaderboard,
-      userRank: currentUserRank > 0 ? currentUserRank : null,
-      totalUsers: users.length,
-      currentUserId: req.user._id.toString()
-    });
+      // Get user details for monthly leaders
+      const userIds = monthlyPoints.map(p => p._id);
+      const users = await User.find({ _id: { $in: userIds } })
+        .select('fullname nickname email avatar totalTimeConnected');
+
+      // Create user lookup map
+      const userMap = {};
+      users.forEach(user => {
+        userMap[user._id.toString()] = user;
+      });
+
+      // Build monthly leaderboard
+      const leaderboard = monthlyPoints.map((point, index) => {
+        const user = userMap[point._id.toString()];
+        if (!user) return null;
+        
+        return {
+          rank: index + 1,
+          id: user._id.toString(),
+          _id: user._id,
+          fullname: user.fullname,
+          nickname: user.nickname,
+          email: user.email,
+          avatar: user.avatar,
+          monthlyPoints: point.monthlyPoints || 0,
+          totalWifiTimeSeconds: user.totalTimeConnected || 0,
+          totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
+        };
+      }).filter(Boolean);
+
+      // Find current user's rank in monthly leaderboard
+      const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
+
+      res.json({
+        leaderboard,
+        userRank: currentUserRank > 0 ? currentUserRank : null,
+        totalUsers: leaderboard.length,
+        currentUserId: req.user._id.toString(),
+        period: 'monthly'
+      });
+
+    } else {
+      // All-time leaderboard logic (existing)
+      const users = await User.find({})
+        .sort({ allTimePoints: -1 }) // Sort by all-time points earned
+        .limit(100)
+        .select('fullname nickname email avatar allTimePoints totalTimeConnected');
+
+      const leaderboard = users.map((user, index) => ({
+        rank: index + 1,
+        id: user._id.toString(), // Convert ObjectId to string for mobile app
+        _id: user._id,
+        fullname: user.fullname,
+        nickname: user.nickname,
+        email: user.email,
+        avatar: user.avatar,
+        allTimePoints: user.allTimePoints || 0,
+        totalWifiTimeSeconds: user.totalTimeConnected || 0,
+        totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
+      }));
+
+      // Find current user's rank
+      const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
+
+      res.json({
+        leaderboard,
+        userRank: currentUserRank > 0 ? currentUserRank : null,
+        totalUsers: users.length,
+        currentUserId: req.user._id.toString(),
+        period: 'all-time'
+      });
+    }
   } catch (error) {
     logger.error('Leaderboard error:', error);
     res.status(500).json({ message: 'Server error' });

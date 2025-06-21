@@ -8,6 +8,7 @@ const Student = require('../models/Student');
 const logger = require('../utils/logger');
 const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const emailService = require('../utils/emailService');
 
 // Register user
 router.post('/register', async (req, res) => {
@@ -270,10 +271,14 @@ router.post('/send-verification-code', async (req, res) => {
     // Generate 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // For demo purposes, we'll just log the code
-    // In production, you would send this via email service
-    console.log(`Verification code for ${email}: ${verificationCode}`);
-    logger.info(`Verification code sent to ${email}: ${verificationCode}`);
+    // Send verification code via email
+    const emailResult = await emailService.sendVerificationCode(email, verificationCode, 'registration');
+    
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: 'Failed to send verification email. Please try again.'
+      });
+    }
 
     // Store the code temporarily (in production, use Redis or database)
     // For now, we'll use a simple in-memory store
@@ -285,9 +290,7 @@ router.post('/send-verification-code', async (req, res) => {
     };
 
     res.json({
-      message: 'Verification code sent successfully',
-      // In production, don't send the code in response
-      tempCode: verificationCode // Only for demo purposes
+      message: 'Verification code sent to your email address'
     });
   } catch (error) {
     console.error('Send verification code error:', error);
@@ -397,8 +400,14 @@ router.post('/resend-verification-code', async (req, res) => {
     // Generate new 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    console.log(`New verification code for ${email}: ${verificationCode}`);
-    logger.info(`New verification code sent to ${email}: ${verificationCode}`);
+    // Send verification code via email
+    const emailResult = await emailService.sendVerificationCode(email, verificationCode, 'registration');
+    
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: 'Failed to resend verification email. Please try again.'
+      });
+    }
 
     // Update stored code
     global.verificationCodes = global.verificationCodes || {};
@@ -409,8 +418,7 @@ router.post('/resend-verification-code', async (req, res) => {
     };
 
     res.json({
-      message: 'Verification code resent successfully',
-      tempCode: verificationCode // Only for demo purposes
+      message: 'Verification code resent to your email address'
     });
   } catch (error) {
     console.error('Resend verification code error:', error);
@@ -449,8 +457,14 @@ router.post('/forgot-password', async (req, res) => {
     // Generate 6-digit reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    console.log(`Password reset code for ${email}: ${resetCode}`);
-    logger.info(`Password reset code sent to ${email}: ${resetCode}`);
+    // Send reset code via email
+    const emailResult = await emailService.sendVerificationCode(email, resetCode, 'password_reset');
+    
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: 'Failed to send password reset email. Please try again.'
+      });
+    }
 
     // Store reset code
     global.resetCodes = global.resetCodes || {};
@@ -461,8 +475,7 @@ router.post('/forgot-password', async (req, res) => {
     };
 
     res.json({
-      message: 'Password reset code sent to your email',
-      tempCode: resetCode // Only for demo purposes
+      message: 'Password reset code sent to your email address'
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -613,8 +626,14 @@ router.post('/resend-reset-code', async (req, res) => {
     // Generate new reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    console.log(`New password reset code for ${email}: ${resetCode}`);
-    logger.info(`New password reset code sent to ${email}: ${resetCode}`);
+    // Send reset code via email
+    const emailResult = await emailService.sendVerificationCode(email, resetCode, 'password_reset');
+    
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: 'Failed to resend password reset email. Please try again.'
+      });
+    }
 
     // Update stored code
     global.resetCodes = global.resetCodes || {};
@@ -625,8 +644,7 @@ router.post('/resend-reset-code', async (req, res) => {
     };
 
     res.json({
-      message: 'Reset code resent successfully',
-      tempCode: resetCode // Only for demo purposes
+      message: 'Password reset code resent to your email address'
     });
   } catch (error) {
     console.error('Resend reset code error:', error);
@@ -698,6 +716,39 @@ router.post('/force-logout', async (req, res) => {
     console.error('Force logout error:', error);
     res.status(500).json({
       message: 'Error during force logout'
+    });
+  }
+});
+
+// Test email endpoint (for development/testing purposes)
+router.post('/test-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        message: 'Email is required'
+      });
+    }
+
+    // Send test email
+    const result = await emailService.sendTestEmail(email);
+
+    if (result.success) {
+      res.json({
+        message: 'Test email sent successfully',
+        messageId: result.messageId
+      });
+    } else {
+      res.status(500).json({
+        message: 'Failed to send test email',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      message: 'Error sending test email'
     });
   }
 });

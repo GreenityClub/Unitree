@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -29,6 +29,7 @@ interface LeaderboardItemProps {
   rank: number;
   user: LeaderboardUser;
   isCurrentUser: boolean;
+  period: 'all-time' | 'monthly';
   onPress?: (user: LeaderboardUser) => void;
 }
 
@@ -115,12 +116,23 @@ interface ApiError extends Error {
   };
 }
 
-const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrentUser, onPress }) => {
+const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrentUser, period, onPress }) => {
   const [avatarError, setAvatarError] = useState(false);
   
   // Animation values for top 3 special effects
   const glowValue = useSharedValue(0);
   const pulseValue = useSharedValue(1);
+
+  // Memoize avatar URI to prevent multiple calls and excessive logging
+  const avatarUri = useMemo(() => {
+    if (user.avatar && !avatarError) {
+      const fullAvatarUrl = getAvatarUrl(user.avatar);
+      if (fullAvatarUrl) {
+        return { uri: fullAvatarUrl };
+      }
+    }
+    return undefined; // Will show default fallback
+  }, [user.avatar, avatarError]);
 
   useEffect(() => {
     if (rank <= 3) {
@@ -161,20 +173,6 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
       transform: [{ scale: pulseValue.value }],
     };
   });
-
-  const getDisplayAvatarUri = (user: LeaderboardUser) => {
-    if (user.avatar && !avatarError) {
-      const fullAvatarUrl = getAvatarUrl(user.avatar);
-      if (fullAvatarUrl) {
-        // Debug logging for development
-        if (__DEV__) {
-          console.log(`Loading avatar for ${user.nickname || user.fullname}: ${fullAvatarUrl}`);
-        }
-        return { uri: fullAvatarUrl };
-      }
-    }
-    return undefined; // Will show default fallback
-  };
 
   const getInitials = (user: LeaderboardUser) => {
     const name = user.nickname || user.fullname || 'U';
@@ -301,9 +299,9 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
             styles.avatarContainer,
             rank <= 3 && styles.topRankAvatarContainer
           ]}>
-            {getDisplayAvatarUri(user) ? (
+            {avatarUri ? (
               <Image
-                source={getDisplayAvatarUri(user)!}
+                source={avatarUri}
                 style={[
                   styles.avatar,
                   rank <= 3 && styles.topRankAvatar
@@ -347,7 +345,10 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ rank, user, isCurrent
               rank <= 3 && styles.topRankUserPoints,
               isCurrentUser && styles.currentUserPoints
             ]}>
-              {user.allTimePoints || 0} Total Points
+              {period === 'monthly' 
+                ? `${user.monthlyPoints || 0} This Month` 
+                : `${user.allTimePoints || 0} Total Points`
+              }
             </Text>
           </View>
 
@@ -385,10 +386,21 @@ const LeaderboardScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'all-time' | 'monthly'>('all-time');
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+    
+    // Set up auto-refresh every minute
+    const refreshInterval = setInterval(() => {
+      console.log('Auto-refreshing leaderboard...');
+      fetchLeaderboard(true);
+    }, 60000); // 60 seconds = 1 minute
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [selectedPeriod]); // Re-fetch when period changes
 
   const fetchLeaderboard = async (isRefresh = false) => {
     try {
@@ -399,7 +411,7 @@ const LeaderboardScreen: React.FC = () => {
       }
       
       // Fetch real leaderboard data from API using userService
-      const data = await userService.getLeaderboard(50);
+      const data = await userService.getLeaderboard(50, selectedPeriod);
       
       if (data && data.leaderboard) {
         setLeaderboardData(data.leaderboard);
@@ -452,6 +464,10 @@ const LeaderboardScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  const handlePeriodChange = (period: 'all-time' | 'monthly') => {
+    setSelectedPeriod(period);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#98D56D" />
@@ -466,6 +482,43 @@ const LeaderboardScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Leaderboard</Text>
         <View style={styles.headerPlaceholder} />
+      </Animated.View>
+
+      {/* Pill Tabs */}
+      <Animated.View 
+        entering={FadeInUp.delay(300)}
+        style={styles.tabsContainer}
+      >
+        <View style={styles.pillTabs}>
+          <TouchableOpacity
+            style={[
+              styles.pillTab,
+              selectedPeriod === 'all-time' && styles.pillTabActive
+            ]}
+            onPress={() => handlePeriodChange('all-time')}
+          >
+            <Text style={[
+              styles.pillTabText,
+              selectedPeriod === 'all-time' && styles.pillTabTextActive
+            ]}>
+              All Time
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.pillTab,
+              selectedPeriod === 'monthly' && styles.pillTabActive
+            ]}
+            onPress={() => handlePeriodChange('monthly')}
+          >
+            <Text style={[
+              styles.pillTabText,
+              selectedPeriod === 'monthly' && styles.pillTabTextActive
+            ]}>
+              This Month
+            </Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {/* Content */}
@@ -510,6 +563,7 @@ const LeaderboardScreen: React.FC = () => {
                     rank={rank}
                     user={item}
                     isCurrentUser={isCurrentUser}
+                    period={selectedPeriod}
                     onPress={handleUserPress}
                   />
                 </Animated.View>
@@ -552,12 +606,48 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: rs(20),
   },
+  tabsContainer: {
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(15),
+    backgroundColor: '#FFCED2',
+  },
+  pillTabs: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: rs(25),
+    padding: rs(4),
+  },
+  pillTab: {
+    flex: 1,
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(20),
+    borderRadius: rs(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillTabActive: {
+    backgroundColor: '#98D56D',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  pillTabText: {
+    fontSize: rf(14),
+    fontWeight: '600',
+    color: '#666',
+  },
+  pillTabTextActive: {
+    color: '#fff',
+  },
   scrollView: {
     flex: 1,
     paddingHorizontal: rs(20),
   },
   scrollContent: {
     paddingBottom: rs(100), // Extra padding for tab bar
+    paddingTop: rs(5),
   },
   loadingContainer: {
     flex: 1,

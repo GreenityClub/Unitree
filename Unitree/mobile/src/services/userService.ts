@@ -16,7 +16,8 @@ export interface LeaderboardUser {
   fullname: string;
   nickname?: string;
   points?: number; // Current redeemable points (deprecated for leaderboard)
-  allTimePoints: number; // Total lifetime points earned - used for leaderboard ranking
+  allTimePoints?: number; // Total lifetime points earned - used for all-time leaderboard ranking
+  monthlyPoints?: number; // Monthly points earned - used for monthly leaderboard ranking
   totalWifiTimeSeconds?: number; // Total WiFi connection time in seconds
   totalWifiTimeFormatted?: string; // Human-readable WiFi time format
   avatar?: string;
@@ -31,6 +32,7 @@ export interface LeaderboardResponse {
   userRank?: number | null;
   totalUsers?: number;
   currentUserId?: string;
+  period?: 'all-time' | 'monthly';
 }
 
 class UserService {
@@ -83,9 +85,9 @@ class UserService {
     }
   }
 
-  async getLeaderboard(limit: number = 50): Promise<LeaderboardResponse> {
+  async getLeaderboard(limit: number = 50, period: 'all-time' | 'monthly' = 'all-time'): Promise<LeaderboardResponse> {
     try {
-      const response = await api.get(`/api/users/leaderboard?limit=${limit}`);
+      const response = await api.get(`/api/users/leaderboard?limit=${limit}&period=${period}`);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to get leaderboard');

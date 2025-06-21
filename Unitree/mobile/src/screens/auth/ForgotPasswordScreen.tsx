@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: rs(30),
     borderTopRightRadius: rs(30),
     paddingHorizontal: rs(24),
-    paddingTop: rs(32),
+    paddingTop: rs(12),
     paddingBottom: rs(40),
   },
   form: {

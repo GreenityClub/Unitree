@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Image,
   StatusBar,
   Modal,
+  Keyboard,
+  Dimensions,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -35,6 +37,17 @@ export default function RegisterScreen() {
   const logoSizes = getResponsiveLogoSizes();
   const logoPositions = getResponsiveLogoPositions();
   const logoSpacing = getResponsiveSpacing();
+
+  // Refs for auto-scroll functionality
+  const scrollViewRef = useRef<ScrollView>(null);
+  const nicknameInputRef = useRef<View>(null);
+  const universityInputRef = useRef<View>(null);
+  const passwordInputRef = useRef<View>(null);
+  const confirmPasswordInputRef = useRef<View>(null);
+  
+  // Keyboard state
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Step management
   const [currentStep, setCurrentStep] = useState(1); // 1 for email, 2 for verification code, 3 for complete registration
@@ -81,6 +94,46 @@ export default function RegisterScreen() {
       if (interval) clearInterval(interval);
     };
   }, [resendCountdown]);
+
+  // Keyboard event listeners for auto-scroll
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+      setKeyboardVisible(true);
+    });
+
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Auto-scroll function to bring active input above keyboard
+  const scrollToInput = (inputRef: React.RefObject<View | null>) => {
+    if (inputRef.current && scrollViewRef.current && keyboardVisible) {
+      const screenHeight = Dimensions.get('window').height;
+      const availableHeight = screenHeight - keyboardHeight;
+      
+      inputRef.current.measureInWindow((x, y, width, height) => {
+        // Calculate if the input is hidden behind keyboard
+        const inputBottom = y + height;
+        const margin = 20; // Extra margin above keyboard
+        
+        if (inputBottom > availableHeight - margin) {
+          const scrollOffset = inputBottom - availableHeight + margin + 50; // Extra padding
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(0, scrollOffset),
+            animated: true,
+          });
+        }
+      });
+    }
+  };
 
   const validatePassword = (password: string) => {
     const passwordValidation = Validator.validatePassword(password);
@@ -331,6 +384,7 @@ export default function RegisterScreen() {
         <KeyboardAvoidingView
           style={styles.keyboardContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           {/* Welcome Section */}
           <View style={styles.welcomeSection}>
@@ -346,6 +400,7 @@ export default function RegisterScreen() {
           </View>
           
           <ScrollView
+            ref={scrollViewRef}
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
@@ -503,13 +558,14 @@ export default function RegisterScreen() {
                     <Text style={styles.sectionTitle}>Registration Information</Text>
 
                     {/* Nickname Input */}
-                    <View style={styles.inputContainer}>
+                    <View ref={nicknameInputRef} style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Nickname *</Text>
                       <View style={styles.inputWrapper}>
                         <Icon name="account-circle-outline" size={20} color="#666" style={styles.inputIcon} />
                         <TextInput
                           value={formData.nickname}
                           onChangeText={(value) => updateFormData('nickname', value)}
+                          onFocus={() => setTimeout(() => scrollToInput(nicknameInputRef), 100)}
                           placeholder="Enter your nickname"
                           style={styles.textInput}
                           underlineColor="transparent"
@@ -520,11 +576,14 @@ export default function RegisterScreen() {
                     </View>
 
                     {/* University Dropdown */}
-                    <View style={styles.inputContainer}>
+                    <View ref={universityInputRef} style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>University *</Text>
                       <TouchableOpacity
                         style={styles.inputWrapper}
-                        onPress={() => setShowUniversityModal(true)}
+                        onPress={() => {
+                          setTimeout(() => scrollToInput(universityInputRef), 100);
+                          setShowUniversityModal(true);
+                        }}
                       >
                         <Icon name="school-outline" size={20} color="#666" style={styles.inputIcon} />
                         <View style={styles.dropdownTextContainer}>
@@ -537,13 +596,14 @@ export default function RegisterScreen() {
                     </View>
 
                     {/* Password Input */}
-                    <View style={styles.inputContainer}>
+                    <View ref={passwordInputRef} style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Password *</Text>
                       <View style={styles.inputWrapper}>
                         <Icon name="lock-outline" size={20} color="#666" style={styles.inputIcon} />
                         <TextInput
                           value={formData.password}
                           onChangeText={(value) => updateFormData('password', value)}
+                          onFocus={() => setTimeout(() => scrollToInput(passwordInputRef), 100)}
                           placeholder="Create a password"
                           secureTextEntry={!showPassword}
                           style={styles.textInput}
@@ -570,13 +630,14 @@ export default function RegisterScreen() {
                     </Text>
 
                     {/* Confirm Password Input */}
-                    <View style={styles.inputContainer}>
+                    <View ref={confirmPasswordInputRef} style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Confirm Password *</Text>
                       <View style={styles.inputWrapper}>
                         <Icon name="lock-outline" size={20} color="#666" style={styles.inputIcon} />
                         <TextInput
                           value={formData.confirmPassword}
                           onChangeText={(value) => updateFormData('confirmPassword', value)}
+                          onFocus={() => setTimeout(() => scrollToInput(confirmPasswordInputRef), 100)}
                           placeholder="Confirm your password"
                           secureTextEntry={!showConfirmPassword}
                           style={styles.textInput}

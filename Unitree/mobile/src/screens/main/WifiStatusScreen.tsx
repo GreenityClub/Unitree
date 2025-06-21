@@ -23,6 +23,7 @@ import { useTabBarContext } from '../../context/TabBarContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { wifiService } from '../../services/wifiService';
+import { pointsService } from '../../services/pointsService';
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
 
 interface StatItemProps {
@@ -73,15 +74,39 @@ const WifiStatusScreen: React.FC = () => {
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  const [liveTotalPoints, setLiveTotalPoints] = useState(user?.points || 0);
 
   useEffect(() => {
-    // Update time every second for real-time display
+    // Update time every second for real-time display and calculate live points
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      
+      // Calculate live total points like in PointsScreen
+      if (stats?.currentSession?.startTime && isSessionActive) {
+        const sessionDuration = wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+        const sessionPoints = Math.floor(sessionDuration / 60); // 1 minute = 1 point
+        const basePoints = pointsService.getState().points;
+        setLiveTotalPoints(basePoints + sessionPoints);
+      } else {
+        setLiveTotalPoints(pointsService.getState().points);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [stats, isSessionActive]);
+
+  // Listen for points service updates
+  useEffect(() => {
+    const unsubscribePoints = pointsService.addListener((state) => {
+      if (!isSessionActive) {
+        setLiveTotalPoints(state.points);
+      }
+    });
+
+    return () => {
+      unsubscribePoints();
+    };
+  }, [isSessionActive]);
 
   // Real-time stats refresh effect
   useEffect(() => {
@@ -222,7 +247,7 @@ const WifiStatusScreen: React.FC = () => {
                 <Icon name="star" size={28} color="#50AF27" />
                 <Text style={styles.cardTitle}>Total Points</Text>
               </View>
-              <Text style={styles.pointsValue}>{user?.points || 0}</Text>
+              <Text style={styles.pointsValue}>{liveTotalPoints}</Text>
               {isSessionActive && (
                 <Text style={styles.activeSessionText}>• Session Active - Earning 1 point per minute</Text>
               )}

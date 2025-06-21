@@ -7,6 +7,37 @@ const User = require('../models/User');
 const Point = require('../models/Point');
 const logger = require('../utils/logger');
 
+// Utility function to execute operations with transactions when available
+const executeWithOptionalTransaction = async (operations) => {
+  let transactionSession = null;
+  let useTransactions = false;
+  
+  try {
+    // Check if transactions are supported (replica set/mongos)
+    transactionSession = await mongoose.startSession();
+    useTransactions = true;
+  } catch (sessionError) {
+    logger.debug('MongoDB transactions not supported, using sequential operations');
+    useTransactions = false;
+  }
+  
+  try {
+    if (useTransactions && transactionSession) {
+      // Production: Use transactions for atomic operations
+      return await transactionSession.withTransaction(async () => {
+        return await operations(transactionSession);
+      });
+    } else {
+      // Local development: Sequential operations
+      return await operations(null);
+    }
+  } finally {
+    if (transactionSession) {
+      await transactionSession.endSession();
+    }
+  }
+};
+
 // Helper function to validate university IP address
 const isValidUniversityIP = (ipAddress) => {
   const allowedPrefix = process.env.UNIVERSITY_IP_PREFIX || '192.168';
@@ -98,36 +129,90 @@ router.post('/start', auth, async (req, res) => {
         if (durationSeconds >= minSessionDuration) {
           const pointsEarned = Math.floor(durationSeconds / 60);
           
-          // Update user points and time tracking
-          await User.findByIdAndUpdate(
-            req.user._id,
-            { 
-              $inc: { 
-                points: pointsEarned,
-                allTimePoints: pointsEarned,
-                dayTimeConnected: durationSeconds,
-                weekTimeConnected: durationSeconds,
-                monthTimeConnected: durationSeconds,
-                totalTimeConnected: durationSeconds
-              }
-            }
-          );
+          // Try to use transactions if available, fallback to sequential operations
+          let transactionSession = null;
+          let useTransactions = false;
           
-          // Create point transaction record
-          const pointTransaction = new Point({
-            userId: req.user._id,
-            amount: pointsEarned,
-            type: 'WIFI_SESSION',
-            metadata: {
-              startTime: activeSession.startTime,
-              endTime: endTime,
-              duration: durationSeconds,
-              description: `WiFi session on ${activeSession.ipAddress}`,
-            }
-          });
-          await pointTransaction.save();
+          try {
+            transactionSession = await mongoose.startSession();
+            useTransactions = true;
+          } catch (sessionError) {
+            useTransactions = false;
+          }
           
-          activeSession.pointsEarned = pointsEarned;
+          try {
+            if (useTransactions && transactionSession) {
+              await transactionSession.withTransaction(async () => {
+                // Update user points and time tracking
+                await User.findByIdAndUpdate(
+                  req.user._id,
+                  { 
+                    $inc: { 
+                      points: pointsEarned,
+                      allTimePoints: pointsEarned,
+                      dayTimeConnected: durationSeconds,
+                      weekTimeConnected: durationSeconds,
+                      monthTimeConnected: durationSeconds,
+                      totalTimeConnected: durationSeconds
+                    }
+                  },
+                  { session: transactionSession }
+                );
+                
+                // Create point transaction record
+                const pointTransaction = new Point({
+                  userId: req.user._id,
+                  amount: pointsEarned,
+                  type: 'WIFI_SESSION',
+                  metadata: {
+                    startTime: activeSession.startTime,
+                    endTime: endTime,
+                    duration: durationSeconds,
+                    description: `WiFi session on ${activeSession.ipAddress}`,
+                  }
+                });
+                await pointTransaction.save({ session: transactionSession });
+                
+                activeSession.pointsEarned = pointsEarned;
+              });
+            } else {
+              // Sequential operations for local development
+              // Update user points and time tracking
+              await User.findByIdAndUpdate(
+                req.user._id,
+                { 
+                  $inc: { 
+                    points: pointsEarned,
+                    allTimePoints: pointsEarned,
+                    dayTimeConnected: durationSeconds,
+                    weekTimeConnected: durationSeconds,
+                    monthTimeConnected: durationSeconds,
+                    totalTimeConnected: durationSeconds
+                  }
+                }
+              );
+              
+              // Create point transaction record
+              const pointTransaction = new Point({
+                userId: req.user._id,
+                amount: pointsEarned,
+                type: 'WIFI_SESSION',
+                metadata: {
+                  startTime: activeSession.startTime,
+                  endTime: endTime,
+                  duration: durationSeconds,
+                  description: `WiFi session on ${activeSession.ipAddress}`,
+                }
+              });
+              await pointTransaction.save();
+              
+              activeSession.pointsEarned = pointsEarned;
+            }
+          } finally {
+            if (transactionSession) {
+              await transactionSession.endSession();
+            }
+          }
         } else {
           // Track time even if no points earned
           await User.findByIdAndUpdate(
@@ -196,25 +281,73 @@ router.post('/end', auth, async (req, res) => {
     if (durationSeconds >= minSessionDuration) {
       const pointsEarned = Math.floor(durationSeconds / 60); // 1 minute = 1 point
       
-      // Use transaction to ensure data consistency
-      const mongoSession = await mongoose.startSession();
+      // Try to use transactions if available (production), fallback to sequential operations (local dev)
+      let transactionSession = null;
+      let useTransactions = false;
       
       try {
-        await mongoSession.withTransaction(async () => {
+        // Check if transactions are supported (replica set/mongos)
+        transactionSession = await mongoose.startSession();
+        useTransactions = true;
+      } catch (sessionError) {
+        logger.info('MongoDB transactions not supported, using sequential operations');
+        useTransactions = false;
+      }
+      
+      try {
+        if (useTransactions && transactionSession) {
+          // Production: Use transactions for atomic operations
+          await transactionSession.withTransaction(async () => {
+            // Update user points and all time tracking fields
+            await User.findByIdAndUpdate(
+              req.user._id,
+              { 
+                $inc: { 
+                  points: pointsEarned,
+                  allTimePoints: pointsEarned,
+                  dayTimeConnected: durationSeconds,
+                  weekTimeConnected: durationSeconds,
+                  monthTimeConnected: durationSeconds,
+                  totalTimeConnected: durationSeconds
+                }
+              },
+              { session: transactionSession }
+            );
+            
+            // Create point transaction record
+            const pointTransaction = new Point({
+              userId: req.user._id,
+              amount: pointsEarned,
+              type: 'WIFI_SESSION',
+              metadata: {
+                startTime: session.startTime,
+                endTime: endTime,
+                duration: durationSeconds,
+                description: `WiFi session on ${session.ipAddress}`,
+              }
+            });
+            await pointTransaction.save({ session: transactionSession });
+            
+            // Update session
+            session.pointsEarned = pointsEarned;
+          });
+          
+          logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (with transactions)`);
+        } else {
+          // Local development: Sequential operations with error handling
           // Update user points and all time tracking fields
           await User.findByIdAndUpdate(
             req.user._id,
             { 
               $inc: { 
                 points: pointsEarned,
-                allTimePoints: pointsEarned, // Add to all-time points 
+                allTimePoints: pointsEarned,
                 dayTimeConnected: durationSeconds,
                 weekTimeConnected: durationSeconds,
                 monthTimeConnected: durationSeconds,
                 totalTimeConnected: durationSeconds
               }
-            },
-            { session: mongoSession }
+            }
           );
           
           // Create point transaction record
@@ -229,18 +362,20 @@ router.post('/end', auth, async (req, res) => {
               description: `WiFi session on ${session.ipAddress}`,
             }
           });
-          await pointTransaction.save({ session: mongoSession });
+          await pointTransaction.save();
           
           // Update session
           session.pointsEarned = pointsEarned;
-        });
-        
-        logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned}`);
-      } catch (transactionError) {
-        logger.error('Transaction failed during session end:', transactionError);
-        throw transactionError;
+          
+          logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (sequential)`);
+        }
+      } catch (updateError) {
+        logger.error('Failed to update user points or create point transaction:', updateError);
+        throw updateError;
       } finally {
-        await mongoSession.endSession();
+        if (transactionSession) {
+          await transactionSession.endSession();
+        }
       }
     } else {
       // Even if no points earned, still track the time
@@ -264,7 +399,11 @@ router.post('/end', auth, async (req, res) => {
     });
   } catch (error) {
     logger.error('End WiFi session error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Server error'
+    });
   }
 });
 
