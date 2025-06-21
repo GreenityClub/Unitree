@@ -45,6 +45,13 @@ const StatItem: React.FC<StatItemProps> = ({ label, duration, points, icon }) =>
   </View>
 );
 
+const LiveBadge: React.FC = () => (
+  <View style={styles.liveBadge}>
+    <View style={styles.liveDot} />
+    <Text style={styles.liveText}>LIVE</Text>
+  </View>
+);
+
 const WifiStatusScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -53,9 +60,11 @@ const WifiStatusScreen: React.FC = () => {
   const { panGesture } = useSwipeNavigation({ currentScreen: 'wifi' });
   const { 
     isConnected, 
-    ssid, 
+    ipAddress,
     isUniversityWifi, 
     isSessionActive, 
+    currentSessionDuration,
+    sessionCount,
     stats, 
     refreshStats, 
     error,
@@ -74,9 +83,18 @@ const WifiStatusScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Real-time stats refresh effect
   useEffect(() => {
-    refreshStats();
-  }, []);
+    const statsTimer = setInterval(async () => {
+      try {
+        await refreshStats();
+      } catch (error) {
+        console.error('Failed to refresh stats:', error);
+      }
+    }, 5000); // Refresh every 5 seconds for real-time updates
+
+    return () => clearInterval(statsTimer);
+  }, [refreshStats]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -98,6 +116,22 @@ const WifiStatusScreen: React.FC = () => {
       return 'CONNECTED';
     }
     return 'NOT CONNECTED';
+  };
+
+  const getLiveSessionDuration = () => {
+    if (stats?.currentSession?.startTime) {
+      const duration = wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+      return duration;
+    }
+    return stats?.currentSession?.duration || 0;
+  };
+
+  const getLiveSessionPoints = () => {
+    if (stats?.currentSession?.startTime) {
+      const duration = wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+      return Math.floor(duration / 60); // 1 minute = 1 point
+    }
+    return stats?.currentSession?.points || 0;
   };
 
   return (
@@ -146,6 +180,7 @@ const WifiStatusScreen: React.FC = () => {
           <View style={styles.content}>
             {/* WiFi Status Card */}
             <View style={styles.statusCard}>
+              {(isConnected && isUniversityWifi && isSessionActive) && <LiveBadge />}
               <View style={styles.cardHeader}>
                 <Icon 
                   name={getWifiStatusIcon()} 
@@ -160,23 +195,21 @@ const WifiStatusScreen: React.FC = () => {
               ]}>
                 {getConnectionStatus()}
               </Text>
-              {ssid && (
-                <Text style={styles.networkInfo}>
-                  Connected to: {ssid}
-                </Text>
-              )}
               {isUniversityWifi && (
                 <Text style={styles.bssidInfo}>
-                  University WiFi ✓
+                  {process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS} ✓
                 </Text>
               )}
-              {(isConnected && isUniversityWifi) && stats?.currentSession && (
+              {(isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionText}>
-                    Current session: {wifiService.formatWifiTime(stats.currentSession.duration)}
+                    Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
                   </Text>
                   <Text style={styles.sessionText}>
-                    Points earned: {Math.floor(stats.currentSession.duration / 60)}
+                    Points earned: {getLiveSessionPoints()}
+                  </Text>
+                  <Text style={styles.sessionText}>
+                    Sessions today: {sessionCount}
                   </Text>
                 </View>
               )}
@@ -184,6 +217,7 @@ const WifiStatusScreen: React.FC = () => {
 
             {/* Current Points Card */}
             <View style={styles.pointsCard}>
+              {isSessionActive && <LiveBadge />}
               <View style={styles.cardHeader}>
                 <Icon name="star" size={28} color="#50AF27" />
                 <Text style={styles.cardTitle}>Total Points</Text>
@@ -203,6 +237,19 @@ const WifiStatusScreen: React.FC = () => {
 
               {stats ? (
                 <>
+                  {/* Session Count Display */}
+                  <View style={styles.statItem}>
+                    <View style={styles.statHeader}>
+                      <Icon name="counter" size={20} color="#50AF27" />
+                      <Text style={styles.statLabel}>Sessions Today</Text>
+                    </View>
+                    <View style={styles.statDetails}>
+                      <Text style={styles.statText}>Count: {sessionCount}</Text>
+                      <Text style={styles.statText}>Status: {isSessionActive ? 'Active' : 'Inactive'}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.divider} />
+
                   <StatItem 
                     label="Today" 
                     duration={stats.periods.today.duration}
@@ -299,6 +346,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: rs(30),
     paddingHorizontal: rs(24),
     paddingTop: rs(32),
+    marginTop: rs(10),
   },
   mascotContainer: {
     position: 'absolute',
@@ -331,6 +379,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    marginTop: rs(10),
   },
   pointsCard: {
     backgroundColor: '#fff',
@@ -406,6 +455,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
     borderRadius: rs(12),
     padding: rs(16),
+    marginTop: rs(12),
   },
   sessionText: {
     fontSize: rf(14),
@@ -462,7 +512,33 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     textAlign: 'center',
     fontWeight: '500',
-  }
+  },
+  liveBadge: {
+    position: 'absolute',
+    top: rs(5),
+    right: rs(-3),
+    backgroundColor: '#50AF27',
+    borderRadius: rs(32),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '30deg' }],
+    zIndex: 10,
+  },
+  liveDot: {
+    width: rs(12),
+    height: rs(12),
+    borderRadius: rs(6),
+    backgroundColor: '#fff',
+    marginRight: rs(8),
+  },
+  liveText: {
+    fontSize: rf(20),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
 }); 
 
 export default WifiStatusScreen; 

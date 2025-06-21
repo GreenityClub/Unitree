@@ -8,9 +8,15 @@ const wifiSessionSchema = new mongoose.Schema({
   },
   ssid: {
     type: String,
-    required: true
+    required: false,
+    default: ''
   },
   bssid: {
+    type: String,
+    required: false,
+    default: ''
+  },
+  ipAddress: {
     type: String,
     required: true
   },
@@ -48,7 +54,7 @@ const wifiSessionSchema = new mongoose.Schema({
 wifiSessionSchema.index({ user: 1, createdAt: -1 });
 wifiSessionSchema.index({ user: 1, isActive: 1 });
 wifiSessionSchema.index({ user: 1, sessionDate: -1 });
-wifiSessionSchema.index({ bssid: 1 });
+wifiSessionSchema.index({ ipAddress: 1 });
 
 // Virtual for calculating real-time duration
 wifiSessionSchema.virtual('currentDuration').get(function() {

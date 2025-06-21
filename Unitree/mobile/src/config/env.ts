@@ -11,11 +11,8 @@ const ENV = {
   APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION || '1.0.0',
   APP_SCHEME: process.env.EXPO_PUBLIC_APP_SCHEME || 'unitree',
 
-  // University WiFi Networks
-  UNIVERSITY_SSIDS: (process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS || 'UniversityWiFi,Campus-Net,EduWiFi,eduroam').split(','),
-  
-  // WiFi BSSID Configuration (first 8 digits for tracking)
-  UNIVERSITY_BSSID_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_BSSID_PREFIX || '24:43:e2:92',
+  // WiFi IP Address Configuration (first 2 numbers separated by periods for tracking)
+  UNIVERSITY_IP_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_IP_PREFIX || '192.168',
 
   // Points Configuration
   POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '60', 10), // 1 minute = 1 point (60 points per hour)
@@ -54,8 +51,7 @@ export interface EnvironmentConfig {
   APP_NAME: string;
   APP_VERSION: string;
   APP_SCHEME: string;
-  UNIVERSITY_SSIDS: string[];
-  UNIVERSITY_BSSID_PREFIX: string;
+  UNIVERSITY_IP_PREFIX: string;
   POINTS_PER_HOUR: number;
   POINTS_FOR_TREE: number;
   MIN_SESSION_DURATION: number;
@@ -99,7 +95,7 @@ export const validateEnvironment = (): void => {
       API_URL: ENV.API_URL,
       APP_NAME: ENV.APP_NAME,
       APP_VERSION: ENV.APP_VERSION,
-      UNIVERSITY_SSIDS: ENV.UNIVERSITY_SSIDS,
+      UNIVERSITY_IP_PREFIX: ENV.UNIVERSITY_IP_PREFIX,
       POINTS_PER_HOUR: ENV.POINTS_PER_HOUR,
       POINTS_FOR_TREE: ENV.POINTS_FOR_TREE,
       isDevelopment: ENV.isDevelopment,

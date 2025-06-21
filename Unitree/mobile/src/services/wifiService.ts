@@ -4,8 +4,7 @@ import ENV from '../config/env';
 export interface WiFiSession {
   _id: string;
   user: string;
-  ssid: string;
-  bssid: string;
+  ipAddress: string;
   startTime: Date;
   endTime?: Date;
   duration: number;
@@ -17,8 +16,7 @@ export interface WiFiSession {
 }
 
 export interface StartSessionData {
-  ssid: string;
-  bssid: string;
+  ipAddress: string;
 }
 
 export interface WifiStats {
@@ -45,9 +43,9 @@ export interface WifiStats {
     points: number;
     isActive: boolean;
     startTime: string;
-    ssid: string;
-    bssid: string;
+    ipAddress: string;
   } | null;
+  sessionCount: number;
   lastResets: {
     day: string | null;
     week: string | null;
@@ -111,25 +109,37 @@ class WiFiService {
     }
   }
 
+  async getSessionCount(): Promise<number> {
+    try {
+      const response = await api.get('/api/wifi/session-count');
+      return response.data.sessionCount || 0;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get session count');
+    }
+  }
+
+  async cleanupOrphanedSessions(): Promise<void> {
+    try {
+      const response = await api.post('/api/wifi/cleanup');
+      console.log('Session cleanup result:', response.data.message);
+    } catch (error: any) {
+      console.error('Failed to cleanup sessions:', error);
+      throw new Error(error.response?.data?.message || 'Failed to cleanup orphaned sessions');
+    }
+  }
+
   // Utility methods for WiFi management
-  isUniversityWiFi(ssid: string): boolean {
-    if (!ssid || typeof ssid !== 'string') return false;
-    return ENV.UNIVERSITY_SSIDS.some(universitySSID => 
-      ssid.toLowerCase().includes(universitySSID.toLowerCase())
-    );
+  isValidUniversityIP(ipAddress: string): boolean {
+    if (!ipAddress || typeof ipAddress !== 'string') return false;
+    return this.extractIPPrefix(ipAddress) === ENV.UNIVERSITY_IP_PREFIX.toLowerCase();
   }
 
-  isValidUniversityBSSID(bssid: string): boolean {
-    if (!bssid || typeof bssid !== 'string') return false;
-    return this.extractBSSIDPrefix(bssid) === ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase();
-  }
-
-  extractBSSIDPrefix(bssid: string): string {
-    // Extract the first four octets (e.g. "24:43:e2:92" from "24:43:e2:92:ab:cd")
-    if (!bssid || typeof bssid !== 'string') return '';
-    const parts = bssid.split(':');
-    if (parts.length < 4) return '';
-    return parts.slice(0, 4).join(':').toLowerCase();
+  extractIPPrefix(ipAddress: string): string {
+    // Extract the first two octets (e.g. "192.168" from "192.168.1.100")
+    if (!ipAddress || typeof ipAddress !== 'string') return '';
+    const parts = ipAddress.split('.');
+    if (parts.length < 2) return '';
+    return parts.slice(0, 2).join('.').toLowerCase();
   }
 
   calculateSessionDuration(startTime: Date, endTime?: Date): number {

@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { useTabBarContext } from '../../context/TabBarContext';
+import { useWiFi } from '../../context/WiFiContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { formatDistanceToNow } from 'date-fns';
@@ -430,6 +431,29 @@ const styles = StyleSheet.create({
   disabledText: {
     color: '#999',
   },
+  sessionInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: rs(16),
+    padding: rs(20),
+    marginBottom: rs(16),
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  sessionInfo: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: rs(12),
+    padding: rs(16),
+    marginTop: rs(12),
+  },
+  sessionText: {
+    fontSize: rf(14),
+    color: '#50AF27',
+    fontWeight: '500',
+    marginBottom: rs(4),
+  },
 });
 
 // Types  
@@ -535,15 +559,24 @@ const TreeRedemptionModal: React.FC<{
   const [species, setSpecies] = useState<TreeSpecies[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && !hasLoaded) {
       console.log('TreeRedemptionModal: Modal became visible, loading species...');
       loadTreeSpecies();
     }
-  }, [visible]);
+    
+    // Reset state when modal closes
+    if (!visible) {
+      setHasLoaded(false);
+      setError(null);
+    }
+  }, [visible, hasLoaded]);
 
   const loadTreeSpecies = async () => {
+    if (loading) return; // Prevent multiple simultaneous calls
+    
     console.log('TreeRedemptionModal: Starting to load species...');
     setLoading(true);
     setError(null);
@@ -553,9 +586,11 @@ const TreeRedemptionModal: React.FC<{
       console.log('TreeRedemptionModal: Received species data:', speciesData);
       console.log('TreeRedemptionModal: Species count:', speciesData?.length || 0);
       setSpecies(speciesData || []);
+      setHasLoaded(true);
     } catch (err) {
       console.error('TreeRedemptionModal: Error loading species:', err);
-      setError('Failed to load tree species');
+      setError('Failed to load tree species. Please check server connection.');
+      setHasLoaded(true); // Mark as loaded even on error to prevent infinite retries
     } finally {
       setLoading(false);
       console.log('TreeRedemptionModal: Finished loading species');
@@ -635,46 +670,39 @@ const TreeRedemptionModal: React.FC<{
           </View>
 
           <View style={styles.modalContent}>
-            {(() => {
-              console.log('TreeRedemptionModal: Rendering content - loading:', loading, 'error:', error, 'species count:', species.length);
-              
-              if (loading) {
-                console.log('TreeRedemptionModal: Showing loading state');
-                return (
-                  <View style={[styles.loadingContainer, { padding: 20, justifyContent: 'center', alignItems: 'center', minHeight: 100 }]}>
-                    <Text style={[styles.loadingText, { fontSize: 16, color: '#666' }]}>Loading tree species...</Text>
-                  </View>
-                );
-              }
-              
-              if (error) {
-                console.log('TreeRedemptionModal: Showing error state:', error);
-                return (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity 
-                      style={styles.retryButton}
-                      onPress={loadTreeSpecies}
-                    >
-                      <Text style={styles.retryText}>Retry</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              }
-              
-              console.log('TreeRedemptionModal: Showing species list, count:', species.length);
-              return (
-                <ScrollView style={[styles.speciesScrollView, { flex: 1, minHeight: 150 }]}>
-                  {species.length === 0 ? (
-                    <Text style={[styles.noSpeciesText, { textAlign: 'center', color: '#666', fontSize: 16, padding: 20 }]}>
+            {loading ? (
+              <View style={[styles.loadingContainer, { padding: 20, justifyContent: 'center', alignItems: 'center', minHeight: 100 }]}>
+                <Text style={[styles.loadingText, { fontSize: 16, color: '#666' }]}>Loading tree species...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity 
+                  style={styles.retryButton}
+                  onPress={() => {
+                    setHasLoaded(false);
+                    loadTreeSpecies();
+                  }}
+                >
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={[styles.speciesScrollView, { flex: 1, minHeight: 150 }]}>
+                {species.length === 0 ? (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={[styles.noSpeciesText, { textAlign: 'center', color: '#666', fontSize: 16, marginBottom: 16 }]}>
                       No tree species available
                     </Text>
-                  ) : (
-                    species.map(renderSpeciesCard)
-                  )}
-                </ScrollView>
-              );
-            })()}
+                    <Text style={{ textAlign: 'center', color: '#999', fontSize: 14 }}>
+                      Tree species may not be seeded in the database.
+                    </Text>
+                  </View>
+                ) : (
+                  species.map(renderSpeciesCard)
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </View>
@@ -688,6 +716,14 @@ const PointsScreen = () => {
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
   const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
   const { panGesture } = useSwipeNavigation({ currentScreen: 'points' });
+  const { 
+    isConnected, 
+    isUniversityWifi, 
+    isSessionActive, 
+    stats, 
+    sessionCount, 
+    ipAddress 
+  } = useWiFi();
   const [pointsState, setPointsState] = useState<PointsState>({ points: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -699,6 +735,23 @@ const PointsScreen = () => {
   const [currentSession, setCurrentSession] = useState<WifiStats['currentSession']>(null);
   const [showSpeciesSelection, setShowSpeciesSelection] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // Real-time calculations for live updates
+  const getLiveSessionDuration = () => {
+    if (!stats?.currentSession?.startTime) return 0;
+    return wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+  };
+
+  const getLiveSessionPoints = () => {
+    const duration = getLiveSessionDuration();
+    return wifiService.calculatePointsEarned(duration);
+  };
+
+  const getLiveTotalPoints = () => {
+    const sessionPoints = getLiveSessionPoints();
+    const basePoints = pointsState.points;
+    return basePoints + sessionPoints;
+  };
 
   useEffect(() => {
     initializeData();
@@ -937,17 +990,9 @@ const PointsScreen = () => {
                     <Icon name="star" size={24} color="#50AF27" />
                     <Text style={styles.cardTitle}>Total Points</Text>
                   </View>
-                  <Text style={styles.pointsValue}>{pointsState.points}</Text>
-                  {sessionPoints > 0 && (
-                    <View style={styles.sessionContainer}>
-                      <Text style={styles.sessionPoints}>
-                        Pending: +{sessionPoints}
-                      </Text>
-                      <Text style={styles.sessionNote}>
-                        (Auto-awarded per hour)
-                      </Text>
-                    </View>
-                  )}
+                  <Text style={styles.pointsValue}>
+                    {isSessionActive ? getLiveTotalPoints() : pointsState.points}
+                  </Text>
                 </View>
 
                 {/* Divider */}
@@ -1025,13 +1070,15 @@ const PointsScreen = () => {
         />
       </View>
 
-      {/* Tree Redemption Modal */}
-      <TreeRedemptionModal
-        visible={showSpeciesSelection}
-        onClose={() => setShowSpeciesSelection(false)}
-        userPoints={pointsState.points}
-        onRedeemTree={handleRedeemTree}
-      />
+      {/* Tree Redemption Modal - Only render when needed */}
+      {showSpeciesSelection && (
+        <TreeRedemptionModal
+          visible={showSpeciesSelection}
+          onClose={() => setShowSpeciesSelection(false)}
+          userPoints={isSessionActive ? getLiveTotalPoints() : pointsState.points}
+          onRedeemTree={handleRedeemTree}
+        />
+      )}
 
       <CustomModal
         visible={showSuccessModal}

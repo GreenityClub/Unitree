@@ -222,7 +222,6 @@ const TreesScreen = () => {
   };
 
   // Calculate summary statistics
-  const totalWifiHours = trees.reduce((acc, tree) => acc + (tree.totalWifiTime / 3600), 0);
   const aliveTrees = trees.filter(tree => !tree.isDead);
   const deadTrees = trees.filter(tree => tree.isDead);
 
@@ -277,14 +276,6 @@ const TreesScreen = () => {
                   <Icon name="tree" size={24} color="#50AF27" />
                   <Text style={styles.statValue}>{aliveTrees.length}</Text>
                   <Text style={styles.statLabel}>Living Trees</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Icon name="clock-outline" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>
-                    {Math.floor(totalWifiHours)}h
-                  </Text>
-                  <Text style={styles.statLabel}>WiFi Hours</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>

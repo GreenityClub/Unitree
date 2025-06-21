@@ -20,9 +20,9 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { wifiService, WifiStats } from '../../services/wifiService';
 import { treeService } from '../../services/treeService';
-import { eventService } from '../../services/eventService';
 import { pointsService } from '../../services/pointsService';
 import { useAuth } from '../../context/AuthContext';
+import { useWiFi } from '../../context/WiFiContext';
 import { useTabBarContext } from '../../context/TabBarContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
@@ -49,21 +49,23 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface WifiStatus {
-  isConnected: boolean;
-  sessionInfo: WifiStats['currentSession'];
-}
+
 
 const HomeScreen = () => {
   const { user, updateUser } = useAuth();
+  const { 
+    isConnected, 
+    isUniversityWifi, 
+    isSessionActive, 
+    currentSessionDuration, 
+    sessionCount, 
+    stats,
+    ipAddress
+  } = useWiFi();
   const navigation = useNavigation<NavigationProp>();
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
   const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
   const { panGesture } = useSwipeNavigation({ currentScreen: 'index' });
-  const [wifiStatus, setWifiStatus] = useState<WifiStatus>({
-    isConnected: false,
-    sessionInfo: null
-  });
   const [currentPoints, setCurrentPoints] = useState<number>(user?.points || 0);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -78,50 +80,14 @@ const HomeScreen = () => {
   };
 
   useEffect(() => {
-    let cleanup: (() => void) | null = null;
-    
-    // Initialize WiFi monitoring and set up listeners
-    const initializeWifiMonitor = async () => {
-      try {
-        // Only initialize if we have a user
-        if (!user) {
-          console.log('No user available, skipping WiFi monitor initialization');
-          return;
-        }
-        
-        console.log('Initializing WiFi monitor for user:', user.id);
-        
-        // Get initial connection status
-        const currentSession = await wifiService.getActiveSession();
-        setWifiStatus({
-          isConnected: !!currentSession,
-          sessionInfo: currentSession
-        });
-
-        // Fetch actual tree count
+    // Fetch actual tree count when user changes
+    const fetchInitialData = async () => {
+      if (user) {
         await fetchActualTreeCount();
-
-        // Add connection change listener
-        const subscription = eventService.addListener('wifi', (status: WifiStatus) => {
-          console.log('WiFi status changed:', status);
-          setWifiStatus(status);
-        });
-
-        cleanup = () => {
-          eventService.removeAllListeners('wifi');
-        };
-      } catch (error) {
-        console.error('Error initializing WiFi monitor:', error);
       }
     };
 
-    initializeWifiMonitor();
-    
-    return () => {
-      if (cleanup) {
-        cleanup();
-      }
-    };
+    fetchInitialData();
   }, [user?.id]); // Reinitialize when user changes
 
   // Update points when user data changes or when user logs in
@@ -145,26 +111,22 @@ const HomeScreen = () => {
     }, [currentPoints, user])
   );
 
-  // Listen for real-time points updates
+  // Listen for real-time points updates from pointsService
   useEffect(() => {
     if (!user) return;
 
-    const pointsSubscription = eventService.addListener('points', (data: { points?: number; totalPoints?: number }) => {
-      if (data.points !== undefined || data.totalPoints !== undefined) {
-        const newPoints = data.totalPoints ?? data.points;
-        setCurrentPoints(newPoints ?? 0);
+    // Set up a periodic refresh for points to keep them in sync
+    const pointsInterval = setInterval(() => {
+      const currentPointsFromService = pointsService.getPoints();
+      if (currentPointsFromService !== currentPoints) {
+        setCurrentPoints(currentPointsFromService);
       }
-    });
-
-    const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
-      fetchActualTreeCount(); // Refresh actual tree count from API
-    });
+    }, 5000); // Check every 5 seconds
 
     return () => {
-      eventService.removeAllListeners('points');
-      eventService.removeAllListeners('treeRedeemed');
+      clearInterval(pointsInterval);
     };
-  }, [user?.id]);
+  }, [user?.id, currentPoints]);
 
   // Update time every second for real-time duration display
   useEffect(() => {
@@ -178,15 +140,31 @@ const HomeScreen = () => {
   }, [user]); // Depend on user so timer restarts/stops with login/logout
 
   const getWifiStatusText = () => {
-    if (wifiStatus.isConnected && wifiStatus.sessionInfo?.startTime) {
-      const duration = wifiService.calculateSessionDuration(new Date(wifiStatus.sessionInfo.startTime));
-      return `Connected to university WiFi\nSession duration: ${wifiService.formatSessionDuration(duration)}`;
+    if (isConnected && isUniversityWifi && isSessionActive && stats?.currentSession?.startTime) {
+      return `Connected to ${process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS}`;
     }
     return 'Not connected to university WiFi';
   };
 
+  // Real-time calculations for live updates
+  const getLiveSessionDuration = () => {
+    if (!stats?.currentSession?.startTime) return 0;
+    return wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+  };
+
+  const getLiveSessionPoints = () => {
+    const duration = getLiveSessionDuration();
+    return wifiService.calculatePointsEarned(duration);
+  };
+
+  const getLiveTotalPoints = () => {
+    const sessionPoints = getLiveSessionPoints();
+    const basePoints = user?.points || 0;
+    return basePoints + sessionPoints;
+  };
+
   const getWifiStatusIcon = () => {
-    return wifiStatus.isConnected ? 'wifi' : 'wifi-off';
+    return (isConnected && isUniversityWifi) ? 'wifi' : 'wifi-off';
   };
 
   // Navigation handlers
@@ -224,15 +202,6 @@ const HomeScreen = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // Refresh WiFi status
-      if (user) {
-        const currentSession = await wifiService.getActiveSession();
-        setWifiStatus({
-          isConnected: !!currentSession,
-          sessionInfo: currentSession
-        });
-      }
-      
       // Refresh points from service
       await pointsService.refreshPoints();
       const updatedPoints = pointsService.getPoints();
@@ -302,9 +271,8 @@ const HomeScreen = () => {
                   <Icon name="chevron-right" size={20} color="#666" />
                 </View>
               </View>
-              <Text style={styles.pointsValue}>{currentPoints}</Text>
-              <Text style={styles.pointsSubtext}>
-                Use your points to plant new trees!
+              <Text style={styles.pointsValue}>
+                {isSessionActive ? getLiveTotalPoints() : currentPoints}
               </Text>
             </TouchableOpacity>
 
@@ -314,11 +282,12 @@ const HomeScreen = () => {
               onPress={navigateToWifi}
               activeOpacity={0.7}
             >
+
               <View style={styles.cardHeader}>
                 <Icon 
                   name={getWifiStatusIcon()} 
                   size={24} 
-                  color={wifiStatus.isConnected ? "#50AF27" : "#FFA79D"} 
+                  color={(isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
                 />
                 <Text style={styles.cardTitle}>WiFi Status</Text>
                 <View style={styles.cardArrow}>
@@ -327,24 +296,26 @@ const HomeScreen = () => {
               </View>
               <Text style={[
                 styles.statusText,
-                wifiStatus.isConnected ? styles.connectedText : styles.disconnectedText
+                (isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
               ]}>
                 {getWifiStatusText()}
               </Text>
-              {wifiStatus.isConnected && wifiStatus.sessionInfo && (
+
+              {(isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionText}>
-                    Points earned: {wifiStatus.sessionInfo.points || 0}
+                    Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
                   </Text>
                   <Text style={styles.sessionText}>
-                    Duration: {wifiService.formatWifiTime(wifiStatus.sessionInfo.duration || 0)}
+                    Points earned: {getLiveSessionPoints()}
                   </Text>
-                  <Text style={styles.tapHintText}>
-                    Tap to view WiFi details
+                  <Text style={styles.sessionText}>
+                    Sessions today: {sessionCount}
                   </Text>
                 </View>
               )}
-              {!wifiStatus.isConnected && (
+
+              {!(isConnected && isUniversityWifi) && (
                 <Text style={styles.tapHintText}>
                   Tap to view WiFi details
                 </Text>
@@ -508,18 +479,7 @@ const styles = StyleSheet.create({
     color: '#FFA79D',
     fontWeight: '600',
   },
-  sessionInfo: {
-    marginTop: rs(12),
-    padding: rs(12),
-    backgroundColor: '#F0F9FF',
-    borderRadius: rs(8),
-    marginBottom: rs(8),
-  },
-  sessionText: {
-    fontSize: rf(14),
-    color: '#50AF27',
-    fontWeight: '500',
-  },
+
   treeCount: {
     fontSize: rf(30),
     fontWeight: 'bold',
@@ -542,6 +502,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: rs(4),
   },
+  sessionInfo: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: rs(12),
+    padding: rs(16),
+    marginTop: rs(12),
+  },
+  sessionText: {
+    fontSize: rf(14),
+    color: '#50AF27',
+    fontWeight: '500',
+    marginBottom: rs(4),
+  },
+
 });
 
 export default HomeScreen; 

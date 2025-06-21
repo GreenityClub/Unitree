@@ -191,6 +191,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
+      // End WiFi session first while we still have authentication
+      try {
+        const { wifiService } = await import('../services/wifiService');
+        await wifiService.endSession();
+        console.log('✅ WiFi session ended successfully during logout');
+      } catch (wifiError: any) {
+        console.log('ℹ️ No active WiFi session to end during logout:', wifiError.message);
+        // Don't treat this as an error - user might not have an active session
+      }
+
       // Call server logout endpoint to clear session
       const token = await AsyncStorage.getItem('authToken');
       if (token) {

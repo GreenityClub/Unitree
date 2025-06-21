@@ -19,6 +19,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useTabBarContext } from '../../context/TabBarContext';
+import { useWiFi } from '../../context/WiFiContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { router } from 'expo-router';
@@ -28,12 +29,21 @@ import userService from '../../services/userService';
 import { treeService } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import { getAvatarUrl, handleAvatarError } from '../../utils/imageUtils';
+import { wifiService } from '../../services/wifiService';
 
 const ProfileScreen = () => {
   const { user, logout, updateUser } = useAuth();
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
   const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
   const { panGesture } = useSwipeNavigation({ currentScreen: 'profile' });
+  const { 
+    isConnected, 
+    isUniversityWifi, 
+    isSessionActive, 
+    stats, 
+    sessionCount, 
+    ipAddress 
+  } = useWiFi();
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [avatarError, setAvatarError] = React.useState(false);
@@ -41,6 +51,23 @@ const ProfileScreen = () => {
   const [actualTreeCount, setActualTreeCount] = React.useState<number>(0);
   const [currentPoints, setCurrentPoints] = React.useState<number>(user?.points || 0);
   const insets = useSafeAreaInsets();
+
+  // Real-time calculations for live updates
+  const getLiveSessionDuration = () => {
+    if (!stats?.currentSession?.startTime) return 0;
+    return wifiService.calculateSessionDuration(new Date(stats.currentSession.startTime));
+  };
+
+  const getLiveSessionPoints = () => {
+    const duration = getLiveSessionDuration();
+    return wifiService.calculatePointsEarned(duration);
+  };
+
+  const getLiveTotalPoints = () => {
+    const sessionPoints = getLiveSessionPoints();
+    const basePoints = currentPoints;
+    return basePoints + sessionPoints;
+  };
 
   React.useEffect(() => {
     if (user) {
@@ -311,7 +338,9 @@ const ProfileScreen = () => {
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Icon name="star" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{currentPoints}</Text>
+                  <Text style={styles.statValue}>
+                  {isSessionActive ? getLiveTotalPoints() : currentPoints}
+                </Text>
                   <Text style={styles.statLabel}>Points</Text>
                 </View>
                 <View style={styles.statDivider} />

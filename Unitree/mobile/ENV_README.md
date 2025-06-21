@@ -23,9 +23,11 @@ This document explains how to set up and use environment variables in the UniTre
 
 - `EXPO_PUBLIC_API_TIMEOUT`: API request timeout in milliseconds (default: 10000)
 - `EXPO_PUBLIC_APP_SCHEME`: Deep linking scheme (default: `unitree`)
-- `EXPO_PUBLIC_UNIVERSITY_SSIDS`: Comma-separated list of university WiFi networks
+- `EXPO_PUBLIC_UNIVERSITY_IP_PREFIX`: IP address prefix for university WiFi tracking (e.g., "192.168")
 - `EXPO_PUBLIC_POINTS_PER_HOUR`: Points earned per hour of WiFi connection (default: 100)
 - `EXPO_PUBLIC_POINTS_FOR_TREE`: Points required to redeem a tree (default: 100)
+- `EXPO_PUBLIC_MIN_SESSION_DURATION`: Minimum session duration in seconds (default: 300)
+- `EXPO_PUBLIC_SESSION_UPDATE_INTERVAL`: Session update interval in seconds (default: 60)
 - `EXPO_PUBLIC_ENABLE_LOCATION_TRACKING`: Enable location tracking (default: true)
 - `EXPO_PUBLIC_ENABLE_BACKGROUND_SYNC`: Enable background synchronization (default: true)
 - `EXPO_PUBLIC_ENABLE_NOTIFICATIONS`: Enable notifications (default: false)
@@ -55,6 +57,25 @@ const universitySSIDs = ENV.UNIVERSITY_SSIDS;
 
 4. **Git Ignore**: The `.env` file is automatically ignored by Git to prevent accidentally committing sensitive configuration.
 
+## WiFi Tracking Changes
+
+### IP-Based Tracking Only
+The application now uses **IP address prefix** as the only method for WiFi tracking:
+- Set `EXPO_PUBLIC_UNIVERSITY_IP_PREFIX` to the first two octets of your university's IP range (e.g., "192.168")
+- This method is more reliable across different devices and operating systems
+- SSID and BSSID are no longer collected, stored, or displayed - only IP address is used
+
+### Enhanced Session Management
+- **Real-time session counting**: Track the number of WiFi sessions per day
+- **Automatic session management**: 
+  - Sessions start when connecting to university WiFi (based on IP prefix)
+  - Sessions end automatically when:
+    - User logs out
+    - User connects to wrong WiFi network  
+    - User disconnects from WiFi entirely
+- **Real-time statistics**: Connection stats update every 30 seconds
+- **Real-time points**: Available and all-time points update based on current session
+
 ## Development vs Production
 
 - Use `.env` for local development
@@ -76,7 +97,9 @@ If you encounter issues:
 # Development Environment
 EXPO_PUBLIC_API_URL=http://192.168.1.100:3000
 EXPO_PUBLIC_APP_NAME=UniTree Dev
-EXPO_PUBLIC_UNIVERSITY_SSIDS=TestWiFi,DevNetwork
+EXPO_PUBLIC_UNIVERSITY_IP_PREFIX=192.168
+EXPO_PUBLIC_MIN_SESSION_DURATION=300
+EXPO_PUBLIC_SESSION_UPDATE_INTERVAL=60
 EXPO_PUBLIC_DEBUG_MODE=true
 ```
 
@@ -84,6 +107,8 @@ EXPO_PUBLIC_DEBUG_MODE=true
 # Production Environment  
 EXPO_PUBLIC_API_URL=https://api.unitree.com
 EXPO_PUBLIC_APP_NAME=UniTree
-EXPO_PUBLIC_UNIVERSITY_SSIDS=UniversityWiFi,Campus-Net,eduroam
+EXPO_PUBLIC_UNIVERSITY_IP_PREFIX=10.0
+EXPO_PUBLIC_MIN_SESSION_DURATION=300
+EXPO_PUBLIC_SESSION_UPDATE_INTERVAL=60
 EXPO_PUBLIC_DEBUG_MODE=false
 ``` 

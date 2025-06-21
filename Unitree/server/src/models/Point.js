@@ -12,7 +12,7 @@ const pointSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['ATTENDANCE', 'TREE_PURCHASE', 'TREE_REDEMPTION', 'ACHIEVEMENT', 'BONUS'],
+    enum: ['ATTENDANCE', 'TREE_PURCHASE', 'TREE_REDEMPTION', 'ACHIEVEMENT', 'BONUS', 'WIFI_SESSION'],
     required: true
   },
   metadata: {

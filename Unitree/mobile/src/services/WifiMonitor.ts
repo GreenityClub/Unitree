@@ -7,10 +7,10 @@ import { Platform } from 'react-native';
 // ---- Types -----------------------------------------------------------------
 interface SessionInfo {
   startTime: Date;
-  ssid: string | null;
-  bssid: string | null;
+  ipAddress: string | null;
   duration: number;         // seconds
   durationMinutes: number;  // rounded minutes
+  sessionCount: number;     // number of sessions today
 }
 
 interface ConnectionChangeData {
@@ -18,18 +18,19 @@ interface ConnectionChangeData {
   sessionInfo: SessionInfo | null;
 }
 
-type WifiEventType = 'connectionChange';
-type WifiEventCallback = (data: ConnectionChangeData) => void;
+type WifiEventType = 'connectionChange' | 'sessionUpdate' | 'statsUpdate';
+type WifiEventCallback = (data: ConnectionChangeData | any) => void;
 
 // ---- Implementation --------------------------------------------------------
 class WifiMonitor {
   private monitoring = false;
   private sessionStartTime: Date | null = null;
-  private currentSSID: string | null = null;
-  private currentBSSID: string | null = null;
+  private currentIPAddress: string | null = null;
+  private sessionCount: number = 0;
   private listeners: Map<number, WifiEventCallback> = new Map();
   private unsubscribeNetInfo: (() => void) | null = null;
   private sessionUpdateTimer: ReturnType<typeof setInterval> | null = null;
+  private statsUpdateTimer: ReturnType<typeof setInterval> | null = null;
 
   // Public API ---------------------------------------------------------------
   async start(onPointsEarned?: (points: number) => void): Promise<void> {
@@ -44,6 +45,9 @@ class WifiMonitor {
       }
     }
 
+    // Get initial session count
+    await this.refreshSessionCount();
+
     // Subscribe to realtime network changes
     this.unsubscribeNetInfo = NetInfo.addEventListener(this.handleNetInfo);
 
@@ -55,8 +59,21 @@ class WifiMonitor {
     this.sessionUpdateTimer = setInterval(() => {
       if (this.sessionStartTime) {
         this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
+        this.notifyStatsUpdate();
       }
     }, 30 * 1000);
+
+    // Update session statistics every minute
+    this.statsUpdateTimer = setInterval(async () => {
+      if (this.sessionStartTime) {
+        try {
+          await wifiService.updateSession();
+          this.notifyStatsUpdate();
+        } catch (error) {
+          console.error('Failed to update session stats:', error);
+        }
+      }
+    }, 60 * 1000); // Every minute
   }
 
   stop(): void {
@@ -66,6 +83,8 @@ class WifiMonitor {
     this.unsubscribeNetInfo = null;
     if (this.sessionUpdateTimer) clearInterval(this.sessionUpdateTimer);
     this.sessionUpdateTimer = null;
+    if (this.statsUpdateTimer) clearInterval(this.statsUpdateTimer);
+    this.statsUpdateTimer = null;
   }
 
   isRunning(): boolean {
@@ -74,8 +93,8 @@ class WifiMonitor {
 
   resetSessionState(): void {
     this.sessionStartTime = null;
-    this.currentSSID = null;
-    this.currentBSSID = null;
+    this.currentIPAddress = null;
+    this.sessionCount = 0;
     this.listeners.clear();
   }
 
@@ -83,7 +102,11 @@ class WifiMonitor {
     return this.buildSessionInfo();
   }
 
-  addListener(_eventType: WifiEventType, cb: WifiEventCallback): () => void {
+  getSessionCount(): number {
+    return this.sessionCount;
+  }
+
+  addListener(eventType: WifiEventType, cb: WifiEventCallback): () => void {
     const id = Date.now() + Math.random();
     this.listeners.set(id, cb);
     return () => {
@@ -98,23 +121,62 @@ class WifiMonitor {
     });
   }
 
+  private notifyStatsUpdate() {
+    this.listeners.forEach(cb => {
+      try { 
+        cb({ 
+          type: 'statsUpdate', 
+          sessionCount: this.sessionCount,
+          currentSession: this.buildSessionInfo()
+        }); 
+      } catch (e) { 
+        console.error('WiFiMonitor stats update error', e); 
+      }
+    });
+  }
+
+  private async refreshSessionCount(): Promise<void> {
+    try {
+      const stats = await wifiService.getStats();
+      // Count sessions from today
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const history = await wifiService.getSessionHistory();
+      this.sessionCount = history.filter(session => {
+        const sessionDate = new Date(session.sessionDate);
+        return sessionDate >= todayStart;
+      }).length;
+    } catch (error) {
+      console.error('Failed to refresh session count:', error);
+      this.sessionCount = 0;
+    }
+  }
+
   private async handleNetInfo(state: NetInfoState): Promise<void> {
     // We only care about WiFi connections
     if (state.type === 'wifi' && state.isConnected && state.details) {
       const details: any = state.details;
-      const ssid = details.ssid || null;
-      const rawBssid: string | null = details.bssid || null;
-      const bssid = rawBssid ? rawBssid.toLowerCase() : null;
+      const ipAddress = details.ipAddress || null;
 
-      const prefix = this.extractPrefix(bssid);
-      const expected = ENV.UNIVERSITY_BSSID_PREFIX.toLowerCase();
+      // Use IP address prefix for tracking instead of BSSID
+      const ipPrefix = this.extractIPPrefix(ipAddress);
+      const expectedPrefix = ENV.UNIVERSITY_IP_PREFIX.toLowerCase();
 
-      if (prefix && prefix === expected) {
-        // Connected to university WiFi
+      console.log('WiFi connection check:', {
+        ipAddress,
+        ipPrefix,
+        expectedPrefix,
+        isValidIP: ipPrefix === expectedPrefix
+      });
+
+      if (ipPrefix && ipPrefix === expectedPrefix) {
+        // Connected to university WiFi (based on IP prefix)
         if (!this.sessionStartTime) {
-          await this.startSession(ssid, bssid);
+          await this.startSession(ipAddress);
         } else {
           // Already in session, just update info
+          this.currentIPAddress = ipAddress;
           this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
         }
         return;
@@ -129,19 +191,22 @@ class WifiMonitor {
     }
   }
 
-  private async startSession(ssid: string | null, bssid: string | null): Promise<void> {
+  private async startSession(ipAddress: string | null): Promise<void> {
     this.sessionStartTime = new Date();
-    this.currentSSID = ssid;
-    this.currentBSSID = bssid;
+    this.currentIPAddress = ipAddress;
+    this.sessionCount += 1;
 
     try {
-      await wifiService.startSession({ ssid: ssid ?? '', bssid: bssid ?? '' });
+      await wifiService.startSession({ 
+        ipAddress: ipAddress ?? ''
+      });
     } catch (err) {
       console.error('Failed to start WiFi session', err);
       // If we fail to register on server, still treat as started locally
     }
 
     this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
+    this.notifyStatsUpdate();
   }
 
   private async endSession(): Promise<void> {
@@ -152,10 +217,10 @@ class WifiMonitor {
     }
 
     this.sessionStartTime = null;
-    this.currentSSID = null;
-    this.currentBSSID = null;
+    this.currentIPAddress = null;
 
     this.notifyListeners({ isConnected: false, sessionInfo: null });
+    this.notifyStatsUpdate();
   }
 
   private buildSessionInfo(): SessionInfo | null {
@@ -164,13 +229,21 @@ class WifiMonitor {
     const durationSec = Math.floor((now.getTime() - this.sessionStartTime.getTime()) / 1000);
     return {
       startTime: this.sessionStartTime,
-      ssid: this.currentSSID,
-      bssid: this.currentBSSID,
+      ipAddress: this.currentIPAddress,
       duration: durationSec,
       durationMinutes: Math.floor(durationSec / 60),
+      sessionCount: this.sessionCount,
     };
   }
 
+  private extractIPPrefix(ipAddress: string | null): string | null {
+    if (!ipAddress) return null;
+    const parts = ipAddress.split('.');
+    if (parts.length < 2) return null;
+    return parts.slice(0, 2).join('.').toLowerCase();
+  }
+
+  // Keep the old method for backward compatibility
   private extractPrefix(bssid: string | null): string | null {
     if (!bssid) return null;
     const parts = bssid.split(':');
