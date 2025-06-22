@@ -56,6 +56,9 @@ api.interceptors.response.use(
       } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
         // Don't log expected real tree collection errors (collection may not exist yet)
         console.log(`🌳 Real trees collection not available yet: ${error.config?.url}`);
+      } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
+        // Don't log WiFi validation errors as errors - they're expected during location testing
+        console.log(`📡 WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
       } else {
         console.error(`❌ API Response Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
       }

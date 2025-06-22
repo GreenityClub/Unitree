@@ -17,6 +17,18 @@ export interface WiFiSession {
 
 export interface StartSessionData {
   ipAddress: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: number;
+  };
+  validationMethods?: {
+    ipAddress: boolean;
+    location: boolean;
+  };
+  campus?: string;
+  distance?: number;
 }
 
 export interface WifiStats {

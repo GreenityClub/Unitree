@@ -6,6 +6,12 @@ export { treeService } from './treeService';
 export { eventService } from './eventService';
 export { pointsService } from './pointsService';
 export { default as userService } from './userService';
+export { default as locationService } from './locationService';
+
+// Load location test commands in development
+if (__DEV__) {
+  import('../utils/locationTestConsole');
+}
  
 export type { LoginCredentials, RegisterData, AuthResponse } from './authService';
 export type { WiFiSession, StartSessionData } from './wifiService';

@@ -14,6 +14,11 @@ const ENV = {
   // WiFi IP Address Configuration (first 2 numbers separated by periods for tracking)
   UNIVERSITY_IP_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_IP_PREFIX || '192.168',
 
+  // University Location Configuration for enhanced WiFi validation
+  UNIVERSITY_LAT: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LAT || '21.023883446210807'), // Default: Hanoi location
+  UNIVERSITY_LNG: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LNG || '105.79044010261333'),
+  UNIVERSITY_RADIUS: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_RADIUS || '100'), // 100m default
+
   // Points Configuration
   POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '60', 10), // 1 minute = 1 point (60 points per hour)
   POINTS_FOR_TREE: parseInt(process.env.EXPO_PUBLIC_POINTS_FOR_TREE || '100', 10),
@@ -52,6 +57,9 @@ export interface EnvironmentConfig {
   APP_VERSION: string;
   APP_SCHEME: string;
   UNIVERSITY_IP_PREFIX: string;
+  UNIVERSITY_LAT: number;
+  UNIVERSITY_LNG: number;
+  UNIVERSITY_RADIUS: number;
   POINTS_PER_HOUR: number;
   POINTS_FOR_TREE: number;
   MIN_SESSION_DURATION: number;

@@ -226,9 +226,14 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
           await refreshStats();
           await refreshSessionCount();
         }
-      } catch (err) {
-        console.error('Session management error:', err);
-        setError('Session management error');
+      } catch (err: any) {
+        // Don't log validation errors as errors - they're expected during testing
+        if (err.message?.includes('must be connected to university WiFi AND be physically on campus')) {
+          console.log('📡 Session validation: Both university WiFi and campus location required');
+        } else {
+          console.error('Session management error:', err);
+          setError('Session management error');
+        }
       }
     };
 

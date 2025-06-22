@@ -3,6 +3,7 @@ import { wifiService } from './wifiService';
 import ENV from '../config/env';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
+import locationService, { LocationData } from './locationService';
 
 // ---- Types -----------------------------------------------------------------
 interface SessionInfo {
@@ -36,6 +37,10 @@ class WifiMonitor {
   async start(onPointsEarned?: (points: number) => void): Promise<void> {
     if (this.monitoring) return;
     this.monitoring = true;
+
+    // Initialize location service for enhanced validation
+    console.log('[WiFiMonitor] Initializing location service...');
+    await locationService.initialize();
 
     // Android requires location permission and location services enabled to access real BSSID
     if (Platform.OS === 'android') {
@@ -159,27 +164,29 @@ class WifiMonitor {
       const details: any = state.details;
       const ipAddress = details.ipAddress || null;
 
-      // Use IP address prefix for tracking instead of BSSID
-      const ipPrefix = this.extractIPPrefix(ipAddress);
-      const expectedPrefix = ENV.UNIVERSITY_IP_PREFIX.toLowerCase();
+      // Enhanced validation using both IP address and location
+      const validationResult = await locationService.validateWiFiSession(ipAddress || '');
 
-      console.log('WiFi connection check:', {
+      console.log('Enhanced WiFi connection check:', {
         ipAddress,
-        ipPrefix,
-        expectedPrefix,
-        isValidIP: ipPrefix === expectedPrefix
+        isValidIP: validationResult.validationMethods.ipAddress,
+        isValidLocation: validationResult.validationMethods.location,
+        isOverallValid: validationResult.isValid,
+        requiresBoth: true,
+        distance: validationResult.distance,
+        campus: validationResult.campus
       });
 
-      if (ipPrefix && ipPrefix === expectedPrefix) {
-        // Connected to university WiFi (based on IP prefix)
+      if (validationResult.isValid) {
+        // Connected to university WiFi AND on campus
         if (!this.sessionStartTime) {
           // No active session, start a new one
-          await this.startSession(ipAddress);
+          await this.startSession(ipAddress, validationResult);
         } else if (this.currentIPAddress !== ipAddress) {
           // IP address changed, end current session and start new one
           console.log('📶 IP address changed in foreground, ending previous session and starting new one');
           await this.endSession();
-          await this.startSession(ipAddress);
+          await this.startSession(ipAddress, validationResult);
         } else {
           // Same session, just update info
           this.currentIPAddress = ipAddress;
@@ -197,17 +204,26 @@ class WifiMonitor {
     }
   }
 
-  private async startSession(ipAddress: string | null): Promise<void> {
+  private async startSession(ipAddress: string | null, validationResult?: any): Promise<void> {
     this.sessionStartTime = new Date();
     this.currentIPAddress = ipAddress;
     this.sessionCount += 1;
 
     try {
       await wifiService.startSession({ 
-        ipAddress: ipAddress ?? ''
+        ipAddress: ipAddress ?? '',
+        location: validationResult?.location,
+        validationMethods: validationResult?.validationMethods,
+        campus: validationResult?.campus,
+        distance: validationResult?.distance
       });
-    } catch (err) {
-      console.error('Failed to start WiFi session', err);
+    } catch (err: any) {
+      // Don't log validation errors as errors - they're expected during testing
+      if (err.message?.includes('must be connected to university WiFi AND be physically on campus')) {
+        console.log('📡 WiFi session validation: Both university WiFi and campus location required');
+      } else {
+        console.error('Failed to start WiFi session', err);
+      }
       // If we fail to register on server, still treat as started locally
     }
 

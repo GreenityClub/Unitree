@@ -197,14 +197,48 @@ router.post('/background-sync', auth, async (req, res) => {
   }
 });
 
+// Helper function to validate location within university campus
+const isValidUniversityLocation = (location) => {
+  if (!location || !location.latitude || !location.longitude) return false;
+  
+  // University campus coordinates (configurable via environment)
+  const universityLat = parseFloat(process.env.UNIVERSITY_LAT || '10.8231'); // Default: HCMC
+  const universityLng = parseFloat(process.env.UNIVERSITY_LNG || '106.6297');
+  const universityRadius = parseFloat(process.env.UNIVERSITY_RADIUS || '100'); // 100m default
+  
+  // Calculate distance using Haversine formula
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (location.latitude * Math.PI) / 180;
+  const φ2 = (universityLat * Math.PI) / 180;
+  const Δφ = ((universityLat - location.latitude) * Math.PI) / 180;
+  const Δλ = ((universityLng - location.longitude) * Math.PI) / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+
+  return distance <= universityRadius;
+};
+
 // Start WiFi session
 router.post('/start', auth, async (req, res) => {
   try {
-    const { ipAddress } = req.body;
+    const { ipAddress, location, validationMethods, campus, distance } = req.body;
 
-    // Validate IP address (only validation method)
-    if (!ipAddress || !isValidUniversityIP(ipAddress)) {
-      return res.status(400).json({ message: 'Invalid university WiFi IP address' });
+    // Enhanced validation: Require BOTH IP and location to be valid
+    const isValidIP = ipAddress && isValidUniversityIP(ipAddress);
+    const isValidLocation = location && isValidUniversityLocation(location);
+    
+    if (!isValidIP || !isValidLocation) {
+      return res.status(400).json({ 
+        message: 'Invalid university access - must be connected to university WiFi AND be physically on campus',
+        validation: {
+          ipValid: isValidIP,
+          locationValid: isValidLocation,
+          requiresBoth: true
+        }
+      });
     }
 
     // Check and reset time periods if needed
@@ -343,10 +377,20 @@ router.post('/start', auth, async (req, res) => {
       }
     }
 
-    // Create new session
+    // Create new session with location data
     const session = new WifiSession({
       user: req.user._id,
       ipAddress: ipAddress,
+      location: location ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        timestamp: new Date(location.timestamp)
+      } : undefined,
+      validationMethods: {
+        ipAddress: isValidIP,
+        location: isValidLocation
+      },
       startTime: new Date(),
       sessionDate: new Date(),
       isActive: true,
@@ -354,7 +398,12 @@ router.post('/start', auth, async (req, res) => {
 
     await session.save();
     
-    logger.info(`WiFi session started for user ${req.user._id} on IP ${ipAddress}`);
+    logger.info(`WiFi session started for user ${req.user._id}`, {
+      ipAddress,
+      campus,
+      distance,
+      validationMethods: { ipAddress: isValidIP, location: isValidLocation }
+    });
     res.json(session);
   } catch (error) {
     logger.error('Start WiFi session error:', error);

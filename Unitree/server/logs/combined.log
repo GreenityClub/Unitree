@@ -1089,3 +1089,70 @@
 {"level":"info","message":"Background session bg_1750614707073_twta1uetz too short (1s), not awarding points","timestamp":"2025-06-22T17:51:50.814Z"}
 {"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:52:23.185Z"}
 {"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:52:51.413Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:53:22.828Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:53:52.464Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:54:23.094Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:54:53.025Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:55:23.224Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:55:51.980Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:56:22.175Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:56:52.903Z"}
+{"level":"info","message":"Returning existing active session for user 6852d10ba0a57324869852f6 on IP 192.168.1.2","timestamp":"2025-06-22T17:57:21.533Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T17:58:26.790Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T17:58:26.793Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T17:58:27.772Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T18:00:44.496Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T18:00:44.499Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T18:00:46.202Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T18:01:09.536Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T18:01:09.539Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T18:01:10.450Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T18:05:27.279Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T18:05:27.282Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T18:05:28.260Z"}
+{"level":"info","message":"Background session synced: bg_1750614708457_i5fe2kdoo for user 6852d10ba0a57324869852f6, points: 17","timestamp":"2025-06-22T18:09:11.452Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:09:27.665Z"}
+{"level":"info","message":"Background session bg_1750615748936_0y02rnzrq too short (20s), not awarding points","timestamp":"2025-06-22T18:09:33.173Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[YA3wxdJB2R-yWAvA245Zwj]","timestamp":"2025-06-22T18:09:33.180Z"}
+{"level":"info","message":"Background session bg_1750615748936_0y02rnzrq too short (20s), not awarding points","timestamp":"2025-06-22T18:09:33.342Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:17:42.374Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[YA3wxdJB2R-yWAvA245Zwj]","timestamp":"2025-06-22T18:17:45.666Z"}
+{"level":"info","message":"Background session synced: bg_1750615770773_n92as7suj for user 6852d10ba0a57324869852f6, points: 8","timestamp":"2025-06-22T18:17:46.629Z"}
+{"level":"info","message":"Background session bg_1750615770773_n92as7suj already synced for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:17:46.830Z"}
+{"level":"info","message":"WiFi session ended for user 6852d10ba0a57324869852f6. Duration: 5275s, Points: 87 (with transactions)","timestamp":"2025-06-22T18:19:52.759Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:22:44.297Z"}
+{"level":"info","message":"Background session synced: bg_1750616265107_0a2ey6fiq for user 6852d10ba0a57324869852f6, points: 5","timestamp":"2025-06-22T18:22:47.250Z"}
+{"level":"info","message":"Background session synced: bg_1750616265107_0a2ey6fiq for user 6852d10ba0a57324869852f6, points: 5","timestamp":"2025-06-22T18:22:47.357Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[YA3wxdJB2R-yWAvA245Zwj]","timestamp":"2025-06-22T18:22:48.204Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:25:21.245Z"}
+{"level":"info","message":"Background session bg_1750616565693_pfd9jn5ug too short (157s), not awarding points","timestamp":"2025-06-22T18:25:23.836Z"}
+{"level":"info","message":"Background session bg_1750616565693_pfd9jn5ug too short (157s), not awarding points","timestamp":"2025-06-22T18:25:23.839Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:27:44.842Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[YA3wxdJB2R-yWAvA245Zwj]","timestamp":"2025-06-22T18:27:46.582Z"}
+{"level":"info","message":"Background session bg_1750616723138_4e21ytbgy too short (142s), not awarding points","timestamp":"2025-06-22T18:27:46.656Z"}
+{"level":"info","message":"Background session bg_1750616723138_4e21ytbgy too short (142s), not awarding points","timestamp":"2025-06-22T18:27:46.660Z"}
+{"level":"info","message":"Background session bg_1750616865995_crz6rpmup too short (60s), not awarding points","timestamp":"2025-06-22T18:28:46.997Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:29:58.718Z"}
+{"level":"info","message":"Background session bg_1750616926216_68myp63sm too short (72s), not awarding points","timestamp":"2025-06-22T18:30:00.310Z"}
+{"level":"info","message":"Background session bg_1750616926216_68myp63sm too short (72s), not awarding points","timestamp":"2025-06-22T18:30:00.312Z"}
+{"level":"info","message":"Background session bg_1750616926216_68myp63sm too short (72s), not awarding points","timestamp":"2025-06-22T18:30:00.445Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:33:10.008Z"}
+{"level":"info","message":"Push token saved for user QuanLDGCH230163@gmail.com: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-22T18:33:10.284Z"}
+{"dayTimeConnected":0,"lastDayReset":"2025-06-22T18:33:14.842Z","lastWeekReset":"2025-06-22T18:33:14.842Z","level":"info","message":"Reset time periods for user 68556ce85153757fd3dbc91f:","timestamp":"2025-06-22T18:33:14.880Z","weekTimeConnected":0}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-22T18:37:11.994Z"}
+{"level":"info","message":"Background session synced: bg_1750616999731_b5euv1o7b for user 6852d10ba0a57324869852f6, points: 7","timestamp":"2025-06-22T18:37:15.515Z"}
+{"level":"info","message":"Background session synced: bg_1750616999731_b5euv1o7b for user 6852d10ba0a57324869852f6, points: 7","timestamp":"2025-06-22T18:37:15.647Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[YA3wxdJB2R-yWAvA245Zwj]","timestamp":"2025-06-22T18:37:21.169Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:38:38.184Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T18:38:41.454Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T18:38:41.456Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T18:38:42.411Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:40:45.578Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-22T18:42:38.729Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-22T18:42:38.733Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-22T18:42:39.693Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:42:41.235Z"}
+{"level":"info","message":"Push token saved for user QuanLDGCH230163@gmail.com: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-22T18:42:41.510Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:43:40.260Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-06-22T18:44:03.961Z"}
+{"level":"info","message":"Push token saved for user QuanLDGCH230163@gmail.com: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-22T18:44:04.244Z"}
