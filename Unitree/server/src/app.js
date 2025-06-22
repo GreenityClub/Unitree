@@ -1,8 +1,13 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { validateEnvironment, env } = require('./config/env');
+const { globalErrorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const cronService = require('./services/cronService');
+
+// Validate environment variables before starting
+const ENV = validateEnvironment();
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -10,19 +15,20 @@ const userRoutes = require('./routes/user');
 const wifiRoutes = require('./routes/wifi');
 const treeRoutes = require('./routes/tree');
 const pointsRoutes = require('./routes/points');
+const notificationRoutes = require('./routes/notification');
 
 const app = express();
 
 // Middleware
 app.use(cors({
   origin: [
-    process.env.CLIENT_URL,
-    process.env.CLIENT_DEV_URL,
-    process.env.CLIENT_URL_DEV,
-    process.env.CLIENT_URL_DEV_2,
+    ENV.CLIENT_URL,
+    ENV.CLIENT_DEV_URL,
+    ENV.CLIENT_URL_DEV,
+    ENV.CLIENT_URL_DEV_2,
     'http://192.168.1.5:3000',  // Add the mobile app's API URL
     'http://localhost:3000'
-  ],
+  ].filter(Boolean), // Remove undefined values
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -35,10 +41,12 @@ app.use('/uploads', express.static('uploads'));
 
 // Connect to MongoDB
 console.log('Connecting to MongoDB...');
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(ENV.MONGODB_URI)
   .then(() => {
     console.log('MongoDB Connected successfully');
-    console.log('Database URI:', process.env.MONGODB_URI);
+    if (ENV.NODE_ENV === 'development') {
+      console.log('Database URI:', ENV.MONGODB_URI);
+    }
   })
   .catch(err => {
     console.error('MongoDB Connection Error:', err);
@@ -51,18 +59,20 @@ app.use('/api/users', userRoutes);
 app.use('/api/wifi', wifiRoutes);
 app.use('/api/trees', treeRoutes);
 app.use('/api/points', pointsRoutes);
+app.use('/api/user', notificationRoutes); // Some routes are under /api/user
+app.use('/api/notification', notificationRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ message: 'Something broke!' });
-});
+// Global error handling middleware (should be last)
+app.use(globalErrorHandler);
 
-const PORT = process.env.PORT || 3000;
+const PORT = ENV.PORT;
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Environment:', ENV.NODE_ENV);
+  
+  // Initialize cron jobs for scheduled notifications
+  cronService.initialize();
 });
 
 module.exports = app; 

@@ -12,7 +12,7 @@ interface ButtonProps {
   textStyle?: TextStyle;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
@@ -113,4 +113,6 @@ const styles = StyleSheet.create({
   disabledText: {
     color: '#999',
   },
-}); 
+});
+
+export default Button;

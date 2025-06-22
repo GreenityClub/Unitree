@@ -173,9 +173,15 @@ class WifiMonitor {
       if (ipPrefix && ipPrefix === expectedPrefix) {
         // Connected to university WiFi (based on IP prefix)
         if (!this.sessionStartTime) {
+          // No active session, start a new one
+          await this.startSession(ipAddress);
+        } else if (this.currentIPAddress !== ipAddress) {
+          // IP address changed, end current session and start new one
+          console.log('📶 IP address changed in foreground, ending previous session and starting new one');
+          await this.endSession();
           await this.startSession(ipAddress);
         } else {
-          // Already in session, just update info
+          // Same session, just update info
           this.currentIPAddress = ipAddress;
           this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
         }

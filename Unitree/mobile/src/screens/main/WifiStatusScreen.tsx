@@ -19,11 +19,13 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
+import { useBackgroundSync } from '../../context/BackgroundSyncContext';
 import { useTabBarContext } from '../../context/TabBarContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { wifiService } from '../../services/wifiService';
 import { pointsService } from '../../services/pointsService';
+
 import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
 
 interface StatItemProps {
@@ -71,10 +73,12 @@ const WifiStatusScreen: React.FC = () => {
     error,
     wifiMonitor 
   } = useWiFi();
+  const { syncStats, isSyncing } = useBackgroundSync();
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [liveTotalPoints, setLiveTotalPoints] = useState(user?.points || 0);
+
 
   useEffect(() => {
     // Update time every second for real-time display and calculate live points
@@ -317,6 +321,32 @@ const WifiStatusScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Background Sync Status */}
+            {syncStats && (
+              <View style={styles.backgroundSyncCard}>
+                <View style={styles.cardHeader}>
+                  <Icon name="sync" size={28} color="#50AF27" />
+                  <Text style={styles.cardTitle}>Background Sync Status</Text>
+                  {isSyncing && <Icon name="loading" size={20} color="#50AF27" />}
+                </View>
+                
+                <View style={styles.backgroundSyncRow}>
+                  <Text style={styles.backgroundSyncLabel}>Pending Sessions:</Text>
+                  <Text style={styles.backgroundSyncValue}>{syncStats.pendingCount}</Text>
+                </View>
+                
+                {syncStats.currentSession && (
+                  <View style={styles.backgroundSyncRow}>
+                    <Text style={styles.backgroundSyncLabel}>Background Session:</Text>
+                    <Text style={[styles.backgroundSyncValue, { color: '#50AF27' }]}>Active</Text>
+                  </View>
+                )}
+                
+                <Text style={styles.backgroundSyncNote}>
+                  Go to User Settings to enable/disable background monitoring
+                </Text>
+              </View>
+            )}
             
           </View>
         </ScrollView>
@@ -330,6 +360,8 @@ const WifiStatusScreen: React.FC = () => {
             resizeMode="contain"
           />
         </View>
+
+
       </View>
     </GestureDetector>
   );
@@ -563,6 +595,39 @@ const styles = StyleSheet.create({
     fontSize: rf(20),
     fontWeight: 'bold',
     color: '#fff',
+  },
+  backgroundSyncCard: {
+    backgroundColor: '#fff',
+    borderRadius: rs(16),
+    padding: rs(20),
+    marginTop: rs(16),
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  backgroundSyncRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: rs(8),
+  },
+  backgroundSyncLabel: {
+    fontSize: rf(14),
+    color: '#333',
+  },
+  backgroundSyncValue: {
+    fontSize: rf(14),
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  backgroundSyncNote: {
+    fontSize: rf(12),
+    color: '#666',
+    textAlign: 'center',
+    marginTop: rs(12),
+    fontStyle: 'italic',
   },
 }); 
 

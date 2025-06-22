@@ -65,7 +65,22 @@ export interface TreeSpecies {
 }
 
 export interface RedeemTreeData {
-  speciesId: string;
+  speciesId?: string;
+  treeType?: 'virtual' | 'real';
+  location?: string;
+  treeSpecie?: string;
+}
+
+export interface RealTree {
+  _id: string;
+  userId: string;
+  studentId: string;
+  treeSpecie: string;
+  plantedDate: Date;
+  location: string;
+  stage: 'planted' | 'thrive' | 'dead';
+  pointsCost: number;
+  notes?: string;
 }
 
 export interface WaterTreeResponse {
@@ -111,7 +126,7 @@ class TreeService {
     }
   }
 
-  async redeemTree(data: RedeemTreeData): Promise<Tree> {
+  async redeemTree(data: RedeemTreeData): Promise<any> {
     try {
       const response = await api.post('/api/trees/redeem', data);
       return response.data;
@@ -329,6 +344,78 @@ class TreeService {
       console.error('Failed to refresh tree status:', error);
       throw error;
     }
+  }
+
+  async getRealTrees(): Promise<RealTree[]> {
+    try {
+      const response = await api.get('/api/trees/real');
+      return response.data;
+    } catch (error: any) {
+      // If the real trees collection doesn't exist yet, return empty array
+      // This is expected behavior for new installations
+      if (error.response?.status === 500) {
+        return [];
+      }
+      throw new Error(error.response?.data?.message || 'Failed to get real trees');
+    }
+  }
+
+  async getRealTree(id: string): Promise<RealTree> {
+    try {
+      const response = await api.get(`/api/trees/real/${id}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get real tree');
+    }
+  }
+
+  // Real tree utility methods
+  getRealTreeStageColor(stage: 'planted' | 'thrive' | 'dead'): string {
+    switch (stage) {
+      case 'planted':
+        return '#8BC34A';
+      case 'thrive':
+        return '#4CAF50';
+      case 'dead':
+        return '#9E9E9E';
+      default:
+        return '#8BC34A';
+    }
+  }
+
+  getRealTreeStageText(stage: 'planted' | 'thrive' | 'dead'): string {
+    switch (stage) {
+      case 'planted':
+        return 'Recently Planted';
+      case 'thrive':
+        return 'Thriving';
+      case 'dead':
+        return 'Dead';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  getRealTreeIcon(stage: 'planted' | 'thrive' | 'dead'): string {
+    switch (stage) {
+      case 'planted':
+        return '🌱';
+      case 'thrive':
+        return '🌳';
+      case 'dead':
+        return '💀';
+      default:
+        return '🌱';
+    }
+  }
+
+  // Get cost for real tree redemption
+  getRealTreeCost(): number {
+    return 500; // Higher cost for real trees
+  }
+
+  canRedeemRealTree(userPoints: number): boolean {
+    return userPoints >= this.getRealTreeCost();
   }
 }
 

@@ -7,7 +7,7 @@ interface CardProps {
   padding?: number;
 }
 
-export const Card: React.FC<CardProps> = ({
+const Card: React.FC<CardProps> = ({
   children,
   style,
   padding = 20,
@@ -33,4 +33,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     marginBottom: 15,
   },
-}); 
+});
+
+export default Card;

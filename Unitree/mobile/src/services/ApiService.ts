@@ -58,28 +58,49 @@ class ApiService {
     }
   }
 
+  // HTTP method shortcuts
+  async get(endpoint: string, params?: any) {
+    return this.request('GET', endpoint, params);
+  }
+
+  async post(endpoint: string, data?: any) {
+    return this.request('POST', endpoint, data);
+  }
+
+  async put(endpoint: string, data?: any) {
+    return this.request('PUT', endpoint, data);
+  }
+
+  async patch(endpoint: string, data?: any) {
+    return this.request('PATCH', endpoint, data);
+  }
+
+  async delete(endpoint: string, data?: any) {
+    return this.request('DELETE', endpoint, data);
+  }
+
   async startWifiSession(data: StartWifiSessionData) {
-    return this.request('POST', '/api/wifi/start', data);
+    return this.post('/api/wifi/start', data);
   }
 
   async endWifiSession() {
-    return this.request('POST', '/api/wifi/end');
+    return this.post('/api/wifi/end');
   }
 
   async updateWifiSession() {
-    return this.request('POST', '/api/wifi/update');
+    return this.post('/api/wifi/update');
   }
 
   async getActiveWifiSession() {
-    return this.request('GET', '/api/wifi/active');
+    return this.get('/api/wifi/active');
   }
 
   async getWifiStats() {
-    return this.request('GET', '/api/wifi/stats');
+    return this.get('/api/wifi/stats');
   }
 
   async getWifiHistory() {
-    return this.request('GET', '/api/wifi/history');
+    return this.get('/api/wifi/history');
   }
 }
 

@@ -7,7 +7,8 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "test": "jest",
-    "seed-tree-types": "node src/scripts/seedTreeTypes.js"
+    "seed-tree-types": "node src/scripts/seedTreeTypes.js",
+    "migrate": "node src/scripts/migrateModels.js"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +16,9 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "cron": "^3.1.6",
     "dotenv": "^16.0.3",
+    "expo-server-sdk": "^3.7.0",
     "express": "^4.18.2",
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.0",
@@ -27,7 +30,7 @@
   },
   "devDependencies": {
     "jest": "^29.5.0",
-    "nodemon": "^2.0.22",
+    "nodemon": "^3.1.10",
     "supertest": "^6.3.3"
   }
 }

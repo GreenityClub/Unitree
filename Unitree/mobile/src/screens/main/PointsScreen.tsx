@@ -11,6 +11,7 @@ import {
   RefreshControl,
   SafeAreaView,
   Modal,
+  TextInput,
 } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -302,157 +303,208 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
+    borderRadius: rs(20),
     width: '100%',
-    maxWidth: rs(400),
-    maxHeight: '80%',
-    minHeight: rs(500),
+    maxHeight: '90%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: rs(20),
-    paddingBottom: rs(16),
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: rf(20),
+    fontSize: rf(18),
     fontWeight: 'bold',
-    color: '#2e7d32',
+    color: '#333',
+  },
+  closeButton: {
+    padding: rs(4),
+  },
+  modalPillTabsContainer: {
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(15),
+  },
+  modalPillTabs: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(152, 213, 109, 0.2)',
+    borderRadius: rs(25),
+    padding: rs(4),
+  },
+  modalPillTab: {
+    flex: 1,
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(20),
+    borderRadius: rs(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPillTabActive: {
+    backgroundColor: '#98D56D',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  modalPillTabText: {
+    fontSize: rf(14),
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalPillTabTextActive: {
+    color: '#fff',
   },
   modalContent: {
-    padding: rs(20),
-    paddingTop: rs(16),
-    flex: 1,
-    minHeight: rs(200),
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: rf(16),
-    color: '#D32F2F',
-    marginBottom: rs(16),
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#50AF27',
+    maxHeight: rs(400),
     paddingHorizontal: rs(20),
-    paddingVertical: rs(10),
-    borderRadius: rs(8),
   },
-  retryText: {
-    color: '#fff',
+  modalDescription: {
     fontSize: rf(14),
-    fontWeight: 'bold',
-  },
-  speciesScrollView: {
-    flex: 1,
-  },
-  noSpeciesText: {
-    textAlign: 'center',
     color: '#666',
-    fontSize: rf(16),
-    padding: rs(20),
+    textAlign: 'center',
+    marginBottom: rs(16),
+    lineHeight: rf(20),
   },
-  treeCard: {
+  userPointsText: {
+    fontSize: rf(16),
+    fontWeight: 'bold',
+    color: '#50AF27',
+    textAlign: 'center',
+    marginBottom: rs(20),
+  },
+  speciesGrid: {
+    paddingBottom: rs(20),
+  },
+  speciesCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: rs(12),
     padding: rs(16),
     marginBottom: rs(12),
-    borderWidth: 2,
-    borderColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
-  treeCardDisabled: {
-    backgroundColor: '#f0f0f0',
-    opacity: 0.6,
+  speciesCardDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#f5f5f5',
   },
-  treeCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: rs(8),
-  },
-  treeInfo: {
+  speciesInfo: {
     flex: 1,
   },
-  treeName: {
-    fontSize: rf(18),
-    fontWeight: 'bold',
-    color: '#2e7d32',
-    marginBottom: rs(2),
-  },
-  treeScientific: {
-    fontSize: rf(14),
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  treeCost: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  costText: {
+  speciesName: {
     fontSize: rf(16),
     fontWeight: 'bold',
-    color: '#50AF27',
-    marginRight: rs(4),
+    color: '#333',
+    marginBottom: rs(4),
   },
-  treeDescription: {
-    fontSize: rf(14),
-    color: '#444',
-    lineHeight: rf(20),
-    marginBottom: rs(12),
-  },
-  treeStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  treeStat: {
+  speciesScientific: {
     fontSize: rf(12),
     color: '#666',
+    fontStyle: 'italic',
+    marginBottom: rs(8),
+  },
+  speciesDescription: {
+    fontSize: rf(13),
+    color: '#666',
+    lineHeight: rf(18),
+    marginBottom: rs(12),
+  },
+  speciesDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: rs(12),
+  },
+  speciesDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    textAlign: 'center',
   },
-  disabledText: {
-    color: '#999',
+  speciesDetailText: {
+    fontSize: rf(11),
+    color: '#666',
+    marginLeft: rs(4),
   },
-  sessionInfoCard: {
+  speciesCost: {
+    alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(16),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderRadius: rs(8),
+    padding: rs(8),
+    minWidth: rs(60),
   },
-  sessionInfo: {
-    backgroundColor: '#F0F9FF',
+  costText: {
+    fontSize: rf(14),
+    fontWeight: 'bold',
+    color: '#50AF27',
+  },
+  costSubtext: {
+    fontSize: rf(10),
+    color: '#666',
+  },
+  realTreeInfo: {
+    marginVertical: rs(10),
+  },
+  realTreeInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: rs(16),
+    paddingHorizontal: rs(16),
+  },
+  realTreeInfoText: {
+    fontSize: rf(14),
+    color: '#333',
+    marginLeft: rs(12),
+    flex: 1,
+  },
+  realTreeCostContainer: {
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: rs(12),
+    padding: rs(20),
+    marginVertical: rs(10),
+  },
+  realTreeCost: {
+    fontSize: rf(24),
+    fontWeight: 'bold',
+    color: '#50AF27',
+  },
+  realTreeCostLabel: {
+    fontSize: rf(12),
+    color: '#666',
+    marginTop: rs(4),
+  },
+  redeemRealTreeButton: {
+    backgroundColor: '#50AF27',
     borderRadius: rs(12),
     padding: rs(16),
-    marginTop: rs(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: rs(20),
   },
-  sessionText: {
-    fontSize: rf(14),
-    color: '#50AF27',
-    fontWeight: '500',
-    marginBottom: rs(4),
+  redeemRealTreeButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  redeemRealTreeButtonText: {
+    color: '#fff',
+    fontSize: rf(16),
+    fontWeight: 'bold',
+    marginLeft: rs(8),
+  },
+  loadingContainer: {
+    padding: rs(40),
+    alignItems: 'center',
+  },
+  // Missing styles for tree species cards
+  disabledText: {
+    color: '#999',
+    opacity: 0.6,
   },
 });
 
@@ -487,16 +539,12 @@ interface TreeSpecies {
   stages: string[];
 }
 
-
-
 interface PointsHistoryItemProps {
   type: string;
   time: string;
   duration: number;
   points: number;
 }
-
-
 
 interface WifiStatus {
   isConnected: boolean;
@@ -550,108 +598,100 @@ const PointsHistoryItem: React.FC<PointsHistoryItemProps> = ({
   );
 };
 
-const TreeRedemptionModal: React.FC<{
+// New unified redemption modal component
+const RedemptionModal: React.FC<{
   visible: boolean;
   onClose: () => void;
   userPoints: number;
   onRedeemTree: (species: TreeSpecies) => void;
-}> = ({ visible, onClose, userPoints, onRedeemTree }) => {
-  const [species, setSpecies] = useState<TreeSpecies[]>([]);
+  onRedeemRealTree: () => void;
+}> = ({ visible, onClose, userPoints, onRedeemTree, onRedeemRealTree }) => {
+  const [selectedType, setSelectedType] = useState<'virtual' | 'real'>('virtual');
+  const [treeSpecies, setTreeSpecies] = useState<TreeSpecies[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    if (visible && !hasLoaded) {
-      console.log('TreeRedemptionModal: Modal became visible, loading species...');
+    if (visible && selectedType === 'virtual') {
       loadTreeSpecies();
     }
-    
-    // Reset state when modal closes
-    if (!visible) {
-      setHasLoaded(false);
-      setError(null);
-    }
-  }, [visible, hasLoaded]);
+  }, [visible, selectedType]);
 
   const loadTreeSpecies = async () => {
-    if (loading) return; // Prevent multiple simultaneous calls
-    
-    console.log('TreeRedemptionModal: Starting to load species...');
-    setLoading(true);
-    setError(null);
     try {
-      console.log('TreeRedemptionModal: Calling treeService.getTreeSpecies()...');
-      const speciesData = await treeService.getTreeSpecies();
-      console.log('TreeRedemptionModal: Received species data:', speciesData);
-      console.log('TreeRedemptionModal: Species count:', speciesData?.length || 0);
-      setSpecies(speciesData || []);
-      setHasLoaded(true);
-    } catch (err) {
-      console.error('TreeRedemptionModal: Error loading species:', err);
-      setError('Failed to load tree species. Please check server connection.');
-      setHasLoaded(true); // Mark as loaded even on error to prevent infinite retries
+      setLoading(true);
+      const species = await treeService.getTreeSpecies();
+      setTreeSpecies(species);
+    } catch (error) {
+      console.error('Error loading tree species:', error);
     } finally {
       setLoading(false);
-      console.log('TreeRedemptionModal: Finished loading species');
     }
   };
 
   const handleSelectTree = (selectedSpecies: TreeSpecies) => {
-    if (userPoints >= selectedSpecies.cost) {
-      onRedeemTree(selectedSpecies);
-      onClose();
-    }
+    onRedeemTree(selectedSpecies);
+    onClose();
   };
 
-  const renderSpeciesCard = (treeSpecies: TreeSpecies) => {
-    const canAfford = userPoints >= treeSpecies.cost;
-    
-    return (
-      <TouchableOpacity
-        key={treeSpecies.id}
-        style={[
-          styles.treeCard,
-          !canAfford && styles.treeCardDisabled
-        ]}
-        onPress={() => handleSelectTree(treeSpecies)}
-        disabled={!canAfford}
-      >
-        <View style={styles.treeCardHeader}>
-          <View style={styles.treeInfo}>
-            <Text style={[styles.treeName, !canAfford && styles.disabledText]}>
-              {treeSpecies.name}
-            </Text>
-            <Text style={[styles.treeScientific, !canAfford && styles.disabledText]}>
-              {treeSpecies.scientificName}
-            </Text>
-          </View>
-          <View style={styles.treeCost}>
-            <Text style={[styles.costText, !canAfford && styles.disabledText]}>
-              {treeSpecies.cost} pts
-            </Text>
-            {!canAfford && <Icon name="lock" size={16} color="#999" />}
-          </View>
-        </View>
-        
-        <Text style={[styles.treeDescription, !canAfford && styles.disabledText]}>
+  const handleRedeemReal = () => {
+    onRedeemRealTree();
+    onClose();
+  };
+
+  const renderSpeciesCard = (treeSpecies: TreeSpecies) => (
+    <TouchableOpacity
+      key={treeSpecies.id}
+      style={[
+        styles.speciesCard,
+        userPoints < treeSpecies.cost && styles.speciesCardDisabled
+      ]}
+      onPress={() => handleSelectTree(treeSpecies)}
+      disabled={userPoints < treeSpecies.cost}
+    >
+      <View style={styles.speciesInfo}>
+        <Text style={[styles.speciesName, userPoints < treeSpecies.cost && styles.disabledText]}>
+          {treeSpecies.name}
+        </Text>
+        <Text style={[styles.speciesScientific, userPoints < treeSpecies.cost && styles.disabledText]}>
+          {treeSpecies.scientificName}
+        </Text>
+        <Text style={[styles.speciesDescription, userPoints < treeSpecies.cost && styles.disabledText]}>
           {treeSpecies.description}
         </Text>
         
-        <View style={styles.treeStats}>
-          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
-            📏 {treeSpecies.maxHeight}
-          </Text>
-          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
-            💚 {treeSpecies.careLevel}
-          </Text>
-          <Text style={[styles.treeStat, !canAfford && styles.disabledText]}>
-            ⏰ {treeSpecies.lifespan}
-          </Text>
+        <View style={styles.speciesDetails}>
+          <View style={styles.speciesDetailItem}>
+            <Icon name="ruler" size={12} color="#666" />
+            <Text style={[styles.speciesDetailText, userPoints < treeSpecies.cost && styles.disabledText]}>
+              {treeSpecies.maxHeight}
+            </Text>
+          </View>
+          <View style={styles.speciesDetailItem}>
+            <Icon name="heart" size={12} color="#666" />
+            <Text style={[styles.speciesDetailText, userPoints < treeSpecies.cost && styles.disabledText]}>
+              {treeSpecies.careLevel}
+            </Text>
+          </View>
+          <View style={styles.speciesDetailItem}>
+            <Icon name="clock" size={12} color="#666" />
+            <Text style={[styles.speciesDetailText, userPoints < treeSpecies.cost && styles.disabledText]}>
+              {treeSpecies.lifespan}
+            </Text>
+          </View>
         </View>
-      </TouchableOpacity>
-    );
-  };
+        
+        <View style={styles.speciesCost}>
+          <Text style={[styles.costText, userPoints < treeSpecies.cost && styles.disabledText]}>
+            {treeSpecies.cost}
+          </Text>
+          <Text style={[styles.costSubtext, userPoints < treeSpecies.cost && styles.disabledText]}>
+            points
+          </Text>
+          {userPoints < treeSpecies.cost && <Icon name="lock" size={16} color="#999" />}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <Modal
@@ -663,47 +703,111 @@ const TreeRedemptionModal: React.FC<{
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Choose Your Tree</Text>
-            <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalTitle}>Redeem Points</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Icon name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
-            {loading ? (
-              <View style={[styles.loadingContainer, { padding: 20, justifyContent: 'center', alignItems: 'center', minHeight: 100 }]}>
-                <Text style={[styles.loadingText, { fontSize: 16, color: '#666' }]}>Loading tree species...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity 
-                  style={styles.retryButton}
-                  onPress={() => {
-                    setHasLoaded(false);
-                    loadTreeSpecies();
-                  }}
-                >
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView style={[styles.speciesScrollView, { flex: 1, minHeight: 150 }]}>
-                {species.length === 0 ? (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
-                    <Text style={[styles.noSpeciesText, { textAlign: 'center', color: '#666', fontSize: 16, marginBottom: 16 }]}>
-                      No tree species available
-                    </Text>
-                    <Text style={{ textAlign: 'center', color: '#999', fontSize: 14 }}>
-                      Tree species may not be seeded in the database.
-                    </Text>
+          {/* Pill Tabs */}
+          <View style={styles.modalPillTabsContainer}>
+            <View style={styles.modalPillTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.modalPillTab,
+                  selectedType === 'virtual' && styles.modalPillTabActive
+                ]}
+                onPress={() => setSelectedType('virtual')}
+              >
+                <Text style={[
+                  styles.modalPillTabText,
+                  selectedType === 'virtual' && styles.modalPillTabTextActive
+                ]}>
+                  Virtual Tree
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalPillTab,
+                  selectedType === 'real' && styles.modalPillTabActive
+                ]}
+                onPress={() => setSelectedType('real')}
+              >
+                <Text style={[
+                  styles.modalPillTabText,
+                  selectedType === 'real' && styles.modalPillTabTextActive
+                ]}>
+                  Real Tree
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {selectedType === 'virtual' ? (
+              <>
+                <Text style={styles.modalDescription}>
+                  Choose from virtual tree species that grow as you use WiFi!
+                </Text>
+                <Text style={styles.userPointsText}>
+                  Your Points: {userPoints}
+                </Text>
+                
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading tree species...</Text>
                   </View>
                 ) : (
-                  species.map(renderSpeciesCard)
+                  <View style={styles.speciesGrid}>
+                    {treeSpecies.map(renderSpeciesCard)}
+                  </View>
                 )}
-              </ScrollView>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalDescription}>
+                  Contribute to real environmental impact with actual tree planting!
+                </Text>
+                <Text style={styles.userPointsText}>
+                  Your Points: {userPoints}
+                </Text>
+                
+                <View style={styles.realTreeInfo}>
+                  <View style={styles.realTreeInfoItem}>
+                    <Icon name="tree" size={24} color="#50AF27" />
+                    <Text style={styles.realTreeInfoText}>Real environmental impact</Text>
+                  </View>
+                  <View style={styles.realTreeInfoItem}>
+                    <Icon name="map-marker" size={24} color="#50AF27" />
+                    <Text style={styles.realTreeInfoText}>Planted in designated locations</Text>
+                  </View>
+                  <View style={styles.realTreeInfoItem}>
+                    <Icon name="certificate" size={24} color="#50AF27" />
+                    <Text style={styles.realTreeInfoText}>Tracked by admin updates</Text>
+                  </View>
+                </View>
+
+                <View style={styles.realTreeCostContainer}>
+                  <Text style={styles.realTreeCost}>500 pts</Text>
+                  <Text style={styles.realTreeCostLabel}>Fixed Cost</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.redeemRealTreeButton,
+                    userPoints < 500 && styles.redeemRealTreeButtonDisabled
+                  ]}
+                  onPress={handleRedeemReal}
+                  disabled={userPoints < 500}
+                >
+                  <Icon name="tree" size={20} color="#fff" />
+                  <Text style={styles.redeemRealTreeButtonText}>
+                    Redeem Real Tree
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -729,11 +833,12 @@ const PointsScreen = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [sessionPoints, setSessionPoints] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSpeciesSelection, setShowSpeciesSelection] = useState(false);
+  const [showRealTreeSelection, setShowRealTreeSelection] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalData, setModalData] = useState({ title: '', message: '' });
   const [currentSession, setCurrentSession] = useState<WifiStats['currentSession']>(null);
-  const [showSpeciesSelection, setShowSpeciesSelection] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Real-time calculations for live updates
@@ -818,31 +923,34 @@ const PointsScreen = () => {
     return;
   };
 
-
-
   const handleRedeem = async () => {
     setShowSpeciesSelection(true);
   };
 
   const handleRedeemTree = async (species: TreeSpecies) => {
     try {
-      console.log('Redeeming tree:', species);
+      console.log('Redeeming virtual tree:', species);
       
-      const data: RedeemTreeData = { speciesId: species.id };
+      const data: RedeemTreeData = { 
+        speciesId: species.id,
+        treeType: 'virtual'
+      };
       const result = await treeService.redeemTree(data);
       
-      console.log('Tree redemption result:', result);
+      console.log('Virtual tree redemption result:', result);
 
       // Trigger animation
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 2000);
 
-      // Update user data
-      if (user) {
+      // Update user data using API response
+      if (user && result.user) {
         const updatedUser = {
           ...user,
-          points: pointsState.points - species.cost,
-          treesPlanted: (user.treesPlanted || 0) + 1,
+          points: result.user.points,
+          treesPlanted: result.user.treesPlanted,
+          virtualTreesPlanted: result.user.virtualTreesPlanted,
+          realTreesPlanted: result.user.realTreesPlanted,
         };
         await updateUser(updatedUser);
       }
@@ -850,7 +958,7 @@ const PointsScreen = () => {
       // Notify other screens about the new tree
       eventService.emit('treeRedeemed', { 
         speciesName: species.name,
-        newTreeCount: (user?.treesPlanted || 0) + 1 
+        newTreeCount: result.user?.treesPlanted || (user?.treesPlanted || 0) + 1 
       });
 
       // Refresh points from service
@@ -858,12 +966,12 @@ const PointsScreen = () => {
       setPointsState(pointsService.getState());
 
       setModalData({
-        title: 'Tree Planted!',
+        title: 'Virtual Tree Planted!',
         message: `Congratulations! Your ${species.name} (${species.scientificName}) has been planted successfully!`,
       });
       setShowSuccessModal(true);
     } catch (error) {
-      console.error('Error redeeming tree:', error);
+      console.error('Error redeeming virtual tree:', error);
       setModalData({
         title: 'Error',
         message: error instanceof Error ? error.message : 'Failed to plant tree. Please try again.',
@@ -872,7 +980,52 @@ const PointsScreen = () => {
     }
   };
 
+  const handleRedeemRealTree = async () => {
+    try {
+      console.log('Redeeming real tree');
+      
+      const result = await treeService.redeemTree({ 
+        treeType: 'real',
+        treeSpecie: 'Tree Species', // Default values since admin will manage
+        location: 'To be determined by admin'
+      });
+      
+      console.log('Real tree redemption result:', result);
 
+      // Trigger animation
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 2000);
+
+      // Update user data using API response
+      if (user && result.user) {
+        const updatedUser = {
+          ...user,
+          points: result.user.points,
+          treesPlanted: result.user.treesPlanted,
+          virtualTreesPlanted: result.user.virtualTreesPlanted,
+          realTreesPlanted: result.user.realTreesPlanted,
+        };
+        await updateUser(updatedUser);
+      }
+
+      // Refresh points from service
+      await pointsService.refreshPoints();
+      setPointsState(pointsService.getState());
+
+      setModalData({
+        title: 'Real Tree Redeemed!',
+        message: 'Congratulations! Your real tree will be planted and you\'ll receive updates about its progress!',
+      });
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error redeeming real tree:', error);
+      setModalData({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to redeem real tree. Please try again.',
+      });
+      setShowErrorModal(true);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -938,8 +1091,6 @@ const PointsScreen = () => {
       />
     );
   };
-
-
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -1016,22 +1167,23 @@ const PointsScreen = () => {
               </View>
             </Animated.View>
 
-            {/* Redeem Tree Card */}
+            {/* Redeem Card */}
             <View style={styles.redeemCard}>
               <View style={styles.cardHeader}>
-                <Icon name="tree" size={28} color="#50AF27" />
-                <Text style={styles.cardTitle}>Plant a Tree</Text>
+                <Icon name="star" size={28} color="#50AF27" />
+                <Text style={styles.cardTitle}>Redeem Points</Text>
               </View>
+              
               <Text style={styles.redeemText}>
-                Choose from multiple tree species and help the environment!
+                Choose from virtual tree species that grow as you use WiFi!
               </Text>
               <TouchableOpacity
                 style={styles.redeemButton}
                 onPress={handleRedeem}
               >
-                <Icon name="plus-circle" size={20} color="#fff" />
+                <Icon name="gift" size={20} color="#fff" />
                 <Text style={styles.redeemButtonText}>
-                  Choose Tree Species
+                  Redeem Point
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1072,11 +1224,12 @@ const PointsScreen = () => {
 
       {/* Tree Redemption Modal - Only render when needed */}
       {showSpeciesSelection && (
-        <TreeRedemptionModal
+        <RedemptionModal
           visible={showSpeciesSelection}
           onClose={() => setShowSpeciesSelection(false)}
           userPoints={isSessionActive ? getLiveTotalPoints() : pointsState.points}
           onRedeemTree={handleRedeemTree}
+          onRedeemRealTree={handleRedeemRealTree}
         />
       )}
 

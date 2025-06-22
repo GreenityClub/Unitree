@@ -46,7 +46,16 @@ api.interceptors.response.use(
       } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
         console.log(`🔑 Session invalidated: ${error.config?.url}`, error.response?.data);
       } else if (error.response?.status === 401) {
-        console.log(`🔓 Authentication required: ${error.config?.url}`);
+        // Only log auth errors for non-routine endpoints to reduce noise
+        const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
+                                 error.config?.url?.includes('/session-count') ||
+                                 error.config?.url?.includes('/me');
+        if (!isRoutineEndpoint) {
+          console.log(`🔓 Authentication required: ${error.config?.url}`);
+        }
+      } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
+        // Don't log expected real tree collection errors (collection may not exist yet)
+        console.log(`🌳 Real trees collection not available yet: ${error.config?.url}`);
       } else {
         console.error(`❌ API Response Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
       }

@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const Tree = require('../models/Tree');
+const RealTree = require('../models/RealTree');
 const TreeType = require('../models/TreeType');
 const User = require('../models/User');
+const Student = require('../models/Student');
 const Point = require('../models/Point');
 const logger = require('../utils/logger');
 
@@ -244,223 +246,355 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// Redeem a tree
+// Redeem a tree (virtual or real)
 router.post('/redeem', auth, async (req, res) => {
   try {
-    const { speciesId } = req.body;
+    const { speciesId, treeType = 'virtual', location, treeSpecie } = req.body;
     
-    console.log('Debug - Request body:', req.body);
-    console.log('Debug - User:', req.user);
+    logger.debug('Tree redemption request', { 
+      userId: req.user._id, 
+      speciesId: req.body.speciesId,
+      treeType 
+    });
     
-    // Validate species ID
-    if (!speciesId) {
-      return res.status(400).json({ message: 'Species ID is required' });
-    }
-
-    // Get and validate tree species
-    const treeType = await TreeType.findByTreeId(speciesId);
-    if (!treeType) {
-      return res.status(400).json({ message: 'Invalid tree species selected' });
-    }
-
     // Get user from auth middleware
     const user = req.user;
-    console.log('Debug - User points:', user.points);
-    console.log('Debug - Tree cost:', treeType.cost);
 
-    // Check if user has enough points (use cost from tree species)
-    const TREE_COST = treeType.cost;
-    if (user.points < TREE_COST) {
-      return res.status(400).json({ 
-        message: `Insufficient points. You need ${TREE_COST} points but have ${user.points}.` 
-      });
-    }
-
-    // Create new tree with wifi time baseline
-    const tree = new Tree({
-      userId: user._id,
-      species: speciesId,
-      name: treeType.name,
-      plantedDate: new Date(),
-      lastWatered: new Date(),
-      healthScore: 100,
-      stage: 'seedling',
-      wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time when tree is redeemed
-      location: {
-        latitude: 0,
-        longitude: 0
-      }
-    });
-
-    console.log('Debug - Creating tree:', tree);
-
-    // Save the tree first
-    try {
-      await tree.save();
-      console.log('Debug - Tree saved successfully:', {
-        treeId: tree._id,
-        userId: tree.userId,
-        species: tree.species,
-        wifiTimeAtRedeem: tree.wifiTimeAtRedeem
-      });
-    } catch (saveError) {
-      console.error('Debug - Tree save error details:', {
-        error: saveError,
-        stack: saveError.stack,
-        validationErrors: saveError.errors
-      });
-      logger.error('Tree save error:', saveError);
-      return res.status(400).json({ 
-        message: 'Failed to save tree',
-        error: saveError.message,
-        validationErrors: saveError.errors
-      });
-    }
-
-    // Create point transaction
-    const pointTransaction = new Point({
-      userId: user._id,
-      amount: -TREE_COST,
-      type: 'TREE_REDEMPTION',
-      metadata: {
-        treeId: tree._id,
-        species: speciesId,
-        speciesName: treeType.name,
-        scientificName: treeType.scientificName
-      }
-    });
-
-    console.log('Debug - Creating point transaction:', pointTransaction);
-
-    // Save the transaction
-    try {
-      await pointTransaction.save();
-      console.log('Debug - Point transaction saved successfully:', {
-        transactionId: pointTransaction._id,
-        amount: pointTransaction.amount,
-        userId: pointTransaction.userId
-      });
-    } catch (transactionError) {
-      console.error('Debug - Transaction error details:', {
-        error: transactionError,
-        stack: transactionError.stack,
-        validationErrors: transactionError.errors
-      });
-      // If transaction fails, delete the tree we just created
-      await Tree.findByIdAndDelete(tree._id);
-      logger.error('Point transaction error:', transactionError);
-      return res.status(400).json({ 
-        message: 'Failed to create point transaction',
-        error: transactionError.message,
-        validationErrors: transactionError.errors
-      });
-    }
-
-    // Update user in database
-    try {
-      console.log('Debug - Before user update:', {
-        userId: user._id,
-        currentPoints: user.points,
-        currentTreesPlanted: user.treesPlanted,
-        treeId: tree._id
-      });
-
-      // Update user in the database directly using atomic operations
-      const updatedUser = await User.findByIdAndUpdate(
-        user._id,
-        {
-          $inc: { 
-            points: -TREE_COST,
-            treesPlanted: 1
-          },
-          $push: { 
-            trees: tree._id 
-          }
-        },
-        { 
-          new: true, 
-          runValidators: true 
-        }
-      );
-
-      if (!updatedUser) {
-        throw new Error('User not found during update');
+    if (treeType === 'real') {
+      // Real tree redemption logic
+      if (!location || !treeSpecie) {
+        return res.status(400).json({ 
+          message: 'Location and tree species are required for real tree redemption' 
+        });
       }
 
-      console.log('Debug - After user update:', {
-        userId: updatedUser._id,
-        newPoints: updatedUser.points,
-        newTreesPlanted: updatedUser.treesPlanted,
-        treesArray: updatedUser.trees
-      });
+      // Get user's student information
+      const student = await Student.findOne({ email: { $regex: new RegExp(user.email, 'i') } });
+      if (!student) {
+        return res.status(400).json({ 
+          message: 'Student information not found. Please contact admin.' 
+        });
+      }
 
-      // Update the local user object to match the database
-      user.points = updatedUser.points;
-      user.treesPlanted = updatedUser.treesPlanted;
-      user.trees = updatedUser.trees;
-
-      // Get initial tree status
-      const growthProgress = tree.getGrowthProgress();
-      const healthStatus = tree.getHealthStatus();
-
-      // Send success response with complete information
-      res.json({
-        success: true,
-        message: 'Tree redeemed successfully',
-        tree: {
-          _id: tree._id,
-          species: tree.species,
-          name: tree.name,
-          stage: tree.stage,
-          healthScore: tree.healthScore,
-          plantedDate: tree.plantedDate,
-          lastWatered: tree.lastWatered,
-          wifiTimeAtRedeem: tree.wifiTimeAtRedeem,
-          totalWifiTime: tree.totalWifiTime,
-          growthProgress,
-          healthStatus
-        },
-        transaction: {
-          _id: pointTransaction._id,
-          amount: pointTransaction.amount,
-          type: pointTransaction.type
-        },
-        remainingPoints: updatedUser.points,
-        user: {
-          points: updatedUser.points,
-          treesPlanted: updatedUser.treesPlanted
-        }
-      });
-
-    } catch (userError) {
-      console.error('Debug - User update error details:', {
-        error: userError,
-        stack: userError.stack,
-        validationErrors: userError.errors,
-        userId: user._id,
-        attemptedPoints: user.points - TREE_COST
-      });
-
-      // If user update fails, delete the tree and transaction
-      await Tree.findByIdAndDelete(tree._id);
-      await Point.findByIdAndDelete(pointTransaction._id);
+      // Fixed cost for real trees (could be configurable)
+      const REAL_TREE_COST = 500; // Higher cost for real trees
       
-      logger.error('User update error:', userError);
-      return res.status(400).json({ 
-        message: 'Failed to update user points',
-        error: userError.message,
-        validationErrors: userError.errors
+      logger.debug('Real tree redemption validation', { 
+        userPoints: user.points, 
+        realTreeCost: REAL_TREE_COST 
       });
-    }
 
+      if (user.points < REAL_TREE_COST) {
+        return res.status(400).json({ 
+          message: `Insufficient points. You need ${REAL_TREE_COST} points but have ${user.points}.` 
+        });
+      }
+
+      // Create new real tree
+      const realTree = new RealTree({
+        userId: user._id,
+        studentId: student.student_id,
+        treeSpecie: treeSpecie,
+        plantedDate: new Date(),
+        location: location,
+        stage: 'planted',
+        pointsCost: REAL_TREE_COST
+      });
+
+      logger.debug('Creating real tree', { 
+        userId: realTree.userId, 
+        studentId: realTree.studentId,
+        treeSpecie: realTree.treeSpecie 
+      });
+
+      // Save the real tree
+      try {
+        await realTree.save();
+        logger.info('Real tree saved successfully', {
+          treeId: realTree._id,
+          userId: realTree.userId,
+          studentId: realTree.studentId
+        });
+      } catch (saveError) {
+        logger.error('Real tree save error:', saveError);
+        return res.status(400).json({ 
+          message: 'Failed to save real tree',
+          error: saveError.message
+        });
+      }
+
+      // Create point transaction for real tree
+      const pointTransaction = new Point({
+        userId: user._id,
+        amount: -REAL_TREE_COST,
+        type: 'REAL_TREE_REDEMPTION',
+        metadata: {
+          realTreeId: realTree._id,
+          studentId: student.student_id,
+          treeSpecie: treeSpecie,
+          location: location
+        }
+      });
+
+      // Save the transaction
+      try {
+        await pointTransaction.save();
+      } catch (transactionError) {
+        await RealTree.findByIdAndDelete(realTree._id);
+        logger.error('Point transaction error:', transactionError);
+        return res.status(400).json({ 
+          message: 'Failed to create point transaction',
+          error: transactionError.message
+        });
+      }
+
+      // Update user points
+      try {
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id,
+          {
+            $inc: { 
+              points: -REAL_TREE_COST,
+              treesPlanted: 1,
+              realTreesPlanted: 1
+            },
+            $push: { 
+              realTrees: realTree._id 
+            }
+          },
+          { new: true, runValidators: true }
+        );
+
+        res.json({
+          success: true,
+          message: 'Real tree redeemed successfully',
+          treeType: 'real',
+          realTree: realTree.getDisplayInfo(),
+          transaction: {
+            _id: pointTransaction._id,
+            amount: pointTransaction.amount,
+            type: pointTransaction.type
+          },
+          remainingPoints: updatedUser.points,
+          user: {
+            points: updatedUser.points,
+            treesPlanted: updatedUser.treesPlanted,
+            virtualTreesPlanted: updatedUser.virtualTreesPlanted,
+            realTreesPlanted: updatedUser.realTreesPlanted
+          }
+        });
+
+      } catch (userError) {
+        await RealTree.findByIdAndDelete(realTree._id);
+        await Point.findByIdAndDelete(pointTransaction._id);
+        logger.error('User update error:', userError);
+        return res.status(400).json({ 
+          message: 'Failed to update user points',
+          error: userError.message
+        });
+      }
+
+    } else {
+      // Virtual tree redemption logic (existing)
+      
+      // Validate species ID
+      if (!speciesId) {
+        return res.status(400).json({ message: 'Species ID is required' });
+      }
+
+      // Get and validate tree species
+      const treeTypeData = await TreeType.findByTreeId(speciesId);
+      if (!treeTypeData) {
+        return res.status(400).json({ message: 'Invalid tree species selected' });
+      }
+
+      logger.debug('Virtual tree redemption validation', { 
+        userPoints: user.points, 
+        treeCost: treeTypeData.cost,
+        species: speciesId 
+      });
+
+      // Check if user has enough points (use cost from tree species)
+      const TREE_COST = treeTypeData.cost;
+      if (user.points < TREE_COST) {
+        return res.status(400).json({ 
+          message: `Insufficient points. You need ${TREE_COST} points but have ${user.points}.` 
+        });
+      }
+
+      // Create new tree with wifi time baseline
+      const tree = new Tree({
+        userId: user._id,
+        species: speciesId,
+        name: treeTypeData.name,
+        plantedDate: new Date(),
+        lastWatered: new Date(),
+        healthScore: 100,
+        stage: 'seedling',
+        wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time when tree is redeemed
+        location: {
+          latitude: 0,
+          longitude: 0
+        }
+      });
+
+      logger.debug('Creating virtual tree', { 
+        userId: tree.userId, 
+        species: tree.species,
+        wifiTimeAtRedeem: tree.wifiTimeAtRedeem 
+      });
+
+      // Save the tree first
+      try {
+        await tree.save();
+        logger.info('Virtual tree saved successfully', {
+          treeId: tree._id,
+          userId: tree.userId,
+          species: tree.species
+        });
+      } catch (saveError) {
+        logger.error('Tree save error:', saveError);
+        return res.status(400).json({ 
+          message: 'Failed to save tree',
+          error: saveError.message,
+          validationErrors: saveError.errors
+        });
+      }
+
+      // Create point transaction
+      const pointTransaction = new Point({
+        userId: user._id,
+        amount: -TREE_COST,
+        type: 'TREE_REDEMPTION',
+        metadata: {
+          treeId: tree._id,
+          species: speciesId,
+          speciesName: treeTypeData.name,
+          scientificName: treeTypeData.scientificName
+        }
+      });
+
+      logger.debug('Creating point transaction', { 
+        userId: pointTransaction.userId, 
+        amount: pointTransaction.amount 
+      });
+
+      // Save the transaction
+      try {
+        await pointTransaction.save();
+        logger.info('Point transaction saved successfully', {
+          transactionId: pointTransaction._id,
+          amount: pointTransaction.amount,
+          userId: pointTransaction.userId
+        });
+      } catch (transactionError) {
+        // If transaction fails, delete the tree we just created
+        await Tree.findByIdAndDelete(tree._id);
+        logger.error('Point transaction error:', transactionError);
+        return res.status(400).json({ 
+          message: 'Failed to create point transaction',
+          error: transactionError.message,
+          validationErrors: transactionError.errors
+        });
+      }
+
+      // Update user in database
+      try {
+        logger.debug('Updating user after tree redemption', {
+          userId: user._id,
+          currentPoints: user.points,
+          treeCost: TREE_COST
+        });
+
+        // Update user in the database directly using atomic operations
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id,
+          {
+            $inc: { 
+              points: -TREE_COST,
+              treesPlanted: 1,
+              virtualTreesPlanted: 1
+            },
+            $push: { 
+              trees: tree._id 
+            }
+          },
+          { 
+            new: true, 
+            runValidators: true 
+          }
+        );
+
+        if (!updatedUser) {
+          throw new Error('User not found during update');
+        }
+
+        logger.info('User updated successfully after tree redemption', {
+          userId: updatedUser._id,
+          newPoints: updatedUser.points,
+          newTreesPlanted: updatedUser.treesPlanted
+        });
+
+        // Update the local user object to match the database
+        user.points = updatedUser.points;
+        user.treesPlanted = updatedUser.treesPlanted;
+        user.trees = updatedUser.trees;
+
+        // Get initial tree status
+        const growthProgress = tree.getGrowthProgress();
+        const healthStatus = tree.getHealthStatus();
+
+        // Send success response with complete information
+        res.json({
+          success: true,
+          message: 'Tree redeemed successfully',
+          treeType: 'virtual',
+          tree: {
+            _id: tree._id,
+            species: tree.species,
+            name: tree.name,
+            stage: tree.stage,
+            healthScore: tree.healthScore,
+            plantedDate: tree.plantedDate,
+            lastWatered: tree.lastWatered,
+            wifiTimeAtRedeem: tree.wifiTimeAtRedeem,
+            totalWifiTime: tree.totalWifiTime,
+            growthProgress,
+            healthStatus
+          },
+          transaction: {
+            _id: pointTransaction._id,
+            amount: pointTransaction.amount,
+            type: pointTransaction.type
+          },
+          remainingPoints: updatedUser.points,
+          user: {
+            points: updatedUser.points,
+            treesPlanted: updatedUser.treesPlanted,
+            virtualTreesPlanted: updatedUser.virtualTreesPlanted,
+            realTreesPlanted: updatedUser.realTreesPlanted
+          }
+        });
+
+      } catch (userError) {
+        logger.error('User update error during tree redemption', {
+          userId: user._id,
+          error: userError.message
+        });
+
+        // If user update fails, delete the tree and transaction
+        await Tree.findByIdAndDelete(tree._id);
+        await Point.findByIdAndDelete(pointTransaction._id);
+        
+        logger.error('User update error:', userError);
+        return res.status(400).json({ 
+          message: 'Failed to update user points',
+          error: userError.message,
+          validationErrors: userError.errors
+        });
+      }
+    }
   } catch (error) {
-    console.error('Debug - Full error details:', {
-      error: error,
-      stack: error.stack,
-      message: error.message,
-      code: error.code,
-      name: error.name
-    });
     logger.error('Tree redemption error:', error);
     res.status(500).json({ 
       message: error.message || 'Error redeeming tree',
@@ -470,6 +604,42 @@ router.post('/redeem', auth, async (req, res) => {
         name: error.name
       } : undefined
     });
+  }
+});
+
+// Get all real trees for the current user
+router.get('/real', auth, async (req, res) => {
+  try {
+    const realTrees = await RealTree.findByUser(req.user._id);
+    res.json(realTrees || []);
+  } catch (error) {
+    logger.warn('Real tree fetch error, returning empty array:', error.message);
+    logger.error('Real tree fetch error:', error);
+    // For real trees, if there's an error (like collection doesn't exist),
+    // return empty array instead of error to avoid client-side errors
+    res.json([]);
+  }
+});
+
+// Get a specific real tree
+router.get('/real/:id', auth, async (req, res) => {
+  try {
+    const realTree = await RealTree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!realTree) {
+      return res.status(404).json({ message: 'Real tree not found' });
+    }
+    
+    res.json(realTree.getDisplayInfo());
+  } catch (error) {
+    logger.warn('Individual real tree fetch error:', error.message);
+    logger.error('Error fetching individual real tree:', error);
+    
+    // If it's a validation error (like invalid ObjectId), return 404
+    if (error.name === 'CastError' || error.name === 'ValidationError') {
+      return res.status(404).json({ message: 'Real tree not found' });
+    }
+    
+    res.status(500).json({ message: 'Error fetching real tree' });
   }
 });
 

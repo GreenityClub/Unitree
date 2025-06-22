@@ -5,6 +5,7 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const Student = require('../models/Student');
+const VerificationCode = require('../models/VerificationCode');
 const logger = require('../utils/logger');
 const { auth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
@@ -280,14 +281,8 @@ router.post('/send-verification-code', async (req, res) => {
       });
     }
 
-    // Store the code temporarily (in production, use Redis or database)
-    // For now, we'll use a simple in-memory store
-    global.verificationCodes = global.verificationCodes || {};
-    global.verificationCodes[email] = {
-      code: verificationCode,
-      timestamp: Date.now(),
-      attempts: 0
-    };
+    // Store the code in database with TTL expiration
+    await VerificationCode.createCode(email, verificationCode, 'verification');
 
     res.json({
       message: 'Verification code sent to your email address'
@@ -311,41 +306,14 @@ router.post('/verify-email-code', async (req, res) => {
       });
     }
 
-    global.verificationCodes = global.verificationCodes || {};
-    const storedData = global.verificationCodes[email];
-
-    if (!storedData) {
+    // Verify code using database model
+    const verificationResult = await VerificationCode.verifyCode(email, code, 'verification');
+    
+    if (!verificationResult.success) {
       return res.status(400).json({
-        message: 'No verification code found for this email'
+        message: verificationResult.error
       });
     }
-
-    // Check if code has expired (10 minutes)
-    if (Date.now() - storedData.timestamp > 10 * 60 * 1000) {
-      delete global.verificationCodes[email];
-      return res.status(400).json({
-        message: 'Verification code has expired'
-      });
-    }
-
-    // Check attempts limit
-    if (storedData.attempts >= 3) {
-      delete global.verificationCodes[email];
-      return res.status(400).json({
-        message: 'Too many failed attempts. Please request a new code.'
-      });
-    }
-
-    // Verify code
-    if (storedData.code !== code) {
-      storedData.attempts++;
-      return res.status(400).json({
-        message: 'Invalid verification code'
-      });
-    }
-
-    // Code is valid, clean up
-    delete global.verificationCodes[email];
 
     // Look up student data in the students collection
     try {
@@ -409,13 +377,8 @@ router.post('/resend-verification-code', async (req, res) => {
       });
     }
 
-    // Update stored code
-    global.verificationCodes = global.verificationCodes || {};
-    global.verificationCodes[email] = {
-      code: verificationCode,
-      timestamp: Date.now(),
-      attempts: 0
-    };
+    // Update stored code in database
+    await VerificationCode.createCode(email, verificationCode, 'verification');
 
     res.json({
       message: 'Verification code resent to your email address'
@@ -466,13 +429,8 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Store reset code
-    global.resetCodes = global.resetCodes || {};
-    global.resetCodes[email] = {
-      code: resetCode,
-      timestamp: Date.now(),
-      attempts: 0
-    };
+    // Store reset code in database
+    await VerificationCode.createCode(email, resetCode, 'reset');
 
     res.json({
       message: 'Password reset code sent to your email address'
@@ -496,36 +454,12 @@ router.post('/verify-reset-code', async (req, res) => {
       });
     }
 
-    global.resetCodes = global.resetCodes || {};
-    const storedData = global.resetCodes[email];
-
-    if (!storedData) {
+    // Verify reset code using database model
+    const verificationResult = await VerificationCode.verifyCode(email, code, 'reset');
+    
+    if (!verificationResult.success) {
       return res.status(400).json({
-        message: 'No reset code found for this email'
-      });
-    }
-
-    // Check if code has expired (10 minutes)
-    if (Date.now() - storedData.timestamp > 10 * 60 * 1000) {
-      delete global.resetCodes[email];
-      return res.status(400).json({
-        message: 'Reset code has expired'
-      });
-    }
-
-    // Check attempts limit
-    if (storedData.attempts >= 3) {
-      delete global.resetCodes[email];
-      return res.status(400).json({
-        message: 'Too many failed attempts. Please request a new code.'
-      });
-    }
-
-    // Verify code
-    if (storedData.code !== code) {
-      storedData.attempts++;
-      return res.status(400).json({
-        message: 'Invalid reset code'
+        message: verificationResult.error
       });
     }
 
@@ -552,12 +486,11 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Verify the reset code first
-    global.resetCodes = global.resetCodes || {};
-    const storedData = global.resetCodes[email];
-
-    if (!storedData || storedData.code !== code) {
+    const verificationResult = await VerificationCode.verifyCode(email, code, 'reset');
+    
+    if (!verificationResult.success) {
       return res.status(400).json({
-        message: 'Invalid or expired reset code'
+        message: verificationResult.error
       });
     }
 
@@ -586,8 +519,7 @@ router.post('/reset-password', async (req, res) => {
     // Clear active session for security (user needs to login again)
     await user.clearActiveSession();
 
-    // Clean up reset code
-    delete global.resetCodes[email];
+    // Reset code is automatically cleaned up by the verification process
 
     res.json({
       message: 'Password reset successfully'
@@ -635,13 +567,8 @@ router.post('/resend-reset-code', async (req, res) => {
       });
     }
 
-    // Update stored code
-    global.resetCodes = global.resetCodes || {};
-    global.resetCodes[email] = {
-      code: resetCode,
-      timestamp: Date.now(),
-      attempts: 0
-    };
+    // Store reset code in database
+    await VerificationCode.createCode(email, resetCode, 'reset');
 
     res.json({
       message: 'Password reset code resent to your email address'

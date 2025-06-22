@@ -367,8 +367,19 @@ const ProfileScreen = () => {
                 onPress={() => router.push('/user-settings')}
               >
                 <View style={styles.settingsItemLeft}>
-                  <Icon name="account-settings-outline" size={24} color="#50AF27" />
+                  <Icon name="account-edit" size={24} color="#50AF27" />
                   <Text style={styles.settingsItemText}>User Settings</Text>
+                </View>
+                <Icon name="chevron-right" size={20} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                onPress={() => router.push('/system-settings')}
+              >
+                <View style={styles.settingsItemLeft}>
+                  <Icon name="cog" size={24} color="#50AF27" />
+                  <Text style={styles.settingsItemText}>System Settings</Text>
                 </View>
                 <Icon name="chevron-right" size={20} color="#666" />
               </TouchableOpacity>

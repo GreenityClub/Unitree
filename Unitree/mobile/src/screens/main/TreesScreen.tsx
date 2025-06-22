@@ -27,7 +27,7 @@ import { useWiFi } from '../../context/WiFiContext';
 import { useTabBarContext } from '../../context/TabBarContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
-import { treeService, Tree } from '../../services/treeService';
+import { treeService, Tree, RealTree } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import type { WiFiSession } from '../../services/wifiService';
 import { rf, rs } from '../../utils/responsive';
@@ -163,25 +163,104 @@ const TreeCard: React.FC<TreeCardProps> = ({ tree, onPress }) => {
   );
 };
 
+interface RealTreeCardProps {
+  realTree: RealTree;
+}
+
+const RealTreeCard: React.FC<RealTreeCardProps> = ({ realTree }) => {
+  const { treeSpecie, stage, location, plantedDate, pointsCost, studentId, notes } = realTree;
+
+  const getStageIcon = () => {
+    return treeService.getRealTreeIcon(stage);
+  };
+
+  const getStageColor = () => {
+    return treeService.getRealTreeStageColor(stage);
+  };
+
+  const getStageText = () => {
+    return treeService.getRealTreeStageText(stage);
+  };
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString();
+  };
+
+  return (
+    <View style={[styles.realTreeCard, stage === 'dead' && styles.deadRealTreeCard]}>
+      <View style={styles.realTreeHeader}>
+        <View style={styles.realTreeIconContainer}>
+          <Text style={styles.realTreeIcon}>{getStageIcon()}</Text>
+        </View>
+        <View style={styles.realTreeInfo}>
+          <Text style={styles.realTreeSpecie}>{treeSpecie}</Text>
+          <Text style={[styles.realTreeStage, { color: getStageColor() }]}>
+            {getStageText()}
+          </Text>
+        </View>
+        <View style={styles.realTreeBadge}>
+          <Text style={styles.realTreeBadgeText}>REAL</Text>
+        </View>
+      </View>
+
+      <View style={styles.realTreeDetails}>
+        <View style={styles.realTreeDetailRow}>
+          <Icon name="map-marker" size={16} color="#666" />
+          <Text style={styles.realTreeDetailLabel}>Location:</Text>
+          <Text style={styles.realTreeDetailValue}>{location}</Text>
+        </View>
+        
+        <View style={styles.realTreeDetailRow}>
+          <Icon name="calendar" size={16} color="#666" />
+          <Text style={styles.realTreeDetailLabel}>Planted:</Text>
+          <Text style={styles.realTreeDetailValue}>{formatDate(plantedDate)}</Text>
+        </View>
+        
+        <View style={styles.realTreeDetailRow}>
+          <Icon name="account-school" size={16} color="#666" />
+          <Text style={styles.realTreeDetailLabel}>Student ID:</Text>
+          <Text style={styles.realTreeDetailValue}>{studentId}</Text>
+        </View>
+        
+        <View style={styles.realTreeDetailRow}>
+          <Icon name="star" size={16} color="#666" />
+          <Text style={styles.realTreeDetailLabel}>Cost:</Text>
+          <Text style={styles.realTreeDetailValue}>{pointsCost} points</Text>
+        </View>
+
+        {notes && (
+          <View style={styles.realTreeNotesContainer}>
+            <Icon name="note-text" size={16} color="#666" />
+            <Text style={styles.realTreeNotesLabel}>Admin Notes:</Text>
+            <Text style={styles.realTreeNotes}>{notes}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
 const TreesScreen = () => {
   const { user } = useAuth();
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
   const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
   const { panGesture } = useSwipeNavigation({ currentScreen: 'trees' });
   const [trees, setTrees] = useState<Tree[]>([]);
+  const [realTrees, setRealTrees] = useState<RealTree[]>([]);
+  const [selectedTreeType, setSelectedTreeType] = useState<'virtual' | 'real'>('virtual');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadTrees();
+    loadAllTrees();
   }, []);
 
   // Real-time updates every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('TreesScreen - Real-time refresh...');
-      loadTrees();
+      loadAllTrees();
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
@@ -193,7 +272,7 @@ const TreesScreen = () => {
 
     const treeSubscription = eventService.addListener('treeRedeemed', (data: { speciesName: string; newTreeCount: number }) => {
       console.log('TreesScreen - Tree redeemed:', data);
-      loadTrees(); // Refresh trees list
+      loadAllTrees(); // Refresh trees list
     });
 
     return () => {
@@ -201,15 +280,26 @@ const TreesScreen = () => {
     };
   }, [user?.id]);
 
-  const loadTrees = async () => {
+  const loadAllTrees = async () => {
     try {
       setLoading(true);
-      const userTrees = await treeService.getTrees();
-      console.log('TreesScreen - Loaded trees:', userTrees);
-      setTrees(userTrees);
+      
+      // Load virtual trees (required)
+      const virtualTrees = await treeService.getTrees();
+      setTrees(virtualTrees);
+      
+      // Load real trees (optional - fail silently)
+      try {
+        const realTreesData = await treeService.getRealTrees();
+        setRealTrees(realTreesData);
+      } catch (realTreeError) {
+        // Silently handle real tree loading failures
+        // This is expected when the real trees collection doesn't exist yet
+        setRealTrees([]);
+      }
     } catch (error) {
-      console.error('Error loading trees:', error);
-      Alert.alert('Error', 'Failed to load your trees. Please try again.');
+      console.error('Error loading virtual trees:', error);
+      Alert.alert('Error', 'Failed to load your virtual trees. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -217,13 +307,19 @@ const TreesScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadTrees();
+    await loadAllTrees();
     setRefreshing(false);
   };
 
   // Calculate summary statistics
   const aliveTrees = trees.filter(tree => !tree.isDead);
   const deadTrees = trees.filter(tree => tree.isDead);
+  const aliveRealTrees = realTrees.filter(tree => tree.stage !== 'dead');
+  const deadRealTrees = realTrees.filter(tree => tree.stage === 'dead');
+
+  const handleTreeTypeChange = (type: 'virtual' | 'real') => {
+    setSelectedTreeType(type);
+  };
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -248,6 +344,86 @@ const TreesScreen = () => {
       <Animated.View 
         style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
       >
+        {/* Fixed Forest Summary Card - Non-scrollable */}
+        <View style={styles.fixedSummaryContainer}>
+          <View style={styles.summaryCard}>
+            <View style={styles.cardHeader}>
+              <Icon name="forest" size={24} color="#50AF27" />
+              <Text style={styles.cardTitle}>Forest Summary</Text>
+            </View>
+            
+            {/* Combined Statistics - Always show all 3 fields */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Icon name="tree" size={20} color="#50AF27" />
+                <Text style={styles.statValue}>{aliveTrees.length}</Text>
+                <Text style={styles.statLabel}>Virtual Trees</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Icon name="pine-tree" size={20} color="#50AF27" />
+                <Text style={styles.statValue}>{aliveRealTrees.length}</Text>
+                <Text style={styles.statLabel}>Real Trees</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Icon name="earth" size={20} color="#50AF27" />
+                <Text style={styles.statValue}>
+                  {(aliveRealTrees.length * 150).toFixed(0)}
+                </Text>
+                <Text style={styles.statLabel}>kg CO₂/year</Text>
+              </View>
+            </View>
+            
+            {/* Warning messages for dead trees */}
+            {(deadTrees.length > 0 || deadRealTrees.length > 0) && (
+              <View style={styles.deadTreesWarning}>
+                <Icon name="skull" size={16} color="#f44336" />
+                <Text style={styles.deadTreesText}>
+                  {deadTrees.length > 0 && `${deadTrees.length} virtual tree${deadTrees.length !== 1 ? 's' : ''} died`}
+                  {deadTrees.length > 0 && deadRealTrees.length > 0 && ', '}
+                  {deadRealTrees.length > 0 && `${deadRealTrees.length} real tree${deadRealTrees.length !== 1 ? 's' : ''} died`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Fixed Pill Tabs - Non-scrollable */}
+          <View style={styles.fixedTabsContainer}>
+            <View style={styles.pillTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.pillTab,
+                  selectedTreeType === 'virtual' && styles.pillTabActive
+                ]}
+                onPress={() => handleTreeTypeChange('virtual')}
+              >
+                <Text style={[
+                  styles.pillTabText,
+                  selectedTreeType === 'virtual' && styles.pillTabTextActive
+                ]}>
+                  Virtual Trees
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.pillTab,
+                  selectedTreeType === 'real' && styles.pillTabActive
+                ]}
+                onPress={() => handleTreeTypeChange('real')}
+              >
+                <Text style={[
+                  styles.pillTabText,
+                  selectedTreeType === 'real' && styles.pillTabTextActive
+                ]}>
+                  Real Trees
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Scrollable Tree Cards Only */}
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
@@ -265,55 +441,45 @@ const TreesScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-            {/* Tree Summary Card */}
-            <View style={styles.summaryCard}>
-              <View style={styles.cardHeader}>
-                <Icon name="forest" size={24} color="#50AF27" />
-                <Text style={styles.cardTitle}>Forest Summary</Text>
-              </View>
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Icon name="tree" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{aliveTrees.length}</Text>
-                  <Text style={styles.statLabel}>Living Trees</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Icon name="cloud-outline" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>
-                    {(aliveTrees.length * 48).toFixed(0)}
-                  </Text>
-                  <Text style={styles.statLabel}>kg CO₂/year</Text>
-                </View>
-              </View>
-              {deadTrees.length > 0 && (
-                <View style={styles.deadTreesWarning}>
-                  <Icon name="skull" size={16} color="#f44336" />
-                  <Text style={styles.deadTreesText}>
-                    {deadTrees.length} tree{deadTrees.length !== 1 ? 's' : ''} died from lack of care
-                  </Text>
-                </View>
-              )}
-            </View>
 
             {/* Tree List */}
             {loading ? (
               <Text style={styles.loadingText}>Loading your forest...</Text>
-            ) : trees.length > 0 ? (
-              trees.map((tree) => (
-                <TreeCard
-                  key={tree._id}
-                  tree={tree}
-                  onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
-                />
-              ))
+            ) : selectedTreeType === 'virtual' ? (
+              // Virtual Trees List
+              trees.length > 0 ? (
+                trees.map((tree) => (
+                  <TreeCard
+                    key={tree._id}
+                    tree={tree}
+                    onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Icon name="tree" size={64} color="#98D56D" />
+                  <Text style={styles.emptyStateText}>
+                    You haven't planted any virtual trees yet. Start by redeeming your points for a new tree!
+                  </Text>
+                </View>
+              )
             ) : (
-              <View style={styles.emptyState}>
-                <Icon name="tree" size={64} color="#98D56D" />
-                <Text style={styles.emptyStateText}>
-                  You haven't planted any trees yet. Start by redeeming your points for a new tree!
-                </Text>
-              </View>
+              // Real Trees List
+              realTrees.length > 0 ? (
+                realTrees.map((realTree) => (
+                  <RealTreeCard
+                    key={realTree._id}
+                    realTree={realTree}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Icon name="pine-tree" size={64} color="#98D56D" />
+                  <Text style={styles.emptyStateText}>
+                    You haven't planted any real trees yet. Redeem points for a real tree to make an actual environmental impact!
+                  </Text>
+                </View>
+              )
             )}
           </View>
         </ScrollView>
@@ -382,7 +548,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    marginTop: rs(40),
+    marginTop: rs(20),
     borderRadius: rs(16),
   },
   scrollContent: {
@@ -391,9 +557,9 @@ const styles = StyleSheet.create({
   content: {},
   summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(20),
+    borderRadius: rs(12),
+    padding: rs(12),
+    marginBottom: rs(12),
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -403,10 +569,10 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(16),
+    marginBottom: rs(8),
   },
   cardTitle: {
-    fontSize: rf(20),
+    fontSize: rf(16),
     fontWeight: 'bold',
     color: '#333',
     marginLeft: rs(8),
@@ -421,22 +587,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: rf(24),
+    fontSize: rf(20),
     fontWeight: 'bold',
     color: '#50AF27',
-    marginTop: rs(8),
-    marginBottom: rs(4),
+    marginTop: rs(4),
+    marginBottom: rs(2),
   },
   statLabel: {
-    fontSize: rf(12),
+    fontSize: rf(11),
     color: '#666',
     textAlign: 'center',
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 30,
     backgroundColor: '#E0E0E0',
-    marginHorizontal: rs(16),
+    marginHorizontal: rs(12),
   },
   loadingText: {
     textAlign: 'center',
@@ -446,22 +612,22 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: rs(32),
-    marginTop: rs(32),
+    padding: rs(20),
+    marginTop: rs(20),
   },
   emptyStateText: {
-    fontSize: rf(16),
+    fontSize: rf(14),
     color: '#666',
     textAlign: 'center',
-    marginTop: rs(16),
+    marginTop: rs(12),
     maxWidth: '80%',
   },
   // Updated TreeCard styles
   treeCard: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(16),
-    marginBottom: rs(16),
+    borderRadius: rs(12),
+    padding: rs(12),
+    marginBottom: rs(10),
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -471,12 +637,12 @@ const styles = StyleSheet.create({
   treeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(12),
+    marginBottom: rs(8),
   },
   treeImageContainer: {
-    width: rs(48),
-    height: rs(48),
-    borderRadius: rs(8),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(6),
     overflow: 'hidden',
   },
   treeImage: {
@@ -485,52 +651,52 @@ const styles = StyleSheet.create({
   },
   treeInfo: {
     flex: 1,
-    marginLeft: rs(12),
+    marginLeft: rs(10),
   },
   treeName: {
-    fontSize: rf(18),
+    fontSize: rf(16),
     fontWeight: 'bold',
     color: '#333',
   },
   treeStage: {
-    fontSize: rf(14),
+    fontSize: rf(12),
     color: '#666',
-    marginTop: rs(2),
+    marginTop: rs(1),
   },
   wifiHours: {
-    fontSize: rf(14),
+    fontSize: rf(12),
     color: '#666',
-    marginBottom: rs(16),
+    marginBottom: rs(10),
   },
   metricSection: {
-    marginBottom: rs(12),
+    marginBottom: rs(8),
   },
   metricHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(8),
+    marginBottom: rs(6),
   },
   metricLabel: {
-    fontSize: rf(14),
+    fontSize: rf(12),
     color: '#333',
-    marginLeft: rs(8),
+    marginLeft: rs(6),
     flex: 1,
   },
   metricStatus: {
-    fontSize: rf(14),
+    fontSize: rf(12),
     color: '#4CAF50',
     textAlign: 'right',
   },
   progressBar: {
-    height: rs(8),
+    height: rs(6),
     backgroundColor: '#E0E0E0',
-    borderRadius: rs(4),
+    borderRadius: rs(3),
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
-    borderRadius: rs(4),
+    borderRadius: rs(3),
   },
   deadTreeCard: {
     backgroundColor: '#f44336',
@@ -574,12 +740,160 @@ const styles = StyleSheet.create({
   deadTreesWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: rs(12),
+    marginTop: rs(8),
   },
   deadTreesText: {
-    fontSize: rf(14),
+    fontSize: rf(12),
     color: '#f44336',
+    marginLeft: rs(6),
+  },
+  realTreeCard: {
+    backgroundColor: '#fff',
+    borderRadius: rs(12),
+    padding: rs(12),
+    marginBottom: rs(10),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  realTreeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: rs(8),
+  },
+  realTreeIconContainer: {
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(6),
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: rs(10),
+  },
+  realTreeIcon: {
+    fontSize: rf(28),
+    textAlign: 'center',
+  },
+  realTreeInfo: {
+    flex: 1,
+  },
+  realTreeSpecie: {
+    fontSize: rf(16),
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  realTreeStage: {
+    fontSize: rf(12),
+    color: '#666',
+    marginTop: rs(1),
+  },
+  realTreeBadge: {
+    backgroundColor: '#50AF27',
+    borderRadius: rs(12),
+    padding: rs(3),
     marginLeft: rs(8),
+  },
+  realTreeBadgeText: {
+    fontSize: rf(10),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  realTreeDetails: {
+    marginTop: rs(8),
+  },
+  realTreeDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: rs(6),
+  },
+  realTreeDetailLabel: {
+    fontSize: rf(12),
+    color: '#666',
+    marginLeft: rs(6),
+    marginRight: rs(3),
+    fontWeight: '500',
+  },
+  realTreeDetailValue: {
+    fontSize: rf(12),
+    color: '#333',
+    fontWeight: '600',
+  },
+  realTreeNotesContainer: {
+    marginTop: rs(8),
+    padding: rs(8),
+    backgroundColor: '#F0F9FF',
+    borderRadius: rs(6),
+    borderLeftWidth: 2,
+    borderLeftColor: '#50AF27',
+  },
+  realTreeNotesLabel: {
+    fontSize: rf(12),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: rs(3),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  realTreeNotes: {
+    fontSize: rf(12),
+    color: '#666',
+    lineHeight: rf(16),
+  },
+  deadRealTreeCard: {
+    backgroundColor: '#f44336',
+  },
+  summarySection: {
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(15),
+    backgroundColor: '#FFCED2',
+  },
+  tabsContainer: {
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(15),
+    backgroundColor: '#FFCED2',
+  },
+  fixedSummaryContainer: {
+    paddingHorizontal: rs(20),
+    paddingTop: rs(15),
+  },
+  fixedTabsContainer: {
+    paddingHorizontal: rs(5),
+    paddingVertical: rs(-5),
+  },
+  pillTabsContainer: {
+    marginBottom: rs(20),
+  },
+  pillTabs: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: rs(25),
+    padding: rs(4),
+  },
+  pillTab: {
+    flex: 1,
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(20),
+    borderRadius: rs(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillTabActive: {
+    backgroundColor: '#98D56D',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  pillTabText: {
+    fontSize: rf(14),
+    fontWeight: '600',
+    color: '#666',
+  },
+  pillTabTextActive: {
+    color: '#fff',
   },
 });
 

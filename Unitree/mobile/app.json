@@ -18,22 +18,45 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.unitree.mobile",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app needs location access to detect WiFi network details for tracking university WiFi usage."
+        "NSLocationWhenInUseUsageDescription": "This app needs location access to detect WiFi network details for tracking university WiFi usage.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs background location access to continuously monitor university WiFi connections.",
+        "UIBackgroundModes": [
+          "background-fetch",
+          "background-processing",
+          "background-fetch",
+          "background-processing"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#2E7D32"
+        "backgroundColor": "#2E7D32",
+        "monochromeImage": "./assets/images/notification-icon.png"
       },
+      "icon": "./assets/images/icon.png",
       "package": "com.unitree.mobile",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_WIFI_STATE",
-        "ACCESS_NETWORK_STATE"
-      ]
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "com.android.alarm.permission.SET_ALARM",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "notification": {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#2E7D32"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -60,15 +83,30 @@
           "photosPermission": "The app accesses your photos to let you share them with your friends.",
           "cameraPermission": "The app accesses your camera to let you take photos and share them with your friends."
         }
+      ],
+      [
+        "expo-task-manager"
+      ],
+      [
+        "expo-background-task"
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2E7D32",
+          "defaultChannel": "default",
+          "sounds": []
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://192.168.1.4:3000",
+      "apiUrl": "http://192.168.1.11:3000",
       "eas": {
-        "projectId": "b53a2dd3-f93c-4eb5-aa1e-3620e8834198"
+        "projectId": "1a55c11b-0205-42e6-961f-496539f0161d"
       }
     }
   }

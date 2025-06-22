@@ -12,6 +12,7 @@ import {
   Modal,
   Keyboard,
   Dimensions,
+  Alert,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -307,8 +308,12 @@ export default function RegisterScreen() {
   };
 
   const handleGoogleSignUp = async () => {
-    // Google sign-up temporarily disabled
-    setError('Google sign-up is currently unavailable. Please use email registration.');
+    // Show coming soon alert instead of setting error
+    Alert.alert(
+      'Coming Soon',
+      'Google Sign-Up will be available in a future update. Please use email registration for now.',
+      [{ text: 'OK' }]
+    );
   };
 
   const goBackToEmailEntry = () => {

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useRe
 import NetInfo from '@react-native-community/netinfo';
 import { wifiService, WifiStats } from '../services/wifiService';
 import WifiMonitor from '../services/WifiMonitor';
+import BackgroundWifiService from '../services/BackgroundWifiService';
 import { useAuth } from './AuthContext';
 import ENV from '../config/env';
 
@@ -65,7 +66,12 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
       setSessionCount(wifiStats.sessionCount || 0);
       
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
+      // Don't log authentication errors as they're handled by the auth system
+      if (err.response?.status === 401) {
+        console.log('🔓 Authentication required for WiFi stats - user will be logged out');
+        return;
+      }
       console.error('Failed to refresh WiFi stats:', err);
       setError('Failed to refresh WiFi stats');
     }
@@ -77,7 +83,12 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     try {
       const sessionCount = await wifiService.getSessionCount();
       setSessionCount(sessionCount);
-    } catch (err) {
+    } catch (err: any) {
+      // Don't log authentication errors as they're handled by the auth system
+      if (err.response?.status === 401) {
+        console.log('🔓 Authentication required for session count - user will be logged out');
+        return;
+      }
       console.error('Failed to refresh session count:', err);
     }
   };

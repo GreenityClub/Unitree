@@ -140,8 +140,12 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = async () => {
-    // Google sign-in temporarily disabled
-    setError('Google sign-in is currently unavailable. Please use email/password login.');
+    // Show coming soon alert instead of setting error
+    Alert.alert(
+      'Coming Soon',
+      'Google Sign-In will be available in a future update. Please use email/password login for now.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleForgotPassword = () => {

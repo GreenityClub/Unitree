@@ -86,6 +86,117 @@ const checkAndResetTimePeriods = async (userId) => {
   }
 };
 
+// Background sync endpoint for minimal bandwidth usage
+router.post('/background-sync', auth, async (req, res) => {
+  try {
+    const { sessionId, startTime, endTime, duration, ipAddress } = req.body;
+
+    // Validate required fields
+    if (!sessionId || !startTime || !duration || !ipAddress) {
+      return res.status(400).json({ 
+        message: 'Missing required fields: sessionId, startTime, duration, ipAddress' 
+      });
+    }
+
+    // Validate IP address
+    if (!isValidUniversityIP(ipAddress)) {
+      return res.status(400).json({ message: 'Invalid university WiFi IP address' });
+    }
+
+    // Check if session already exists to prevent duplicates
+    const existingSession = await WifiSession.findOne({
+      user: req.user._id,
+      'metadata.backgroundSessionId': sessionId
+    });
+
+    if (existingSession) {
+      logger.info(`Background session ${sessionId} already synced for user ${req.user._id}`);
+      return res.json({ message: 'Session already synced', session: existingSession });
+    }
+
+    // Calculate points: 1 minute = 1 point
+    const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
+    const durationSeconds = parseInt(duration, 10);
+    
+    if (durationSeconds < minSessionDuration) {
+      logger.info(`Background session ${sessionId} too short (${durationSeconds}s), not awarding points`);
+      return res.json({ message: 'Session too short, no points awarded' });
+    }
+
+    const pointsEarned = Math.floor(durationSeconds / 60);
+
+    // Reset time periods if needed
+    await checkAndResetTimePeriods(req.user._id);
+
+    // Use transactions if available
+    const result = await executeWithOptionalTransaction(async (session) => {
+      // Create WiFi session record
+      const wifiSession = new WifiSession({
+        user: req.user._id,
+        ipAddress,
+        startTime: new Date(startTime),
+        endTime: endTime ? new Date(endTime) : new Date(),
+        duration: durationSeconds,
+        pointsEarned,
+        sessionDate: new Date(startTime),
+        isActive: false,
+        metadata: {
+          backgroundSessionId: sessionId,
+          syncedAt: new Date(),
+          source: 'background'
+        }
+      });
+
+      await wifiSession.save(session ? { session } : {});
+
+      // Update user points and time tracking
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { 
+          $inc: { 
+            points: pointsEarned,
+            allTimePoints: pointsEarned,
+            dayTimeConnected: durationSeconds,
+            weekTimeConnected: durationSeconds,
+            monthTimeConnected: durationSeconds,
+            totalTimeConnected: durationSeconds
+          }
+        },
+        session ? { session } : {}
+      );
+
+      // Create point transaction record
+      const pointTransaction = new Point({
+        userId: req.user._id,
+        amount: pointsEarned,
+        type: 'WIFI_SESSION',
+        metadata: {
+          backgroundSessionId: sessionId,
+          startTime: new Date(startTime),
+          endTime: endTime ? new Date(endTime) : new Date(),
+          duration: durationSeconds,
+          description: `Background WiFi session on ${ipAddress}`,
+        }
+      });
+
+      await pointTransaction.save(session ? { session } : {});
+
+      return wifiSession;
+    });
+
+    logger.info(`Background session synced: ${sessionId} for user ${req.user._id}, points: ${pointsEarned}`);
+    res.json({ 
+      message: 'Background session synced successfully', 
+      session: result,
+      pointsEarned 
+    });
+
+  } catch (error) {
+    logger.error('Background sync error:', error);
+    res.status(500).json({ message: 'Failed to sync background session', error: error.message });
+  }
+});
+
 // Start WiFi session
 router.post('/start', auth, async (req, res) => {
   try {

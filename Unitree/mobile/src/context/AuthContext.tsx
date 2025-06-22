@@ -50,13 +50,17 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     checkAuthState();
     
     // Listen for auth events from API interceptor
     const handleSessionInvalid = async () => {
+      if (isLoggingOut) return; // Prevent multiple logout attempts
+      
       console.log('📧 Received SESSION_INVALID event, logging out user');
+      setIsLoggingOut(true);
       setUser(null);
       setIsLoading(false); // Ensure loading is false to trigger navigation
       
@@ -69,11 +73,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('Navigation error:', error);
         }
+        setIsLoggingOut(false);
       }, 100);
     };
 
     const handleTokenExpired = async () => {
+      if (isLoggingOut) return; // Prevent multiple logout attempts
+      
       console.log('📧 Received TOKEN_EXPIRED event, logging out user');
+      setIsLoggingOut(true);
       setUser(null);
       setIsLoading(false); // Ensure loading is false to trigger navigation
       
@@ -86,6 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('Navigation error:', error);
         }
+        setIsLoggingOut(false);
       }, 100);
     };
 
@@ -94,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     // Set up periodic auth check to handle session invalidation
     const authCheckInterval = setInterval(() => {
-      if (user) {
+      if (user && !isLoggingOut) {
         checkAuthState();
       }
     }, 60000); // Check every 60 seconds if user is logged in
@@ -104,9 +113,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       authEvents.off(AUTH_EVENTS.SESSION_INVALID, handleSessionInvalid);
       authEvents.off(AUTH_EVENTS.TOKEN_EXPIRED, handleTokenExpired);
     };
-  }, [user]);
+  }, [user, isLoggingOut]);
 
   const checkAuthState = async () => {
+    if (isLoggingOut) return; // Don't check auth state during logout
+    
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
@@ -190,7 +201,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
+    if (isLoggingOut) return; // Prevent multiple logout attempts
+    
     try {
+      setIsLoggingOut(true);
+      
       // End WiFi session first while we still have authentication
       try {
         const { wifiService } = await import('../services/wifiService');
@@ -220,6 +235,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', error);
       // Even on error, ensure user is logged out
       setUser(null);
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 

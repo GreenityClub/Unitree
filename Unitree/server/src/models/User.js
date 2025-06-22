@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { env } = require('../config/env');
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -36,7 +37,18 @@ const userSchema = new mongoose.Schema({
   },
   treesPlanted: {
     type: Number,
-    default: 0
+    default: 0,
+    comment: 'Total trees planted (virtual + real) - for backward compatibility'
+  },
+  virtualTreesPlanted: {
+    type: Number,
+    default: 0,
+    comment: 'Number of virtual trees planted'
+  },
+  realTreesPlanted: {
+    type: Number,
+    default: 0,
+    comment: 'Number of real trees planted'
   },
   university: {
     type: String,
@@ -59,6 +71,10 @@ const userSchema = new mongoose.Schema({
   trees: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tree'
+  }],
+  realTrees: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RealTree'
   }],
   createdAt: {
     type: Date,
@@ -111,6 +127,53 @@ const userSchema = new mongoose.Schema({
     comment: 'Last time month stats were reset'
   },
   
+  // Notification fields
+  pushToken: {
+    type: String,
+    default: null,
+    comment: 'Expo push notification token'
+  },
+  notificationSettings: {
+    pushNotificationsEnabled: {
+      type: Boolean,
+      default: true
+    },
+    appReminderNotifications: {
+      type: Boolean,
+      default: true
+    },
+    statsNotifications: {
+      type: Boolean,
+      default: true
+    },
+    dailyStatsTime: {
+      type: String,
+      default: "20:00"
+    },
+    weeklyStatsDay: {
+      type: Number,
+      default: 0, // Sunday
+      min: 0,
+      max: 6
+    },
+    monthlyStatsDay: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 31
+    }
+  },
+  lastActive: {
+    type: Date,
+    default: Date.now,
+    comment: 'Last time user was active in the app'
+  },
+  lastReminderSent: {
+    type: Date,
+    default: null,
+    comment: 'Last time reminder notification was sent'
+  },
+
   // Session management for single device login
   activeSession: {
     token: {
@@ -151,8 +214,8 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
     { id: this._id },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRE }
   );
 };
 

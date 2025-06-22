@@ -3,10 +3,13 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 import { AuthProvider } from '../src/context/AuthContext';
 import { WiFiProvider } from '../src/context/WiFiContext';
 import { TabBarProvider } from '../src/context/TabBarContext';
+import { BackgroundSyncProvider } from '../src/context/BackgroundSyncContext';
+import { NotificationProvider } from '../src/context/NotificationContext';
 import ENV, { validateEnvironment } from '../src/config/env';
 import { useEffect } from 'react';
 
@@ -38,20 +41,27 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <WiFiProvider>
-          <TabBarProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </TabBarProvider>
-        </WiFiProvider>
-      </AuthProvider>
+      <PaperProvider>
+        <AuthProvider>
+          <WiFiProvider>
+            <BackgroundSyncProvider>
+              <NotificationProvider>
+                <TabBarProvider>
+                  <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                    <Stack>
+                      <Stack.Screen name="auth" options={{ headerShown: false }} />
+                      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                      <Stack.Screen name="user-settings" options={{ headerShown: false }} />
+                      <Stack.Screen name="+not-found" />
+                    </Stack>
+                    <StatusBar style="auto" />
+                  </ThemeProvider>
+                </TabBarProvider>
+              </NotificationProvider>
+            </BackgroundSyncProvider>
+          </WiFiProvider>
+        </AuthProvider>
+      </PaperProvider>
     </GestureHandlerRootView>
   );
 }
