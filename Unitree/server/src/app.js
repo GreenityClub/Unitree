@@ -39,6 +39,16 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files for avatar uploads
 app.use('/uploads', express.static('uploads'));
 
+// Health check endpoint for deployment platforms
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
 // Connect to MongoDB
 console.log('Connecting to MongoDB...');
 mongoose.connect(ENV.MONGODB_URI)
