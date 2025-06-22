@@ -2,6 +2,7 @@ services:
   - type: web
     name: unitree-server
     env: node
+    rootDir: ./Unitree/server
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
@@ -30,12 +31,12 @@ services:
         value: 100
       - key: LOG_LEVEL
         value: info
-      # These will be updated with actual deployed URLs
+      # For mobile apps, use * or leave empty
       - key: CLIENT_URL
-        value: https://your-app-name.onrender.com
+        value: "*"
       - key: CLIENT_DEV_URL
-        value: https://your-app-name.onrender.com
+        value: "*"
       - key: CLIENT_URL_DEV
-        value: https://your-app-name.onrender.com
+        value: "*"
       - key: CLIENT_URL_DEV_2
-        value: https://your-app-name.onrender.com 
+        value: "*" 

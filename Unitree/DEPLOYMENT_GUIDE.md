@@ -98,10 +98,11 @@ npm run submit:ios
    POINTS_PER_HOUR=60
    TREE_COST=100
    LOG_LEVEL=info
-   CLIENT_URL=https://your-render-app.onrender.com
-   CLIENT_DEV_URL=https://your-render-app.onrender.com
-   CLIENT_URL_DEV=https://your-render-app.onrender.com
-   CLIENT_URL_DEV_2=https://your-render-app.onrender.com
+   # For mobile apps, use * or leave empty
+   CLIENT_URL=*
+   CLIENT_DEV_URL=*
+   CLIENT_URL_DEV=*
+   CLIENT_URL_DEV_2=*
    ```
 
 ### Method 2: Using render.yaml (Infrastructure as Code)

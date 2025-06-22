@@ -38,6 +38,11 @@ MIN_SESSION_DURATION=300
 POINTS_PER_HOUR=60
 TREE_COST=100
 LOG_LEVEL=info
+# For mobile apps, use * or leave empty
+CLIENT_URL=*
+CLIENT_DEV_URL=*
+CLIENT_URL_DEV=*
+CLIENT_URL_DEV_2=*
 ```
 
 ### 1.3 Deploy Server
