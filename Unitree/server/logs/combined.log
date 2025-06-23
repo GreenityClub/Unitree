@@ -1175,3 +1175,28 @@
 {"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T15:01:14.915Z"}
 {"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T15:37:11.236Z"}
 {"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-23T15:37:11.599Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-23T16:19:55.570Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:19:55.652Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:19:55.653Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:19:57.261Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T16:21:27.627Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-23T16:21:28.086Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:23:57.992Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:23:58.038Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:23:59.234Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T16:24:15.651Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-23T16:24:15.873Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:25:10.341Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:25:10.346Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:25:11.311Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:25:16.146Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:25:16.151Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:25:17.132Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:25:26.351Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:25:26.355Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:25:27.326Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T16:25:38.427Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-23T16:25:38.699Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T16:26:11.270Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T16:26:11.274Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T16:26:12.290Z"}
