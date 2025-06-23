@@ -22,7 +22,13 @@ services:
       - key: EMAIL_PASSWORD
         sync: false
       - key: UNIVERSITY_IP_PREFIX
-        value: 192.168
+        value: 10.22
+      - key: UNIVERSITY_LAT
+        value: 21.023883446210807
+      - key: UNIVERSITY_LNG
+        value: 105.79044010261333
+      - key: UNIVERSITY_RADIUS
+        value: 100
       - key: MIN_SESSION_DURATION
         value: 300
       - key: POINTS_PER_HOUR
@@ -31,6 +37,13 @@ services:
         value: 100
       - key: LOG_LEVEL
         value: info
+      # Cloud Storage Configuration (Optional - set manually)
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: de7fhgkqn
+      - key: CLOUDINARY_API_KEY
+        sync: 395491463937558
+      - key: CLOUDINARY_API_SECRET
+        sync: QPtKOVira1O1duGC9Ioc0mCw5dM
       # For mobile apps, use * or leave empty
       - key: CLIENT_URL
         value: "*"

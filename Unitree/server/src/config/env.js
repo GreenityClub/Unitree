@@ -17,12 +17,22 @@ const requiredEnvVars = {
   PORT: process.env.PORT || 3000,
   
   // WiFi & Points Configuration
-  UNIVERSITY_IP_PREFIX: process.env.UNIVERSITY_IP_PREFIX || '192.168',
+  UNIVERSITY_IP_PREFIX: process.env.UNIVERSITY_IP_PREFIX || '10.22',
   MIN_SESSION_DURATION: process.env.MIN_SESSION_DURATION || '300',
   POINTS_PER_HOUR: process.env.POINTS_PER_HOUR || '60',
   
+  // University Location Configuration
+  UNIVERSITY_LAT: process.env.UNIVERSITY_LAT || '21.023883446210807',
+  UNIVERSITY_LNG: process.env.UNIVERSITY_LNG || '105.79044010261333',
+  UNIVERSITY_RADIUS: process.env.UNIVERSITY_RADIUS || '100',
+  
   // Tree Configuration
   TREE_COST: process.env.TREE_COST || '100',
+  
+  // Cloud Storage Configuration (Cloudinary)
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   
   // CORS Origins
   CLIENT_URL: process.env.CLIENT_URL,

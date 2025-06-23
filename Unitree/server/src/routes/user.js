@@ -6,6 +6,7 @@ const fs = require('fs');
 const { auth } = require('../middleware/auth');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const cloudStorage = require('../services/cloudStorage');
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
@@ -199,11 +200,43 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Clean up existing avatars but EXCLUDE the one we just uploaded
-    avatarUtils.cleanupUserAvatarsExcept(user._id, req.file.filename);
+    let avatarUrl;
+    let avatarPath;
 
-    // Update user avatar path using findByIdAndUpdate to avoid validation issues
-    const avatarPath = `uploads/avatars/${req.file.filename}`;
+    if (cloudStorage.isAvailable()) {
+      // Use cloud storage (Cloudinary)
+      try {
+        // Delete existing cloud avatar if exists
+        const existingUser = await User.findById(user._id);
+        if (existingUser.avatar && existingUser.avatar.includes('cloudinary.com')) {
+          // Extract public_id from Cloudinary URL to delete old avatar
+          const publicId = `unitree/avatars/avatar-${user._id}`;
+          await cloudStorage.deleteAvatar(publicId);
+        }
+
+        // Upload to cloud storage
+        const uploadResult = await cloudStorage.uploadAvatar(req.file.path, user._id);
+        avatarUrl = uploadResult.url;
+        avatarPath = uploadResult.url; // Store the full URL for cloud storage
+
+        // Clean up local temp file
+        fs.unlinkSync(req.file.path);
+        
+        logger.info(`Avatar uploaded to cloud storage for user ${user._id}`);
+      } catch (cloudError) {
+        logger.error('Cloud storage failed, falling back to local storage:', cloudError);
+        // Fall back to local storage
+        avatarUtils.cleanupUserAvatarsExcept(user._id, req.file.filename);
+        avatarPath = `uploads/avatars/${req.file.filename}`;
+        avatarUrl = avatarPath;
+      }
+    } else {
+      // Use local storage (fallback)
+      avatarUtils.cleanupUserAvatarsExcept(user._id, req.file.filename);
+      avatarPath = `uploads/avatars/${req.file.filename}`;
+      avatarUrl = avatarPath;
+      logger.info(`Avatar uploaded to local storage for user ${user._id}`);
+    }
     
     // Use findByIdAndUpdate to update only the avatar field
     const updatedUser = await User.findByIdAndUpdate(
@@ -215,11 +248,13 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
     res.json({ 
       message: 'Avatar uploaded successfully',
       avatar: avatarPath,
-      user: updatedUser
+      avatarUrl: avatarUrl,
+      user: updatedUser,
+      storage: cloudStorage.isAvailable() ? 'cloud' : 'local'
     });
   } catch (error) {
     logger.error('Upload avatar error:', error);
-    if (req.file) {
+    if (req.file && fs.existsSync(req.file.path)) {
       // Clean up uploaded file if error occurs
       try {
         fs.unlinkSync(req.file.path);
@@ -239,8 +274,25 @@ router.delete('/avatar', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Clean up ALL avatar files for this user
-    avatarUtils.cleanupUserAvatars(user._id);
+    // Get current user to check avatar URL
+    const existingUser = await User.findById(user._id);
+    
+    if (existingUser.avatar) {
+      if (cloudStorage.isAvailable() && existingUser.avatar.includes('cloudinary.com')) {
+        // Delete from cloud storage
+        try {
+          const publicId = `unitree/avatars/avatar-${user._id}`;
+          await cloudStorage.deleteAvatar(publicId);
+          logger.info(`Avatar deleted from cloud storage for user ${user._id}`);
+        } catch (cloudError) {
+          logger.error('Failed to delete avatar from cloud storage:', cloudError);
+        }
+      } else {
+        // Delete from local storage
+        avatarUtils.cleanupUserAvatars(user._id);
+        logger.info(`Avatar deleted from local storage for user ${user._id}`);
+      }
+    }
 
     // Use findByIdAndUpdate to avoid validation issues
     const updatedUser = await User.findByIdAndUpdate(

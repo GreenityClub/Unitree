@@ -224,7 +224,7 @@ const WifiStatusScreen: React.FC = () => {
               ]}>
                 {getConnectionStatus()}
               </Text>
-              {isUniversityWifi && (
+              {(isConnected && isUniversityWifi) && (
                 <Text style={styles.bssidInfo}>
                   {process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS} ✓
                 </Text>

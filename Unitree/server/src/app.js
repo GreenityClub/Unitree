@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const { validateEnvironment, env } = require('./config/env');
 const { globalErrorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
@@ -36,8 +37,26 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files for avatar uploads
-app.use('/uploads', express.static('uploads'));
+// Serve static files for avatar uploads with proper headers
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res, path, stat) => {
+    res.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+}));
+
+// Add explicit avatar endpoint for debugging
+app.get('/uploads/avatars/:filename', (req, res) => {
+  const filePath = path.join(__dirname, '../uploads/avatars', req.params.filename);
+  const fs = require('fs');
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    logger.warn(`Avatar file not found: ${filePath}`);
+    res.status(404).json({ message: 'Avatar not found' });
+  }
+});
 
 // Health check endpoint for deployment platforms
 app.get('/health', (req, res) => {

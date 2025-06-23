@@ -11,13 +11,14 @@ const ENV = {
   APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION || '1.0.0',
   APP_SCHEME: process.env.EXPO_PUBLIC_APP_SCHEME || 'unitree',
 
-  // WiFi IP Address Configuration (first 2 numbers separated by periods for tracking)
-  UNIVERSITY_IP_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_IP_PREFIX || '192.168',
+  // WiFi IP Address Configuration (first 2 octets for tracking - e.g., 10.22.xx.xx)
+  UNIVERSITY_IP_PREFIX: process.env.EXPO_PUBLIC_UNIVERSITY_IP_PREFIX || '10.22',
 
   // University Location Configuration for enhanced WiFi validation
+  // Configure these coordinates to match your university's location
   UNIVERSITY_LAT: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LAT || '21.023883446210807'), // Default: Hanoi location
   UNIVERSITY_LNG: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LNG || '105.79044010261333'),
-  UNIVERSITY_RADIUS: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_RADIUS || '100'), // 100m default
+  UNIVERSITY_RADIUS: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_RADIUS || '100'), // Validation radius in meters
 
   // Points Configuration
   POINTS_PER_HOUR: parseInt(process.env.EXPO_PUBLIC_POINTS_PER_HOUR || '60', 10), // 1 minute = 1 point (60 points per hour)

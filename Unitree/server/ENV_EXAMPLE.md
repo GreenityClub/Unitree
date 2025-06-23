@@ -34,13 +34,22 @@ CLIENT_DEV_URL=http://192.168.1.5:3000
 CLIENT_URL_DEV=http://10.0.2.2:3000
 CLIENT_URL_DEV_2=http://localhost:19006
 
-# University WiFi IP Configuration
-UNIVERSITY_IP_PREFIX=192.168
+# University WiFi & Location Configuration
+UNIVERSITY_IP_PREFIX=10.22
+UNIVERSITY_LAT=21.023883446210807
+UNIVERSITY_LNG=105.79044010261333
+UNIVERSITY_RADIUS=100
 
 # Points System Configuration
 MIN_SESSION_DURATION=300
 POINTS_PER_HOUR=60
 TREE_COST=100
+
+# Cloud Storage Configuration (Optional - for avatar uploads)
+# Get these from your Cloudinary dashboard at https://cloudinary.com
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
 
 # Logging Configuration
 LOG_LEVEL=info

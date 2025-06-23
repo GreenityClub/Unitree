@@ -17,14 +17,14 @@ Users can earn points **ONLY** if they meet **BOTH** validation methods - they m
 Add these to your `.env` file or environment configuration:
 
 ```bash
-# WiFi IP Configuration (existing)
-EXPO_PUBLIC_UNIVERSITY_IP_PREFIX=192.168
+# WiFi IP Configuration (configured for 10.22.xx.xx networks)
+EXPO_PUBLIC_UNIVERSITY_IP_PREFIX=10.22
 
-# Location Configuration (new)
-EXPO_PUBLIC_UNIVERSITY_LAT=10.8231          # University latitude
-EXPO_PUBLIC_UNIVERSITY_LNG=106.6297         # University longitude  
-EXPO_PUBLIC_UNIVERSITY_RADIUS=100           # Validation radius in meters
-EXPO_PUBLIC_ENABLE_LOCATION_TRACKING=true   # Enable location features
+# Location Configuration (set to your university coordinates)
+EXPO_PUBLIC_UNIVERSITY_LAT=21.023883446210807    # University latitude
+EXPO_PUBLIC_UNIVERSITY_LNG=105.79044010261333    # University longitude  
+EXPO_PUBLIC_UNIVERSITY_RADIUS=100                # Validation radius in meters
+EXPO_PUBLIC_ENABLE_LOCATION_TRACKING=true        # Enable location features
 ```
 
 ### Server Environment Variables
@@ -32,9 +32,10 @@ EXPO_PUBLIC_ENABLE_LOCATION_TRACKING=true   # Enable location features
 Add these to your server `.env` file:
 
 ```bash
-# Location Configuration
-UNIVERSITY_LAT=10.8231                       # University latitude
-UNIVERSITY_LNG=106.6297                      # University longitude
+# WiFi & Location Configuration
+UNIVERSITY_IP_PREFIX=10.22                   # IP prefix for university WiFi
+UNIVERSITY_LAT=21.023883446210807            # University latitude
+UNIVERSITY_LNG=105.79044010261333            # University longitude
 UNIVERSITY_RADIUS=100                        # Validation radius in meters
 ```
 

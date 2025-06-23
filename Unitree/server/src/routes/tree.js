@@ -111,6 +111,42 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// Get all real trees for the current user (MUST be before /:id route)
+router.get('/real', auth, async (req, res) => {
+  try {
+    const realTrees = await RealTree.findByUser(req.user._id);
+    res.json(realTrees || []);
+  } catch (error) {
+    logger.warn('Real tree fetch error, returning empty array:', error.message);
+    logger.error('Real tree fetch error:', error);
+    // For real trees, if there's an error (like collection doesn't exist),
+    // return empty array instead of error to avoid client-side errors
+    res.json([]);
+  }
+});
+
+// Get a specific real tree (MUST be before /:id route)
+router.get('/real/:id', auth, async (req, res) => {
+  try {
+    const realTree = await RealTree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!realTree) {
+      return res.status(404).json({ message: 'Real tree not found' });
+    }
+    
+    res.json(realTree.getDisplayInfo());
+  } catch (error) {
+    logger.warn('Individual real tree fetch error:', error.message);
+    logger.error('Error fetching individual real tree:', error);
+    
+    // If it's a validation error (like invalid ObjectId), return 404
+    if (error.name === 'CastError' || error.name === 'ValidationError') {
+      return res.status(404).json({ message: 'Real tree not found' });
+    }
+    
+    res.status(500).json({ message: 'Error fetching real tree' });
+  }
+});
+
 // Get a specific tree with real-time status
 router.get('/:id', auth, async (req, res) => {
   try {
@@ -604,42 +640,6 @@ router.post('/redeem', auth, async (req, res) => {
         name: error.name
       } : undefined
     });
-  }
-});
-
-// Get all real trees for the current user
-router.get('/real', auth, async (req, res) => {
-  try {
-    const realTrees = await RealTree.findByUser(req.user._id);
-    res.json(realTrees || []);
-  } catch (error) {
-    logger.warn('Real tree fetch error, returning empty array:', error.message);
-    logger.error('Real tree fetch error:', error);
-    // For real trees, if there's an error (like collection doesn't exist),
-    // return empty array instead of error to avoid client-side errors
-    res.json([]);
-  }
-});
-
-// Get a specific real tree
-router.get('/real/:id', auth, async (req, res) => {
-  try {
-    const realTree = await RealTree.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!realTree) {
-      return res.status(404).json({ message: 'Real tree not found' });
-    }
-    
-    res.json(realTree.getDisplayInfo());
-  } catch (error) {
-    logger.warn('Individual real tree fetch error:', error.message);
-    logger.error('Error fetching individual real tree:', error);
-    
-    // If it's a validation error (like invalid ObjectId), return 404
-    if (error.name === 'CastError' || error.name === 'ValidationError') {
-      return res.status(404).json({ message: 'Real tree not found' });
-    }
-    
-    res.status(500).json({ message: 'Error fetching real tree' });
   }
 });
 

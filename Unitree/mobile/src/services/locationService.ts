@@ -16,12 +16,12 @@ export interface UniversityLocation {
   name: string;
 }
 
-// University campus locations (configurable)
+// University campus locations (configurable via environment variables)
 const UNIVERSITY_LOCATIONS: UniversityLocation[] = [
   {
-    latitude: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LAT || '10.8231'), // Default: HCMC location
-    longitude: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_LNG || '106.6297'),
-    radius: parseFloat(process.env.EXPO_PUBLIC_UNIVERSITY_RADIUS || '100'), // 100m default
+    latitude: ENV.UNIVERSITY_LAT,
+    longitude: ENV.UNIVERSITY_LNG,
+    radius: ENV.UNIVERSITY_RADIUS,
     name: 'Main Campus'
   }
   // Add more campus locations as needed
