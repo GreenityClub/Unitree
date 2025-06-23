@@ -74,8 +74,17 @@ class WifiMonitor {
         try {
           await wifiService.updateSession();
           this.notifyStatsUpdate();
-        } catch (error) {
-          console.error('Failed to update session stats:', error);
+        } catch (error: any) {
+          // If server says no active session, sync our local state
+          if (error.response?.status === 404 || error.message?.includes('No active session found')) {
+            console.log('📡 Server has no active session, syncing local state');
+            this.sessionStartTime = null;
+            this.currentIPAddress = null;
+            this.notifyListeners({ isConnected: false, sessionInfo: null });
+            this.notifyStatsUpdate();
+          } else {
+            console.error('Failed to update session stats:', error);
+          }
         }
       }
     }, 60 * 1000); // Every minute

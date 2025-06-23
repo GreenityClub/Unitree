@@ -188,7 +188,17 @@ class SessionManager {
         this.sessionState.lastUpdate = new Date();
         await this.saveSessionState();
         return true;
-      } catch (error) {
+      } catch (error: any) {
+        // If server says no active session, sync our local state
+        if (error.response?.status === 404 || error.message?.includes('No active session found')) {
+          console.log('📡 Server has no active session, syncing local state in SessionManager');
+          this.sessionState.isActive = false;
+          this.sessionState.sessionId = null;
+          this.sessionState.startTime = null;
+          this.sessionState.ipAddress = null;
+          await this.saveSessionState();
+          return false;
+        }
         console.error('Failed to update session:', error);
         return false;
       }
