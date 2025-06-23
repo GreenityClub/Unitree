@@ -17,6 +17,7 @@ interface WiFiContextType {
   refreshStats: () => Promise<void>;
   error: string | null;
   wifiMonitor: typeof WifiMonitor;
+  isInitialized: boolean;
 }
 
 const WiFiContext = createContext<WiFiContextType | undefined>(undefined);
@@ -43,6 +44,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   const [sessionCount, setSessionCount] = useState(0);
   const [stats, setStats] = useState<WifiStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const wifiMonitorListenerRef = useRef<(() => void) | null>(null);
   const realTimeUpdateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -167,6 +169,9 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
           );
         }
       }
+
+      // Mark as initialized after first network state update
+      setIsInitialized(true);
     });
 
     return unsubscribe;
@@ -178,6 +183,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
       setIsSessionActive(false);
       setCurrentSessionDuration(0);
       setSessionCount(0);
+      setIsInitialized(false);
     }
   }, [isAuthenticated]);
 
@@ -351,6 +357,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     refreshStats,
     error,
     wifiMonitor: WifiMonitor,
+    isInitialized,
   };
 
   return (

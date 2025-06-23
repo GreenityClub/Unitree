@@ -139,14 +139,7 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    // Show coming soon alert instead of setting error
-    Alert.alert(
-      'Coming Soon',
-      'Google Sign-In will be available in a future update. Please use email/password login for now.',
-      [{ text: 'OK' }]
-    );
-  };
+
 
   const handleForgotPassword = () => {
     router.push('/auth/forgot-password');
@@ -407,19 +400,6 @@ export default function LoginScreen() {
               <Text style={styles.loginButtonText}>Login</Text>
             </TouchableOpacity>
 
-            {/* Or Divider */}
-            <Text style={styles.orText}>or</Text>
-
-            {/* Google Sign In Button */}
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              activeOpacity={0.8}
-            >
-              <Icon name="google" size={20} color="#fff" style={styles.googleIcon} />
-              <Text style={styles.googleButtonText}>Sign in with Google</Text>
-            </TouchableOpacity>
-
             {/* Sign Up Link */}
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpText}>Don't have an account? </Text>
@@ -596,30 +576,7 @@ const styles = StyleSheet.create({
     fontSize: rf(16),
     fontWeight: 'bold',
   },
-  orText: {
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: rf(16),
-    marginBottom: rs(14),
-    fontWeight: '500',
-  },
-  googleButton: {
-    backgroundColor: '#FFA79D',
-    paddingVertical: rs(16),
-    borderRadius: rs(12),
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: rs(14),
-  },
-  googleIcon: {
-    marginRight: rs(12),
-  },
-  googleButtonText: {
-    color: '#fff',
-    fontSize: rf(16),
-    fontWeight: 'bold',
-  },
+
   signUpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

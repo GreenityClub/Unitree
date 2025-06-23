@@ -12,7 +12,7 @@ const pointSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['ATTENDANCE', 'TREE_PURCHASE', 'TREE_REDEMPTION', 'ACHIEVEMENT', 'BONUS', 'WIFI_SESSION'],
+    enum: ['ATTENDANCE', 'TREE_PURCHASE', 'TREE_REDEMPTION', 'REAL_TREE_REDEMPTION', 'ACHIEVEMENT', 'BONUS', 'WIFI_SESSION'],
     required: true
   },
   metadata: {
@@ -21,7 +21,14 @@ const pointSchema = new mongoose.Schema({
     duration: Number,
     description: String,
     achievementId: String,
-    treeId: mongoose.Schema.Types.ObjectId
+    treeId: mongoose.Schema.Types.ObjectId,
+    realTreeId: mongoose.Schema.Types.ObjectId,
+    studentId: String,
+    treeSpecie: String,
+    location: String,
+    species: String,
+    speciesName: String,
+    scientificName: String
   }
 }, {
   timestamps: true

@@ -26,7 +26,7 @@ import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { wifiService } from '../../services/wifiService';
 import { pointsService } from '../../services/pointsService';
 
-import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '../../utils/responsive';
+import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS, isSmallHeightDevice } from '../../utils/responsive';
 
 interface StatItemProps {
   label: string;
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#FFCED2',
-    paddingBottom: rs(90),
+    paddingBottom: isSmallHeightDevice() ? rs(60) : rs(90),
     paddingTop: rs(10),
   },
   welcomeSection: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(105),
+    top: isSmallHeightDevice() ? rs(75) : rs(105),
     zIndex: 9999,
   },
   mascotImage: {

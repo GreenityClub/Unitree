@@ -34,7 +34,7 @@ import { useWiFi } from '../../context/WiFiContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { formatDistanceToNow } from 'date-fns';
-import { rf, rs } from '../../utils/responsive';
+import { rf, rs, isSmallHeightDevice } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { wifiService, WiFiSession, WifiStats } from '../../services/wifiService';
 import { treeService, Tree, RedeemTreeData } from '../../services/treeService';
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#B7DDE6',
-    paddingBottom: rs(90),
+    paddingBottom: isSmallHeightDevice() ? rs(60) : rs(90),
     paddingTop: rs(10),
   },
   welcomeSection: {
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(105),
+    top: isSmallHeightDevice() ? rs(75) : rs(105),
     zIndex: 9999,
   },
   mascotImage: {

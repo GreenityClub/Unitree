@@ -56,5 +56,8 @@ export const getImageSize = (baseWidth: number, baseHeight: number) => {
 // Check if device is small
 export const isSmallDevice = (): boolean => SCREEN_WIDTH < 350;
 
+// Check if device is iPhone 7 or similar small height devices
+export const isSmallHeightDevice = (): boolean => SCREEN_HEIGHT <= 667;
+
 // Check if device is large
 export const isLargeDevice = (): boolean => SCREEN_WIDTH > 400; 

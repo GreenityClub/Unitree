@@ -307,14 +307,7 @@ export default function RegisterScreen() {
     setShowUniversityModal(false);
   };
 
-  const handleGoogleSignUp = async () => {
-    // Show coming soon alert instead of setting error
-    Alert.alert(
-      'Coming Soon',
-      'Google Sign-Up will be available in a future update. Please use email registration for now.',
-      [{ text: 'OK' }]
-    );
-  };
+
 
   const goBackToEmailEntry = () => {
     setCurrentStep(1);
@@ -675,21 +668,7 @@ export default function RegisterScreen() {
                 </>
               )}
 
-              {/* OR Divider - Only show on step 1 */}
-              {currentStep === 1 && (
-                <>
-                  <Text style={styles.orText}>OR</Text>
 
-                  {/* Google Sign Up Button */}
-                  <TouchableOpacity
-                    onPress={handleGoogleSignUp}
-                    style={styles.googleButton}
-                  >
-                    <Icon name="google" size={20} color="#fff" style={styles.googleIcon} />
-                    <Text style={styles.googleButtonText}>Sign up with Google</Text>
-                  </TouchableOpacity>
-                </>
-              )}
 
               {/* Login Link */}
               <View style={styles.loginContainer}>
@@ -927,30 +906,7 @@ const styles = StyleSheet.create({
     fontSize: rf(16),
     fontWeight: 'bold',
   },
-  orText: {
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: rf(16),
-    marginBottom: rs(20),
-    fontWeight: '500',
-  },
-  googleButton: {
-    backgroundColor: '#FFA79D',
-    paddingVertical: rs(14),
-    borderRadius: rs(12),
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: rs(24),
-  },
-  googleIcon: {
-    marginRight: rs(12),
-  },
-  googleButtonText: {
-    color: '#fff',
-    fontSize: rf(16),
-    fontWeight: 'bold',
-  },
+
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

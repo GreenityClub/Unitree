@@ -30,7 +30,7 @@ import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { treeService, Tree, RealTree } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import type { WiFiSession } from '../../services/wifiService';
-import { rf, rs } from '../../utils/responsive';
+import { rf, rs, isSmallHeightDevice } from '../../utils/responsive';
 import { router } from 'expo-router';
 
 // Tree stage images from assets
@@ -217,7 +217,7 @@ const RealTreeCard: React.FC<RealTreeCardProps> = ({ realTree }) => {
         </View>
         
         <View style={styles.realTreeDetailRow}>
-          <Icon name="account-school" size={16} color="#666" />
+          <Icon name="account" size={16} color="#666" />
           <Text style={styles.realTreeDetailLabel}>Student ID:</Text>
           <Text style={styles.realTreeDetailValue}>{studentId}</Text>
         </View>
@@ -488,7 +488,7 @@ const TreesScreen = () => {
         {/* Mascot */}
         <View style={styles.mascotContainer}>
           <Image
-            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+            source={require('../../assets/mascots/Unitree - Mascot-5.png')}
             style={styles.mascotImage}
             resizeMode="contain"
           />
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#FFCED2',
-    paddingBottom: rs(90),
+    paddingBottom: isSmallHeightDevice() ? rs(60) : rs(90),
     paddingTop: rs(10),
   },
   welcomeSection: {
@@ -533,13 +533,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: rs(30),
     borderTopRightRadius: rs(30),
     paddingHorizontal: rs(24),
-    paddingTop: rs(32),
+    paddingTop: rs(60),
     
   },
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(105),
+    top: isSmallHeightDevice() ? rs(75) : rs(105),
     zIndex: 9999,
   },
   mascotImage: {

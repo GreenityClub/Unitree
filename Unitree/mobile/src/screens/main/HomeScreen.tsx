@@ -34,7 +34,8 @@ import {
   rs, 
   deviceValue, 
   getImageSize,
-  SCREEN_DIMENSIONS 
+  SCREEN_DIMENSIONS,
+  isSmallHeightDevice
 } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,7 +61,8 @@ const HomeScreen = () => {
     currentSessionDuration, 
     sessionCount, 
     stats,
-    ipAddress
+    ipAddress,
+    isInitialized
   } = useWiFi();
   const navigation = useNavigation<NavigationProp>();
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
@@ -164,6 +166,8 @@ const HomeScreen = () => {
   };
 
   const getWifiStatusIcon = () => {
+    // Show loading/disconnected icon if not initialized yet
+    if (!isInitialized) return 'wifi-off';
     return (isConnected && isUniversityWifi) ? 'wifi' : 'wifi-off';
   };
 
@@ -287,7 +291,7 @@ const HomeScreen = () => {
                 <Icon 
                   name={getWifiStatusIcon()} 
                   size={24} 
-                  color={(isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
+                  color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
                 />
                 <Text style={styles.cardTitle}>WiFi Status</Text>
                 <View style={styles.cardArrow}>
@@ -296,12 +300,12 @@ const HomeScreen = () => {
               </View>
               <Text style={[
                 styles.statusText,
-                (isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
+                (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
               ]}>
-                {getWifiStatusText()}
+                {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
               </Text>
 
-              {(isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
+              {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionText}>
                     Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
@@ -315,7 +319,7 @@ const HomeScreen = () => {
                 </View>
               )}
 
-              {!(isConnected && isUniversityWifi) && (
+              {isInitialized && !(isConnected && isUniversityWifi) && (
                 <Text style={styles.tapHintText}>
                   Tap to view WiFi details
                 </Text>
@@ -347,7 +351,7 @@ const HomeScreen = () => {
         {/* Mascot */}
         <View style={styles.mascotContainer}>
           <Image
-            source={require('../../assets/mascots/Unitree - Mascot-5.png')}
+            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
             style={styles.mascotImage}
             resizeMode="contain"
           />
@@ -364,7 +368,7 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#B7DDE6',
-    paddingBottom: rs(90),
+    paddingBottom: isSmallHeightDevice() ? rs(60) : rs(90),
     paddingTop: rs(10),
   },
   welcomeSection: {
@@ -397,7 +401,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: rs(105),
+    top: isSmallHeightDevice() ? rs(75) : rs(105),
     zIndex: 9999,
   },
   mascotImage: {

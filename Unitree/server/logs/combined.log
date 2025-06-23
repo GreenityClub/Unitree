@@ -1162,3 +1162,16 @@
 {"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T05:00:32.015Z"}
 {"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T05:00:32.022Z"}
 {"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T05:00:33.180Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-23T14:53:53.158Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM","timestamp":"2025-06-23T14:53:53.313Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-23T14:53:53.315Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-23T14:53:55.238Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T14:59:53.425Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[_jPetHNeAu5mxBr36lD3JH]","timestamp":"2025-06-23T14:59:53.780Z"}
+{"level":"info","message":"🔔 Starting scheduled reminder notifications...","timestamp":"2025-06-23T15:00:00.017Z"}
+{"level":"info","message":"Outside app reminder hours (7 AM - 6 PM), skipping notifications","timestamp":"2025-06-23T15:00:00.018Z"}
+{"level":"warn","message":"⚠️ Scheduled reminders completed with issues: Outside notification hours","timestamp":"2025-06-23T15:00:00.020Z"}
+{"level":"info","message":"Real tree saved successfully","studentId":"GBH220312","timestamp":"2025-06-23T15:01:01.165Z","treeId":"68596c2dbcc1305e513e21a7","userId":"6852d10ba0a57324869852f6"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T15:01:14.915Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-23T15:37:11.236Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-06-23T15:37:11.599Z"}

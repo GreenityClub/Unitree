@@ -34,7 +34,7 @@ services:
       - key: UNIVERSITY_LNG
         value: 105.79044010261333
       - key: UNIVERSITY_RADIUS
-        value: 100
+        value: 70
       - key: MIN_SESSION_DURATION
         value: 300
       - key: POINTS_PER_HOUR
