@@ -6,6 +6,12 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+    # Resource configuration
+    plan: starter
+    # Health check configuration
+    healthCheckTimeout: 30
+    healthCheckInterval: 30
+    numInstances: 1
     envVars:
       - key: NODE_ENV
         value: production
