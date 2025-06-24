@@ -27,7 +27,7 @@ const auth = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       // Get user from token with session data
-      req.user = await User.findById(decoded.id).select('+activeSession.token +activeSession.deviceInfo +activeSession.loginTime +activeSession.lastActivity');
+      req.user = await User.findById(decoded.id).select('+activeSession.token +activeSession.refreshToken +activeSession.deviceInfo +activeSession.loginTime +activeSession.lastActivity +activeSession.refreshTokenExpiresAt');
       
       if (!req.user) {
         return res.status(401).json({

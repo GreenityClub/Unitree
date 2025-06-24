@@ -6,7 +6,8 @@ const requiredEnvVars = {
   
   // JWT Security
   JWT_SECRET: process.env.JWT_SECRET,
-  JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',
+  JWT_EXPIRE: process.env.JWT_EXPIRE || '15m',
+  JWT_REFRESH_EXPIRE: process.env.JWT_REFRESH_EXPIRE || '30d',
   
   // Email Service
   EMAIL_USER: process.env.EMAIL_USER,

@@ -40,17 +40,19 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
-    // Generate token
+    // Generate tokens
     const token = user.getSignedJwtToken();
+    const refreshToken = user.getSignedRefreshToken();
 
     // Get device info from User-Agent header or default
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
 
     // Set active session for registration
-    await user.setActiveSession(token, deviceInfo);
+    await user.setActiveSession(token, refreshToken, deviceInfo);
 
     res.status(201).json({
       token,
+      refreshToken,
       user: {
         id: user._id,
         fullname: user.fullname,
@@ -95,7 +97,7 @@ router.post('/login', async (req, res) => {
       email: { 
         $regex: new RegExp('^' + email + '$', 'i') 
       }
-    }).select('+password +activeSession.token +activeSession.deviceInfo +activeSession.loginTime');
+    }).select('+password +activeSession.token +activeSession.refreshToken +activeSession.deviceInfo +activeSession.loginTime +activeSession.refreshTokenExpiresAt');
     
     if (!user) {
       return res.status(401).json({
@@ -121,17 +123,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Generate token
+    // Generate tokens
     const token = user.getSignedJwtToken();
+    const refreshToken = user.getSignedRefreshToken();
 
     // Get device info from User-Agent header or default
     const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
 
     // Set active session
-    await user.setActiveSession(token, deviceInfo);
+    await user.setActiveSession(token, refreshToken, deviceInfo);
 
     res.json({
       token,
+      refreshToken,
       user: {
         id: user._id,
         fullname: user.fullname,
@@ -168,6 +172,81 @@ router.get('/me', auth, async (req, res) => {
     console.error('Get user error:', error);
     res.status(500).json({
       message: 'Error getting user data'
+    });
+  }
+});
+
+// Refresh access token
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        message: 'Refresh token is required'
+      });
+    }
+
+    // Verify refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({
+        message: 'Invalid or expired refresh token'
+      });
+    }
+
+    // Check if it's actually a refresh token
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({
+        message: 'Invalid token type'
+      });
+    }
+
+    // Get user with session data
+    const user = await User.findById(decoded.id).select('+activeSession.refreshToken +activeSession.refreshTokenExpiresAt');
+    
+    if (!user) {
+      return res.status(401).json({
+        message: 'User no longer exists'
+      });
+    }
+
+    // Verify refresh token against stored session
+    if (!user.hasValidRefreshToken(refreshToken)) {
+      return res.status(401).json({
+        message: 'Invalid refresh token or session expired'
+      });
+    }
+
+    // Generate new access token
+    const newAccessToken = user.getSignedJwtToken();
+    
+    // Update stored access token
+    await user.updateAccessToken(newAccessToken);
+
+    res.json({
+      token: newAccessToken,
+      refreshToken: refreshToken, // Return the same refresh token
+      user: {
+        id: user._id,
+        fullname: user.fullname,
+        nickname: user.nickname,
+        email: user.email,
+        points: user.points,
+        allTimePoints: user.allTimePoints || 0,
+        treesPlanted: user.treesPlanted,
+        studentId: user.studentId,
+        university: user.university,
+        avatar: user.avatar,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({
+      message: 'Error refreshing token'
     });
   }
 });

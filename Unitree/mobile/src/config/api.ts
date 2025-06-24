@@ -31,6 +31,34 @@ api.interceptors.request.use(
   }
 );
 
+// Function to refresh access token
+const refreshAccessToken = async () => {
+  try {
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await axios.post(`${ENV.API_URL}/api/auth/refresh`, {
+      refreshToken
+    });
+
+    const { token, refreshToken: newRefreshToken } = response.data;
+    
+    // Store new tokens
+    await AsyncStorage.multiSet([
+      ['authToken', token],
+      ['refreshToken', newRefreshToken || refreshToken]
+    ]);
+
+    return token;
+  } catch (error) {
+    // If refresh fails, clear all auth data
+    await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+    throw error;
+  }
+};
+
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
@@ -63,22 +91,47 @@ api.interceptors.response.use(
     
     if (error.response?.status === 401) {
       const errorCode = error.response?.data?.code;
+      const originalRequest = error.config;
       
       if (errorCode === 'SESSION_INVALID') {
         // Session invalid - user was logged out from another device
-        await AsyncStorage.multiRemove(['authToken', 'user']);
+        await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
         authEvents.emit(AUTH_EVENTS.SESSION_INVALID);
         
         if (ENV.DEBUG_MODE) {
           console.log('🔑 Session invalidated - user logged out from another device');
         }
+      } else if (!originalRequest._retry) {
+        // Try to refresh token before giving up
+        originalRequest._retry = true;
+        
+        try {
+          const newToken = await refreshAccessToken();
+          
+          // Update the failed request with new token and retry
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          
+          if (ENV.DEBUG_MODE) {
+            console.log('🔄 Token refreshed successfully, retrying request');
+          }
+          
+          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, clear storage and redirect to login
+          await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+          authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
+          
+          if (ENV.DEBUG_MODE) {
+            console.log('🔓 Token refresh failed - clearing auth data');
+          }
+        }
       } else {
-        // Regular token expired, clear storage and redirect to login
-        await AsyncStorage.multiRemove(['authToken', 'user']);
+        // Already tried to refresh, clear storage and redirect to login
+        await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
         authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
         
         if (ENV.DEBUG_MODE) {
-          console.log('🔓 Authentication expired - clearing auth data');
+          console.log('🔓 Authentication expired after refresh attempt - clearing auth data');
         }
       }
     }
@@ -110,6 +163,9 @@ export const authAPI = {
   
   forceLogout: (email: string, password: string) =>
     api.post('/api/auth/force-logout', { email, password }),
+  
+  refreshToken: (refreshToken: string) =>
+    api.post('/api/auth/refresh', { refreshToken }),
 };
 
 export const wifiAPI = {

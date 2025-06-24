@@ -12,7 +12,8 @@ MONGODB_URI=mongodb://localhost:27017/unitree
 
 # JWT Security Configuration
 JWT_SECRET=your-super-secret-jwt-key-here-make-it-long-and-random
-JWT_EXPIRE=7d
+JWT_EXPIRE=15m
+JWT_REFRESH_EXPIRE=30d
 ```
 
 ## Recommended Environment Variables

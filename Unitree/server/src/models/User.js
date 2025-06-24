@@ -181,6 +181,11 @@ const userSchema = new mongoose.Schema({
       default: null,
       select: false
     },
+    refreshToken: {
+      type: String,
+      default: null,
+      select: false
+    },
     deviceInfo: {
       type: String,
       default: null,
@@ -192,6 +197,11 @@ const userSchema = new mongoose.Schema({
       select: false
     },
     lastActivity: {
+      type: Date,
+      default: null,
+      select: false
+    },
+    refreshTokenExpiresAt: {
       type: Date,
       default: null,
       select: false
@@ -219,6 +229,15 @@ userSchema.methods.getSignedJwtToken = function() {
   );
 };
 
+// Generate refresh token
+userSchema.methods.getSignedRefreshToken = function() {
+  return jwt.sign(
+    { id: this._id, type: 'refresh' },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_REFRESH_EXPIRE }
+  );
+};
+
 // Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
@@ -243,12 +262,17 @@ userSchema.methods.updatePoints = async function(points) {
 };
 
 // Session management methods
-userSchema.methods.setActiveSession = async function(token, deviceInfo = 'Unknown Device') {
+userSchema.methods.setActiveSession = async function(token, refreshToken, deviceInfo = 'Unknown Device') {
+  const refreshTokenExpiresAt = new Date();
+  refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 30); // 30 days from now
+  
   this.activeSession = {
     token: token,
+    refreshToken: refreshToken,
     deviceInfo: deviceInfo,
     loginTime: new Date(),
-    lastActivity: new Date()
+    lastActivity: new Date(),
+    refreshTokenExpiresAt: refreshTokenExpiresAt
   };
   await this.save();
 };
@@ -256,9 +280,11 @@ userSchema.methods.setActiveSession = async function(token, deviceInfo = 'Unknow
 userSchema.methods.clearActiveSession = async function() {
   this.activeSession = {
     token: null,
+    refreshToken: null,
     deviceInfo: null,
     loginTime: null,
-    lastActivity: null
+    lastActivity: null,
+    refreshTokenExpiresAt: null
   };
   await this.save();
 };
@@ -269,6 +295,22 @@ userSchema.methods.hasActiveSession = function() {
 
 userSchema.methods.updateLastActivity = async function() {
   if (this.activeSession && this.activeSession.token && this.activeSession.token.trim() !== '') {
+    this.activeSession.lastActivity = new Date();
+    await this.save();
+  }
+};
+
+// Refresh token methods
+userSchema.methods.hasValidRefreshToken = function(refreshToken) {
+  return this.activeSession && 
+         this.activeSession.refreshToken === refreshToken &&
+         this.activeSession.refreshTokenExpiresAt &&
+         new Date() < this.activeSession.refreshTokenExpiresAt;
+};
+
+userSchema.methods.updateAccessToken = async function(newToken) {
+  if (this.activeSession) {
+    this.activeSession.token = newToken;
     this.activeSession.lastActivity = new Date();
     await this.save();
   }

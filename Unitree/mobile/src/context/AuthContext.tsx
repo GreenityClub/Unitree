@@ -120,8 +120,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isLoggingOut) return; // Don't check auth state during logout
     
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (token) {
+      const [token, refreshToken] = await AsyncStorage.multiGet(['authToken', 'refreshToken']);
+      if (token[1] && refreshToken[1]) {
         try {
           const response = await authAPI.getMe();
           setUser(response.data);
@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else {
               console.log('🔓 Authentication required - clearing auth data');
             }
-            await AsyncStorage.multiRemove(['authToken', 'user']);
+            await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
             setUser(null); // This will trigger the app to show login screen
           } else {
             console.error('Auth check failed:', error);
@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else {
               // If no cached user and token exists but API fails, logout
               console.log('No cached user data, logging out');
-              await AsyncStorage.multiRemove(['authToken', 'user']);
+              await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
               setUser(null);
             }
           }
@@ -165,10 +165,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await authAPI.login(email, password);
-      const { token, user } = response.data;
+      const { token, refreshToken, user } = response.data;
       
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await AsyncStorage.multiSet([
+        ['authToken', token],
+        ['refreshToken', refreshToken],
+        ['user', JSON.stringify(user)]
+      ]);
       setUser(user);
       
       // Refresh user data to ensure we have the latest points
@@ -191,10 +194,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (userData: any) => {
     try {
       const response = await authAPI.register(userData);
-      const { token, user } = response.data;
+      const { token, refreshToken, user } = response.data;
       
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await AsyncStorage.multiSet([
+        ['authToken', token],
+        ['refreshToken', refreshToken],
+        ['user', JSON.stringify(user)]
+      ]);
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed');
@@ -228,7 +234,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
-      await AsyncStorage.multiRemove(['authToken', 'user']);
+      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
       setUser(null);
       authEvents.emit(AUTH_EVENTS.LOGOUT);
       logger.auth.info('User logged out successfully');
