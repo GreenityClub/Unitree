@@ -30,6 +30,7 @@ import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS } from '..
 import { getResponsiveLogoSizes, getResponsiveLogoPositions, getResponsiveSpacing } from '../../utils/logoUtils';
 import { Validator } from '../../utils';
 import ENV from '../../config/env';
+import { logger } from '../../utils/logger';
 
 const REMEMBER_ME_KEY = '@unitree_remember_me';
 

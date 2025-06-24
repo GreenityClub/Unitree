@@ -49,6 +49,7 @@ const ProfileScreen = () => {
   const [avatarError, setAvatarError] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [actualTreeCount, setActualTreeCount] = React.useState<number>(0);
+  const [realTreeCount, setRealTreeCount] = React.useState<number>(0);
   const [currentPoints, setCurrentPoints] = React.useState<number>(user?.points || 0);
   const insets = useSafeAreaInsets();
 
@@ -72,6 +73,7 @@ const ProfileScreen = () => {
   React.useEffect(() => {
     if (user) {
       fetchActualTreeCount();
+      fetchRealTreeCount();
     }
   }, [user?.id]);
 
@@ -248,6 +250,20 @@ const ProfileScreen = () => {
     }
   };
 
+  const fetchRealTreeCount = async () => {
+    try {
+      if (user) {
+        const realTrees = await treeService.getRealTrees();
+        const aliveRealTrees = realTrees.filter(tree => tree.stage !== 'dead');
+        setRealTreeCount(aliveRealTrees.length);
+      }
+    } catch (error) {
+      console.error('Error fetching real tree count:', error);
+      // Set to 0 if real trees collection doesn't exist or fails
+      setRealTreeCount(0);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
@@ -256,6 +272,8 @@ const ProfileScreen = () => {
       setAvatarError(false);
       // Fetch actual tree count
       await fetchActualTreeCount();
+      // Fetch real tree count
+      await fetchRealTreeCount();
     } catch (error) {
       console.error('Error refreshing profile data:', error);
     } finally {
@@ -352,7 +370,7 @@ const ProfileScreen = () => {
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Icon name="cloud-outline" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{actualTreeCount * 48}</Text>
+                  <Text style={styles.statValue}>{realTreeCount * 22}</Text>
                   <Text style={styles.statLabel}>kg CO₂/year</Text>
                 </View>
               </View>

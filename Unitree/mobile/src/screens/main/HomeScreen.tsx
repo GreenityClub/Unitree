@@ -72,6 +72,7 @@ const HomeScreen = () => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [actualTreeCount, setActualTreeCount] = useState<number>(0);
+  const [realTreeCount, setRealTreeCount] = useState<number>(0);
   const insets = useSafeAreaInsets();
 
   // Get last name from full name
@@ -86,6 +87,7 @@ const HomeScreen = () => {
     const fetchInitialData = async () => {
       if (user) {
         await fetchActualTreeCount();
+        await fetchRealTreeCount();
       }
     };
 
@@ -203,6 +205,20 @@ const HomeScreen = () => {
     }
   };
 
+  const fetchRealTreeCount = async () => {
+    try {
+      if (user) {
+        const realTrees = await treeService.getRealTrees();
+        const aliveRealTrees = realTrees.filter(tree => tree.stage !== 'dead');
+        setRealTreeCount(aliveRealTrees.length);
+      }
+    } catch (error) {
+      console.error('Error fetching real tree count:', error);
+      // Set to 0 if real trees collection doesn't exist or fails
+      setRealTreeCount(0);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
@@ -213,6 +229,8 @@ const HomeScreen = () => {
       
       // Fetch actual tree count
       await fetchActualTreeCount();
+      // Fetch real tree count
+      await fetchRealTreeCount();
     } catch (error) {
       console.error('Error refreshing home data:', error);
     } finally {
@@ -341,7 +359,7 @@ const HomeScreen = () => {
               </View>
               <Text style={styles.treeCount}>{actualTreeCount}</Text>
               <Text style={styles.co2Text}>
-                You've helped reduce CO₂ by approximately {(actualTreeCount * 48)}kg per year!
+                You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
               </Text>
             </TouchableOpacity>
           </View>

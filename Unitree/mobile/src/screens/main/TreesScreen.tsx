@@ -369,7 +369,7 @@ const TreesScreen = () => {
               <View style={styles.statItem}>
                 <Icon name="earth" size={20} color="#50AF27" />
                 <Text style={styles.statValue}>
-                  {(aliveRealTrees.length * 150).toFixed(0)}
+                  {(aliveRealTrees.length * 22).toFixed(0)}
                 </Text>
                 <Text style={styles.statLabel}>kg CO₂/year</Text>
               </View>
