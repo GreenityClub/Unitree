@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BackgroundWifiService from '../services/BackgroundWifiService';
 import { wifiService } from '../services/wifiService';
 import { useAuth } from './AuthContext';
+import { logger } from '../utils/logger';
 
 interface BackgroundSyncContextType {
   isBackgroundMonitoringEnabled: boolean;
@@ -65,9 +66,9 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
         await refreshSyncStats();
         setIsInitialized(true);
 
-        console.log('✅ Background sync context initialized');
+        logger.background.info('Background sync context initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize background sync:', error);
+        logger.background.error('Failed to initialize background sync', { data: error });
         setIsInitialized(false);
       }
     };
@@ -78,11 +79,11 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
   // Handle app state changes for foreground sync
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      console.log('📱 App state changed:', appState.current, '->', nextAppState);
+      logger.background.debug('App state changed: ' + appState.current + ' -> ' + nextAppState);
 
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to the foreground
-        console.log('🔄 App came to foreground, performing sync...');
+        logger.background.info('App came to foreground, performing sync...');
         
         if (isAuthenticated && isInitialized) {
           await performForegroundSync();
@@ -92,7 +93,7 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
         }
       } else if (nextAppState === 'background') {
         // App is going to background
-        console.log('🌙 App going to background');
+        logger.background.debug('App going to background');
         
         // Reset the sync flag so we sync again when coming back
         hasPerformedInitialSync.current = false;
@@ -128,20 +129,20 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
           const token = await AsyncStorage.getItem('authToken');
           if (token) {
             // Token is already saved by auth service
-            console.log('🔐 Auth token available for background sync');
+            logger.background.debug('Auth token available for background sync');
           } else {
-            console.warn('⚠️ No auth token found - background sync may fail');
+            logger.background.warn('No auth token found - background sync may fail');
           }
         } catch (error) {
-          console.error('Failed to verify auth token:', error);
+          logger.background.error('Failed to verify auth token', { data: error });
         }
       } else {
         // Clear any stale sessions when user logs out
         try {
           await BackgroundWifiService.clearPendingSessions();
-          console.log('🧹 Cleared pending sessions on logout');
+          logger.background.info('Cleared pending sessions on logout');
         } catch (error) {
-          console.error('Failed to clear pending sessions:', error);
+          logger.background.error('Failed to clear pending sessions', { data: error });
         }
       }
     };
@@ -184,26 +185,26 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
 
   const performForegroundSync = async (): Promise<{ synced: number; failed: number }> => {
     if (isSyncing) {
-      console.log('🔄 Sync already in progress, skipping...');
+      logger.background.debug('Sync already in progress, skipping...');
       return { synced: 0, failed: 0 };
     }
 
     setIsSyncing(true);
     
     try {
-      console.log('🔄 Starting foreground sync...');
+      logger.background.info('Starting foreground sync...');
       
       // First, handle app reopen session transition
       if (isBackgroundMonitoringEnabled) {
         const sessionTransition = await BackgroundWifiService.handleAppReopen();
         if (sessionTransition.sessionEnded || sessionTransition.sessionStarted) {
-          console.log('📱 Session transition completed during app reopen');
+          logger.background.info('Session transition completed during app reopen');
         }
       }
       
       // Then, sync any pending background sessions
       const syncResult = await BackgroundWifiService.syncPendingSessions();
-      console.log('📊 Background sessions synced:', syncResult);
+      logger.background.info('Background sessions synced', { data: syncResult });
 
       // Then refresh all app data
       await Promise.all([
@@ -211,11 +212,11 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
         // Add other data refresh calls here as needed
       ]);
 
-      console.log('✅ Foreground sync completed');
+      logger.background.info('Foreground sync completed');
       return syncResult;
       
     } catch (error) {
-      console.error('❌ Foreground sync failed:', error);
+      logger.background.error('Foreground sync failed', { data: error });
       return { synced: 0, failed: 1 };
     } finally {
       setIsSyncing(false);

@@ -4,6 +4,7 @@ import ENV from '../config/env';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
 import locationService, { LocationData } from './locationService';
+import { logger } from '../utils/logger';
 
 // ---- Types -----------------------------------------------------------------
 interface SessionInfo {
@@ -176,14 +177,16 @@ class WifiMonitor {
       // Enhanced validation using both IP address and location
       const validationResult = await locationService.validateWiFiSession(ipAddress || '');
 
-      console.log('Enhanced WiFi connection check:', {
-        ipAddress,
-        isValidIP: validationResult.validationMethods.ipAddress,
-        isValidLocation: validationResult.validationMethods.location,
-        isOverallValid: validationResult.isValid,
-        requiresBoth: true,
-        distance: validationResult.distance,
-        campus: validationResult.campus
+      logger.wifi.debug('Enhanced WiFi connection check', {
+        data: {
+          ipAddress,
+          isValidIP: validationResult.validationMethods.ipAddress,
+          isValidLocation: validationResult.validationMethods.location,
+          isOverallValid: validationResult.isValid,
+          requiresBoth: true,
+          distance: validationResult.distance,
+          campus: validationResult.campus
+        }
       });
 
       if (validationResult.isValid) {
@@ -193,7 +196,7 @@ class WifiMonitor {
           await this.startSession(ipAddress, validationResult);
         } else if (this.currentIPAddress !== ipAddress) {
           // IP address changed, end current session and start new one
-          console.log('📶 IP address changed in foreground, ending previous session and starting new one');
+          logger.wifi.info('IP address changed in foreground, ending previous session and starting new one');
           await this.endSession();
           await this.startSession(ipAddress, validationResult);
         } else {
@@ -229,9 +232,9 @@ class WifiMonitor {
     } catch (err: any) {
       // Don't log validation errors as errors - they're expected during testing
       if (err.message?.includes('must be connected to university WiFi AND be physically on campus')) {
-        console.log('📡 WiFi session validation: Both university WiFi and campus location required');
+        logger.wifi.info('Session validation: Both university WiFi and campus location required');
       } else {
-        console.error('Failed to start WiFi session', err);
+        logger.wifi.error('Failed to start WiFi session', { data: err });
       }
       // If we fail to register on server, still treat as started locally
     }

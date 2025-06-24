@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ENV from './env';
 import { authEvents, AUTH_EVENTS } from '../utils/authEvents';
+import { logger } from '../utils/logger';
 
 // API Configuration using environment variables
 const api = axios.create({
@@ -25,9 +26,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    if (ENV.DEBUG_MODE) {
-      console.error('🚫 API Request Error:', error);
-    }
+    logger.api.error('API Request Error', { data: error });
     return Promise.reject(error);
   }
 );
@@ -39,29 +38,27 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if (ENV.DEBUG_MODE) {
-      // Don't log expected behaviors as errors
-      if (error.response?.status === 409 && error.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
-        console.log(`🔐 Multi-device login blocked: ${error.config?.url}`, error.response?.data);
-      } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
-        console.log(`🔑 Session invalidated: ${error.config?.url}`, error.response?.data);
-      } else if (error.response?.status === 401) {
-        // Only log auth errors for non-routine endpoints to reduce noise
-        const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
-                                 error.config?.url?.includes('/session-count') ||
-                                 error.config?.url?.includes('/me');
-        if (!isRoutineEndpoint) {
-          console.log(`🔓 Authentication required: ${error.config?.url}`);
-        }
-      } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
-        // Don't log expected real tree collection errors (collection may not exist yet)
-        console.log(`🌳 Real trees collection not available yet: ${error.config?.url}`);
-      } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
-        // Don't log WiFi validation errors as errors - they're expected during location testing
-        console.log(`📡 WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
-      } else {
-        console.error(`❌ API Response Error: ${error.response?.status} ${error.config?.url}`, error.response?.data);
+    // Handle different types of API errors with appropriate logging levels
+    if (error.response?.status === 409 && error.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
+      logger.auth.info(`Multi-device login blocked: ${error.config?.url}`, { data: error.response?.data });
+    } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
+      logger.auth.info(`Session invalidated: ${error.config?.url}`, { data: error.response?.data });
+    } else if (error.response?.status === 401) {
+      // Only log auth errors for non-routine endpoints to reduce noise
+      const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
+                               error.config?.url?.includes('/session-count') ||
+                               error.config?.url?.includes('/me');
+      if (!isRoutineEndpoint) {
+        logger.auth.warn(`Authentication required: ${error.config?.url}`);
       }
+    } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
+      // Don't log expected real tree collection errors (collection may not exist yet)
+      logger.debug(`Real trees collection not available yet: ${error.config?.url}`);
+    } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
+      // Don't log WiFi validation errors as errors - they're expected during location testing
+      logger.wifi.info(`WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
+    } else {
+      logger.api.error(`API Response Error: ${error.response?.status} ${error.config?.url}`, { data: error.response?.data });
     }
     
     if (error.response?.status === 401) {

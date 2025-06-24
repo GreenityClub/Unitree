@@ -76,16 +76,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Handle app state changes for push notification reminders
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      console.log('📱 App state changed for notifications:', appState.current, '->', nextAppState);
+      logger.debug('App state changed for notifications: ' + appState.current + ' -> ' + nextAppState);
 
       if (appState.current === 'background' && nextAppState === 'active') {
         // App came to foreground - update last active time
         lastActiveTime.current = new Date();
-        console.log('🔄 App came to foreground, updating last active time');
+        logger.debug('App came to foreground, updating last active time');
       } else if (nextAppState === 'background') {
         // App going to background - record time for potential reminder
         lastActiveTime.current = new Date();
-        console.log('🌙 App going to background at:', lastActiveTime.current);
+        logger.debug('App going to background at: ' + lastActiveTime.current.toISOString());
       }
 
       appState.current = nextAppState;

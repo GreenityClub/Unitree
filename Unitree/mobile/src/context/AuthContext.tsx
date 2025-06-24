@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../config/api';
 import { authEvents, AUTH_EVENTS } from '../utils/authEvents';
+import { logger } from '../utils/logger';
 
 interface User {
   id: string;
@@ -210,7 +211,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const { wifiService } = await import('../services/wifiService');
         await wifiService.endSession();
-        console.log('✅ WiFi session ended successfully during logout');
+        logger.wifi.info('WiFi session ended successfully during logout');
       } catch (wifiError: any) {
         console.log('ℹ️ No active WiFi session to end during logout:', wifiError.message);
         // Don't treat this as an error - user might not have an active session
@@ -230,7 +231,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.multiRemove(['authToken', 'user']);
       setUser(null);
       authEvents.emit(AUTH_EVENTS.LOGOUT);
-      console.log('🚪 User logged out successfully');
+      logger.auth.info('User logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
       // Even on error, ensure user is logged out
@@ -249,7 +250,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const forceAuthCheck = async () => {
-    console.log('🔄 Force auth check requested');
+          logger.auth.debug('Force auth check requested');
     await checkAuthState();
   };
 

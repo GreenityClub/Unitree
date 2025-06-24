@@ -5,6 +5,7 @@ import WifiMonitor from '../services/WifiMonitor';
 import BackgroundWifiService from '../services/BackgroundWifiService';
 import { useAuth } from './AuthContext';
 import ENV from '../config/env';
+import { logger } from '../utils/logger';
 
 interface WiFiContextType {
   isConnected: boolean;
@@ -71,10 +72,10 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     } catch (err: any) {
       // Don't log authentication errors as they're handled by the auth system
       if (err.response?.status === 401) {
-        console.log('🔓 Authentication required for WiFi stats - user will be logged out');
+        logger.auth.debug('Authentication required for WiFi stats');
         return;
       }
-      console.error('Failed to refresh WiFi stats:', err);
+      logger.wifi.error('Failed to refresh WiFi stats', { data: err });
       setError('Failed to refresh WiFi stats');
     }
   };
@@ -88,42 +89,45 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     } catch (err: any) {
       // Don't log authentication errors as they're handled by the auth system
       if (err.response?.status === 401) {
-        console.log('🔓 Authentication required for session count - user will be logged out');
+        logger.auth.debug('Authentication required for session count');
         return;
       }
-      console.error('Failed to refresh session count:', err);
+      logger.wifi.error('Failed to refresh session count', { data: err });
     }
   };
 
   // Monitor network state
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      // 🔥 LOG ALL WIFI INFORMATION FROM NETINFO 🔥
-      console.log('📶 NetInfo State Update:', {
-        timestamp: new Date().toISOString(),
-        isConnected: state.isConnected,
-        type: state.type,
-        isInternetReachable: state.isInternetReachable,
-        details: state.details,
-        fullState: state
+      // Log network state changes
+      logger.wifi.debug('NetInfo State Update', {
+        data: {
+          timestamp: new Date().toISOString(),
+          isConnected: state.isConnected,
+          type: state.type,
+          isInternetReachable: state.isInternetReachable,
+          details: state.details
+        }
       });
 
       // Additional logging for wifi-specific details
       if (state.type === 'wifi' && state.details) {
         const wifiDetails = state.details as any;
-        console.log('📡 WiFi Details (IP-based tracking only):', {
-          ipAddress: wifiDetails.ipAddress,
-          strength: wifiDetails.strength,
-          subnet: wifiDetails.subnet,
-          frequency: wifiDetails.frequency,
-          linkSpeed: wifiDetails.linkSpeed,
-          rxLinkSpeed: wifiDetails.rxLinkSpeed,
-          txLinkSpeed: wifiDetails.txLinkSpeed
+        logger.wifi.debug('WiFi Details', {
+          data: {
+            ipAddress: wifiDetails.ipAddress,
+            strength: wifiDetails.strength,
+            subnet: wifiDetails.subnet,
+            frequency: wifiDetails.frequency,
+            linkSpeed: wifiDetails.linkSpeed
+          }
         });
       } else {
-        console.log('📵 Not connected to WiFi or no WiFi details available:', {
-          type: state.type,
-          isConnected: state.isConnected
+        logger.wifi.debug('Not connected to WiFi', {
+          data: {
+            type: state.type,
+            isConnected: state.isConnected
+          }
         });
       }
 
@@ -133,39 +137,41 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
         const wifiDetails = state.details as any;
         const networkIPAddress = wifiDetails.ipAddress || null;
         
-        console.log('🔄 Setting WiFi State:', {
-          ipAddress: networkIPAddress
+        logger.wifi.debug('Setting WiFi State', {
+          data: { ipAddress: networkIPAddress }
         });
         
         setIpAddress(networkIPAddress);
         
         // Check if connected to university WiFi using IP address only
         const isValidIP = wifiService.isValidUniversityIP(networkIPAddress);
-        console.log('🏫 University WiFi Check (IP-based only):', {
-          ipAddress: networkIPAddress,
-          isValidIP: isValidIP,
-          ipPrefix: wifiService.extractIPPrefix(networkIPAddress),
-          expectedPrefix: ENV.UNIVERSITY_IP_PREFIX
+        logger.wifi.debug('University WiFi Check', {
+          data: {
+            ipAddress: networkIPAddress,
+            isValidIP: isValidIP,
+            ipPrefix: wifiService.extractIPPrefix(networkIPAddress),
+            expectedPrefix: ENV.UNIVERSITY_IP_PREFIX
+          }
         });
         setIsUniversityWifi(isValidIP);
 
         // End session if connected to wrong WiFi and session is active
         if (!isValidIP && isSessionActive && isAuthenticated) {
-          console.log('❌ Connected to wrong WiFi, ending session');
+          logger.wifi.info('Connected to wrong WiFi, ending session');
           wifiService.endSession().catch(err => 
-            console.error('Failed to end session on wrong WiFi:', err)
+            logger.wifi.error('Failed to end session on wrong WiFi', { data: err })
           );
         }
       } else {
-        console.log('❌ Clearing WiFi State - Not connected to WiFi');
+        logger.wifi.debug('Clearing WiFi State - Not connected to WiFi');
         setIpAddress(null);
         setIsUniversityWifi(false);
 
         // End session if disconnected from WiFi and session is active
         if (isSessionActive && isAuthenticated) {
-          console.log('❌ Disconnected from WiFi, ending session');
+          logger.wifi.info('Disconnected from WiFi, ending session');
           wifiService.endSession().catch(err => 
-            console.error('Failed to end session on disconnect:', err)
+            logger.wifi.error('Failed to end session on disconnect', { data: err })
           );
         }
       }
@@ -235,9 +241,9 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
       } catch (err: any) {
         // Don't log validation errors as errors - they're expected during testing
         if (err.message?.includes('must be connected to university WiFi AND be physically on campus')) {
-          console.log('📡 Session validation: Both university WiFi and campus location required');
+          logger.wifi.info('Session validation: Both university WiFi and campus location required');
         } else {
-          console.error('Session management error:', err);
+          logger.wifi.error('Session management error', { data: err });
           setError('Session management error');
         }
       }
@@ -286,7 +292,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
 
         // Add listener for WiFi Monitor events
         wifiMonitorListenerRef.current = WifiMonitor.addListener('connectionChange', (data) => {
-          console.log('WiFi Monitor connection change:', data);
+          logger.wifi.debug('WiFi Monitor connection change', { data });
           setIsConnected(data.isConnected);
           
           if (data.sessionInfo) {

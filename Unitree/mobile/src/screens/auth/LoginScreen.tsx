@@ -178,7 +178,7 @@ export default function LoginScreen() {
     try {
       setConnectionStatus('Testing connection...');
       const response = await fetch(`${ENV.API_URL}/api/auth/me`);
-      console.log('Connection test response:', response.status);
+              logger.api.debug('Connection test response', { data: { status: response.status } });
       
       if (response.status === 401) {
         // 401 means the server is reachable but we're not authenticated (expected)
