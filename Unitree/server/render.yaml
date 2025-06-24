@@ -8,10 +8,10 @@ services:
     healthCheckPath: /health
     # Resource configuration - Better stability settings
     plan: starter
-    # Enhanced health check configuration
-    healthCheckTimeout: 60
-    healthCheckInterval: 60
-    maxShutdownDelaySeconds: 30
+    # Enhanced health check configuration for stability
+    healthCheckTimeout: 90
+    healthCheckInterval: 120
+    maxShutdownDelaySeconds: 60
     numInstances: 1
     # Auto-deploy configuration
     autoDeploy: true
@@ -21,15 +21,17 @@ services:
         value: production
       - key: PORT
         value: 10000
-      # Add memory optimization
+      # Add aggressive memory optimization
       - key: NODE_OPTIONS
-        value: "--max-old-space-size=512"
+        value: "--max-old-space-size=384 --max-semi-space-size=64 --optimize-for-size"
       - key: MONGODB_URI
         sync: false  # Will be set manually with Atlas connection string
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRE
-        value: 7d
+        value: 15m
+      - key: JWT_REFRESH_EXPIRE
+        value: 30d
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASSWORD

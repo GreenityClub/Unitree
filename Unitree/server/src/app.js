@@ -6,6 +6,7 @@ const { validateEnvironment, env } = require('./config/env');
 const { globalErrorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const cronService = require('./services/cronService');
+const memoryMonitor = require('./utils/memoryMonitor');
 
 // Validate environment variables before starting
 const ENV = validateEnvironment();
@@ -20,25 +21,43 @@ const notificationRoutes = require('./routes/notification');
 
 const app = express();
 
+// Start memory monitoring
+memoryMonitor.startMonitoring(3); // Monitor every 3 minutes
+
 // Add process event handlers for graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  const memStats = memoryMonitor.getMemoryStats();
+  logger.info(`Shutdown memory stats: Current: ${memStats.current}MB, Avg: ${memStats.average}MB, Max: ${memStats.maximum}MB, Trend: ${memStats.trend}`);
+  gracefulShutdown();
 });
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
+  gracefulShutdown();
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Log memory state during errors
+  const memStats = memoryMonitor.getMemoryStats();
+  logger.error(`Memory state during rejection: ${memStats.current}MB (${memStats.status})`);
   // Don't exit the process, just log the error
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
+  const memStats = memoryMonitor.getMemoryStats();
+  logger.error(`Memory state during exception: ${memStats.current}MB (${memStats.status})`);
   process.exit(1);
+});
+
+// Add memory pressure handling
+process.on('warning', (warning) => {
+  if (warning.name === 'MaxListenersExceededWarning') {
+    logger.warn('MaxListenersExceededWarning - potential memory leak detected');
+    memoryMonitor.cleanup();
+  }
 });
 
 // Middleware
@@ -86,9 +105,8 @@ app.get('/health', async (req, res) => {
     const dbState = mongoose.connection.readyState;
     const dbStatus = dbState === 1 ? 'connected' : 'disconnected';
     
-    // Check memory usage
-    const memUsage = process.memoryUsage();
-    const memMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    // Get detailed memory stats from monitor
+    const memStats = memoryMonitor.getMemoryStats();
     
     if (dbState !== 1) {
       return res.status(503).json({
@@ -98,13 +116,29 @@ app.get('/health', async (req, res) => {
       });
     }
     
+    // Return unhealthy if memory is critical
+    if (memStats.status === 'critical') {
+      logger.warn(`Health check: Critical memory usage ${memStats.current}MB`);
+      return res.status(503).json({
+        status: 'unhealthy',
+        reason: `Critical memory usage: ${memStats.current}MB`,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     res.status(200).json({
       status: 'healthy',
       database: dbStatus,
-      memory: `${memMB}MB`,
+      memory: `${memStats.current}MB`,
+      memoryStatus: memStats.status,
+      memoryTrend: memStats.trend,
+      averageMemory: `${memStats.average}MB`,
+      maxMemory: `${memStats.maximum}MB`,
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
-      version: process.env.npm_package_version || '1.0.0'
+      version: process.env.npm_package_version || '1.0.0',
+      nodeVersion: process.version,
+      platform: process.platform
     });
   } catch (error) {
     logger.error('Health check error:', error);
@@ -170,6 +204,7 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Your service is live`);
   console.log(`Server is running on port ${PORT}`);
   console.log('Environment:', ENV.NODE_ENV);
+  console.log(`Memory limits: 384MB heap, 64MB semi-space`);
   
   // Initialize cron jobs for scheduled notifications
   try {
@@ -177,6 +212,23 @@ const server = app.listen(PORT, () => {
   } catch (error) {
     logger.error('Failed to initialize cron service:', error);
   }
+  
+  // Set up periodic maintenance tasks
+  setInterval(() => {
+    try {
+      logger.info('Running periodic maintenance...');
+      memoryMonitor.cleanup();
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
+      
+      logger.info('Periodic maintenance completed');
+    } catch (error) {
+      logger.error('Error during periodic maintenance:', error);
+    }
+  }, 30 * 60 * 1000); // Every 30 minutes
 });
 
 // Handle server shutdown gracefully
