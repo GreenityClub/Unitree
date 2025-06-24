@@ -1,0 +1,14 @@
+name: Server Keep-Alive Ping
+
+on:
+  schedule:
+    # Runs every 10 minutes
+    - cron: '*/10 * * * *'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping server health endpoint
+        run: |
+          curl -sS "https://unitree-server-production.onrender.com/health" || echo "Ping failed" 
