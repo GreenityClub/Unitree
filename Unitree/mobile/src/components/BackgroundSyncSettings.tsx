@@ -141,8 +141,8 @@ const BackgroundSyncSettings: React.FC<BackgroundSyncSettingsProps> = ({ onClose
           value={isBackgroundMonitoringEnabled}
           onValueChange={handleToggleBackgroundMonitoring}
           disabled={isLoading}
-          trackColor={{ false: colors.gray, true: colors.primary }}
-          thumbColor={isBackgroundMonitoringEnabled ? colors.white : colors.lightGray}
+          trackColor={{ false: colors.gray300, true: colors.primary }}
+          thumbColor={isBackgroundMonitoringEnabled ? colors.white : colors.gray300}
         />
       </View>
 
@@ -170,7 +170,7 @@ const BackgroundSyncSettings: React.FC<BackgroundSyncSettingsProps> = ({ onClose
       )}
 
       <View style={styles.buttonContainer}>
-        {syncStats?.pendingCount > 0 && (
+        {syncStats && syncStats.pendingCount > 0 && (
           <Button
             title={isSyncing ? 'Syncing...' : `Sync ${syncStats.pendingCount} Session${syncStats.pendingCount !== 1 ? 's' : ''}`}
             onPress={handleManualSync}
@@ -184,7 +184,7 @@ const BackgroundSyncSettings: React.FC<BackgroundSyncSettingsProps> = ({ onClose
           title="Refresh Status"
           onPress={refreshSyncStats}
           disabled={isLoading}
-          variant="outline"
+          variant="secondary"
           style={styles.refreshButton}
         />
         
@@ -217,8 +217,8 @@ const styles = StyleSheet.create({
     margin: spacing.md,
   },
   title: {
-    ...typography.h2,
-    color: colors.text,
+    ...typography.heading.h2,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   description: {
@@ -241,8 +241,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   settingLabel: {
-    ...typography.h3,
-    color: colors.text,
+    ...typography.heading.h3,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   settingSubtext: {
@@ -256,8 +256,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   statsTitle: {
-    ...typography.h3,
-    color: colors.text,
+    ...typography.heading.h3,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   statRow: {
@@ -271,8 +271,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   statValue: {
-    ...typography.bodyBold,
-    color: colors.text,
+    ...typography.body.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
   },
   buttonContainer: {
     gap: spacing.sm,
@@ -293,8 +294,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   infoTitle: {
-    ...typography.bodyBold,
-    color: colors.text,
+    ...typography.body.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   infoText: {

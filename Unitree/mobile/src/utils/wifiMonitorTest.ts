@@ -1,10 +1,24 @@
 import WifiMonitor from '../services/WifiMonitor';
 import ApiService from '../services/ApiService';
 
+// Use proper SessionInfo type that matches WifiMonitor
+interface SessionInfo {
+  startTime: Date;
+  ipAddress: string | null;
+  duration: number;
+  durationMinutes: number;
+  sessionCount: number;
+}
+
 interface WifiMonitorTestResult {
   isRunning: boolean;
-  sessionInfo: any;
+  sessionInfo: SessionInfo | null;
   hasToken: boolean;
+  error?: string;
+}
+
+interface TestResult {
+  success: boolean;
   error?: string;
 }
 
@@ -18,47 +32,41 @@ export class WifiMonitorTest {
       };
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         isRunning: false,
         sessionInfo: null,
         hasToken: false,
-        error: error.message || 'Unknown error',
+        error: errorMessage,
       };
     }
   }
 
-  static async startMonitor(): Promise<{ success: boolean; error?: string }> {
+  static async startMonitor(): Promise<TestResult> {
     try {
-      await WifiMonitor.start((points, data) => {
-        console.log('🎉 Points earned in test:', points, data);
+      // WifiMonitor.start expects (points: number) => void
+      await WifiMonitor.start((points: number) => {
+        console.log('🎉 Points earned in test:', points);
       });
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message || 'Failed to start monitor' };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start monitor';
+      return { success: false, error: errorMessage };
     }
   }
 
-  static stopMonitor(): { success: boolean } {
+  static stopMonitor(): TestResult {
     try {
       WifiMonitor.stop();
       return { success: true };
-    } catch (error) {
-      return { success: false };
-    }
-  }
-
-  static forceStopMonitor(): { success: boolean } {
-    try {
-      WifiMonitor.forceStop();
-      return { success: true };
-    } catch (error) {
+    } catch (error: unknown) {
       return { success: false };
     }
   }
 
   static addTestListener(): () => void {
-    return WifiMonitor.addListener('connectionChange', (data) => {
+    return WifiMonitor.addListener('connectionChange', (data: unknown) => {
       console.log('🔗 Connection change in test:', data);
     });
   }

@@ -19,7 +19,7 @@ export default function NotificationSettingsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Icon name="arrow-left" size={24} color={colors.text} />
+          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notification Settings</Text>
         <View style={styles.headerSpacer} />
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: rf(20),
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.textPrimary,
     textAlign: 'center',
     marginHorizontal: rs(16),
   },
