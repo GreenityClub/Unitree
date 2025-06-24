@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, ViewStyle, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
+import { isTablet, getMaxContentWidth } from '../../utils/responsive';
 
 interface ScreenLayoutProps {
   children: React.ReactNode;
@@ -25,7 +26,13 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
         translucent
       />
       <View style={[styles.container, style]}>
-        {children}
+        {isTablet() ? (
+          <View style={styles.tabletContentWrapper}>
+            {children}
+          </View>
+        ) : (
+          children
+        )}
       </View>
     </SafeAreaView>
   );
@@ -41,5 +48,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     width: '100%',
     height: '100%',
+    alignItems: isTablet() ? 'center' : 'stretch',
+  },
+  tabletContentWrapper: {
+    flex: 1,
+    width: getMaxContentWidth(),
+    maxWidth: '100%',
+    alignSelf: 'center',
   },
 }); 

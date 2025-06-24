@@ -60,4 +60,23 @@ export const isSmallDevice = (): boolean => SCREEN_WIDTH < 350;
 export const isSmallHeightDevice = (): boolean => SCREEN_HEIGHT <= 667;
 
 // Check if device is large
-export const isLargeDevice = (): boolean => SCREEN_WIDTH > 400; 
+export const isLargeDevice = (): boolean => SCREEN_WIDTH > 400;
+
+// Check if device is tablet (iPad)
+export const isTablet = (): boolean => SCREEN_WIDTH >= 768;
+
+// Get responsive size based on device type
+export const getResponsiveSize = (phoneSize: number, tabletSize?: number): number => {
+  if (isTablet() && tabletSize !== undefined) {
+    return tabletSize;
+  }
+  return phoneSize;
+};
+
+// Get maximum width for content on tablets (prevents overly wide layouts)
+export const getMaxContentWidth = (): number => {
+  if (isTablet()) {
+    return Math.min(SCREEN_WIDTH * 0.7, 600); // 70% of screen width or max 600px
+  }
+  return SCREEN_WIDTH;
+}; 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { isTablet } from '../../utils/responsive';
 
 interface ButtonProps {
   title: string;
@@ -59,19 +60,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    maxWidth: isTablet() ? 400 : undefined, // Limit button width on tablets
+    alignSelf: isTablet() ? 'center' : 'stretch', // Center buttons on tablets
   },
   // Sizes
   small: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: isTablet() ? 12 : 8,
+    paddingHorizontal: isTablet() ? 24 : 16,
   },
   medium: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: isTablet() ? 20 : 15,
+    paddingHorizontal: isTablet() ? 32 : 20,
   },
   large: {
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    paddingVertical: isTablet() ? 24 : 18,
+    paddingHorizontal: isTablet() ? 40 : 24,
   },
   // Variants
   primary: {
@@ -93,13 +96,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   smallText: {
-    fontSize: 14,
+    fontSize: isTablet() ? 16 : 14,
   },
   mediumText: {
-    fontSize: 16,
+    fontSize: isTablet() ? 18 : 16,
   },
   largeText: {
-    fontSize: 18,
+    fontSize: isTablet() ? 20 : 18,
   },
   primaryText: {
     color: 'white',
