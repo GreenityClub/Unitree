@@ -23,10 +23,7 @@
         "NSLocationWhenInUseUsageDescription": "This app needs location access to detect WiFi network details for tracking university WiFi usage.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs background location access to continuously monitor university WiFi connections.",
         "UIBackgroundModes": [
-          "background-fetch",
-          "background-processing",
-          "background-fetch",
-          "background-processing"
+          "location"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }

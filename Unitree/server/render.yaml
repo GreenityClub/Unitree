@@ -6,17 +6,24 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
-    # Resource configuration
+    # Resource configuration - Better stability settings
     plan: starter
-    # Health check configuration
-    healthCheckTimeout: 30
-    healthCheckInterval: 30
+    # Enhanced health check configuration
+    healthCheckTimeout: 60
+    healthCheckInterval: 60
+    maxShutdownDelaySeconds: 30
     numInstances: 1
+    # Auto-deploy configuration
+    autoDeploy: true
+    # Environment variables
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      # Add memory optimization
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=512"
       - key: MONGODB_URI
         sync: false  # Will be set manually with Atlas connection string
       - key: JWT_SECRET
