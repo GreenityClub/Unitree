@@ -120,12 +120,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isLoggingOut) return; // Don't check auth state during logout
     
     try {
-      const [token, refreshToken] = await AsyncStorage.multiGet(['authToken', 'refreshToken']);
+      const [token, refreshToken, cachedUser] = await AsyncStorage.multiGet(['authToken', 'refreshToken', 'user']);
+      
       if (token[1] && refreshToken[1]) {
         try {
           const response = await authAPI.getMe();
-          setUser(response.data);
+          const freshUser = response.data;
+          setUser(freshUser);
+          
+          // Update cached user data
+          await AsyncStorage.setItem('user', JSON.stringify(freshUser));
         } catch (error: any) {
+          // Handle timeout specifically
+          if (error.message === 'AUTH_CHECK_TIMEOUT' || error.code === 'ECONNABORTED') {
+            logger.auth.warn('Auth check timed out, using cached user data');
+            
+            // Use cached user data if available
+            if (cachedUser[1]) {
+              try {
+                const parsedUser = JSON.parse(cachedUser[1]);
+                setUser(parsedUser);
+                logger.auth.info('Using cached user data due to network timeout');
+                return; // Successfully using cached data
+              } catch (parseError) {
+                logger.auth.error('Failed to parse cached user data');
+              }
+            }
+            
+            // If no cached data available, clear auth state
+            logger.auth.warn('No cached user data available, clearing auth state');
+            await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+            setUser(null);
+            return;
+          }
+          
           // Handle auth check failures gracefully
           if (error.response?.status === 401) {
             if (error.response?.data?.code === 'SESSION_INVALID') {
@@ -138,9 +166,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else {
             console.error('Auth check failed:', error);
             // For other errors, try to use cached user data
-            const cachedUser = await AsyncStorage.getItem('user');
-            if (cachedUser) {
-              setUser(JSON.parse(cachedUser));
+            if (cachedUser[1]) {
+              try {
+                const parsedUser = JSON.parse(cachedUser[1]);
+                setUser(parsedUser);
+                logger.auth.info('Using cached user data due to auth check error');
+              } catch (parseError) {
+                logger.auth.error('Failed to parse cached user data');
+                // If no cached user and token exists but API fails, logout
+                console.log('No cached user data, logging out');
+                await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+                setUser(null);
+              }
             } else {
               // If no cached user and token exists but API fails, logout
               console.log('No cached user data, logging out');

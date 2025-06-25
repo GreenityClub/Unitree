@@ -4,5 +4,6 @@ export { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS, isSmallDe
 export { getResponsiveLogoSizes, getResponsiveLogoPositions, getResponsiveSpacing, getDeviceInfo } from './logoUtils';
 export { logger, log, LogLevel } from './logger';
 export { default as WiFiSessionTester } from './wifiSessionTest';
+export { default as NetworkTester } from './networkTest';
 
 export type { ValidationRule, ValidationResult } from './validation'; 

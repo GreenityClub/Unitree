@@ -4,7 +4,7 @@ import ENV from './env';
 import { authEvents, AUTH_EVENTS } from '../utils/authEvents';
 import { logger } from '../utils/logger';
 
-// API Configuration using environment variables
+// API Configuration using environment variables with improved timeout handling
 const api = axios.create({
   baseURL: ENV.API_URL,
   timeout: ENV.API_TIMEOUT,
@@ -13,25 +13,36 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  async (config) => {
-    const token = await AsyncStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Debug logging removed
-    
-    return config;
+// Create a separate API instance for critical auth operations with shorter timeout
+const authApi = axios.create({
+  baseURL: ENV.API_URL,
+  timeout: 5000, // 5 second timeout for auth operations
+  headers: {
+    'Content-Type': 'application/json',
   },
-  (error) => {
-    logger.api.error('API Request Error', { data: error });
-    return Promise.reject(error);
-  }
-);
+});
 
-// Function to refresh access token
+// Request interceptor to add auth token
+const addAuthToken = async (config: any) => {
+  const token = await AsyncStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+// Apply auth token interceptor to both API instances
+api.interceptors.request.use(addAuthToken, (error) => {
+  logger.api.error('API Request Error', { data: error });
+  return Promise.reject(error);
+});
+
+authApi.interceptors.request.use(addAuthToken, (error) => {
+  logger.api.error('Auth API Request Error', { data: error });
+  return Promise.reject(error);
+});
+
+// Function to refresh access token with retry logic
 const refreshAccessToken = async () => {
   try {
     const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -39,7 +50,8 @@ const refreshAccessToken = async () => {
       throw new Error('No refresh token available');
     }
 
-    const response = await axios.post(`${ENV.API_URL}/api/auth/refresh`, {
+    // Use shorter timeout for auth operations
+    const response = await authApi.post('/api/auth/refresh', {
       refreshToken
     });
 
@@ -59,84 +71,103 @@ const refreshAccessToken = async () => {
   }
 };
 
-// Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => {
-    // Debug logging removed
-    return response;
-  },
-  async (error) => {
-    // Handle different types of API errors with appropriate logging levels
-    if (error.response?.status === 409 && error.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
-      logger.auth.info(`Multi-device login blocked: ${error.config?.url}`, { data: error.response?.data });
-    } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
-      logger.auth.info(`Session invalidated: ${error.config?.url}`, { data: error.response?.data });
-    } else if (error.response?.status === 401) {
-      // Only log auth errors for non-routine endpoints to reduce noise
-      const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
-                               error.config?.url?.includes('/session-count') ||
-                               error.config?.url?.includes('/me');
-      if (!isRoutineEndpoint) {
-        logger.auth.warn(`Authentication required: ${error.config?.url}`);
-      }
-    } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
-      // Don't log expected real tree collection errors (collection may not exist yet)
-      logger.debug(`Real trees collection not available yet: ${error.config?.url}`);
-    } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
-      // Don't log WiFi validation errors as errors - they're expected during location testing
-      logger.wifi.info(`WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
-    } else {
-      logger.api.error(`API Response Error: ${error.response?.status} ${error.config?.url}`, { data: error.response?.data });
+// Enhanced response interceptor with better timeout handling
+const handleApiResponse = async (error: any) => {
+  // Handle network timeouts specifically
+  if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    logger.api.warn(`API Timeout: ${error.config?.url} (${error.config?.timeout}ms)`);
+    
+    // For auth endpoints, provide specific timeout handling
+    if (error.config?.url?.includes('/api/auth/me')) {
+      logger.auth.warn('Auth check timeout - will retry with cached data if available');
+      // Don't emit auth events for timeout - let the app handle gracefully
+      return Promise.reject(new Error('AUTH_CHECK_TIMEOUT'));
     }
     
-    if (error.response?.status === 401) {
-      const errorCode = error.response?.data?.code;
-      const originalRequest = error.config;
+    return Promise.reject(new Error('NETWORK_TIMEOUT'));
+  }
+
+  // Handle different types of API errors with appropriate logging levels
+  if (error.response?.status === 409 && error.response?.data?.code === 'ACCOUNT_ALREADY_LOGGED_IN') {
+    logger.auth.info(`Multi-device login blocked: ${error.config?.url}`, { data: error.response?.data });
+  } else if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_INVALID') {
+    logger.auth.info(`Session invalidated: ${error.config?.url}`, { data: error.response?.data });
+  } else if (error.response?.status === 401) {
+    // Only log auth errors for non-routine endpoints to reduce noise
+    const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
+                             error.config?.url?.includes('/session-count') ||
+                             error.config?.url?.includes('/me');
+    if (!isRoutineEndpoint) {
+      logger.auth.warn(`Authentication required: ${error.config?.url}`);
+    }
+  } else if (error.response?.status === 500 && error.config?.url?.includes('/api/trees/real')) {
+    // Don't log expected real tree collection errors (collection may not exist yet)
+    logger.debug(`Real trees collection not available yet: ${error.config?.url}`);
+  } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
+    // Don't log WiFi validation errors as errors - they're expected during location testing
+    logger.wifi.info(`WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
+  } else if (error.response) {
+    logger.api.error(`API Response Error: ${error.response?.status} ${error.config?.url}`, { data: error.response?.data });
+  }
+  
+  if (error.response?.status === 401) {
+    const errorCode = error.response?.data?.code;
+    const originalRequest = error.config;
+    
+    if (errorCode === 'SESSION_INVALID') {
+      // Session invalid - user was logged out from another device
+      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+      authEvents.emit(AUTH_EVENTS.SESSION_INVALID);
       
-      if (errorCode === 'SESSION_INVALID') {
-        // Session invalid - user was logged out from another device
-        await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
-        authEvents.emit(AUTH_EVENTS.SESSION_INVALID);
+      if (ENV.DEBUG_MODE) {
+        console.log('🔑 Session invalidated - user logged out from another device');
+      }
+    } else if (!originalRequest._retry) {
+      // Try to refresh token before giving up
+      originalRequest._retry = true;
+      
+      try {
+        const newToken = await refreshAccessToken();
+        
+        // Update the failed request with new token and retry
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         
         if (ENV.DEBUG_MODE) {
-          console.log('🔑 Session invalidated - user logged out from another device');
+          console.log('🔄 Token refreshed successfully, retrying request');
         }
-      } else if (!originalRequest._retry) {
-        // Try to refresh token before giving up
-        originalRequest._retry = true;
         
-        try {
-          const newToken = await refreshAccessToken();
-          
-          // Update the failed request with new token and retry
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          
-          if (ENV.DEBUG_MODE) {
-            console.log('🔄 Token refreshed successfully, retrying request');
-          }
-          
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed, clear storage and redirect to login
-          await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
-          authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
-          
-          if (ENV.DEBUG_MODE) {
-            console.log('🔓 Token refresh failed - clearing auth data');
-          }
-        }
-      } else {
-        // Already tried to refresh, clear storage and redirect to login
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, clear storage and redirect to login
         await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
         authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
         
         if (ENV.DEBUG_MODE) {
-          console.log('🔓 Authentication expired after refresh attempt - clearing auth data');
+          console.log('🔓 Token refresh failed - clearing auth data');
         }
       }
+    } else {
+      // Already tried to refresh, clear storage and redirect to login
+      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user']);
+      authEvents.emit(AUTH_EVENTS.TOKEN_EXPIRED);
+      
+      if (ENV.DEBUG_MODE) {
+        console.log('🔓 Authentication expired after refresh attempt - clearing auth data');
+      }
     }
-    return Promise.reject(error);
   }
+  return Promise.reject(error);
+};
+
+// Apply response interceptor to both API instances
+api.interceptors.response.use(
+  (response) => response,
+  handleApiResponse
+);
+
+authApi.interceptors.response.use(
+  (response) => response,
+  handleApiResponse
 );
 
 export default api;
@@ -144,28 +175,28 @@ export default api;
 // API endpoints using environment variables
 export const authAPI = {
   login: (email: string, password: string) =>
-    api.post('/api/auth/login', { email, password }),
+    authApi.post('/api/auth/login', { email, password }),
   
   register: (userData: any) =>
-    api.post('/api/auth/register', userData),
+    authApi.post('/api/auth/register', userData),
   
   forgotPassword: (email: string) =>
-    api.post('/api/auth/forgot-password', { email }),
+    authApi.post('/api/auth/forgot-password', { email }),
   
   resetPassword: (token: string, newPassword: string) =>
-    api.post('/api/auth/reset-password', { token, newPassword }),
+    authApi.post('/api/auth/reset-password', { token, newPassword }),
   
   getMe: () =>
-    api.get('/api/auth/me'),
+    authApi.get('/api/auth/me'),
   
   logout: () =>
-    api.post('/api/auth/logout'),
+    authApi.post('/api/auth/logout'),
   
   forceLogout: (email: string, password: string) =>
-    api.post('/api/auth/force-logout', { email, password }),
+    authApi.post('/api/auth/force-logout', { email, password }),
   
   refreshToken: (refreshToken: string) =>
-    api.post('/api/auth/refresh', { refreshToken }),
+    authApi.post('/api/auth/refresh', { refreshToken }),
 };
 
 export const wifiAPI = {

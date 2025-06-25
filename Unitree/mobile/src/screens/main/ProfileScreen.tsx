@@ -24,7 +24,18 @@ import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { rf, rs, deviceValue } from '../../utils/responsive';
+import { 
+  rf, 
+  rs, 
+  deviceValue, 
+  isTablet,
+  isTabletLarge,
+  getLayoutConfig,
+  getContainerPadding,
+  getMaxContentWidth,
+  getModalWidth
+} from '../../utils/responsive';
+import { ResponsiveGrid } from '../../components';
 import userService from '../../services/userService';
 import { treeService } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
@@ -52,6 +63,7 @@ const ProfileScreen = () => {
   const [realTreeCount, setRealTreeCount] = React.useState<number>(0);
   const [currentPoints, setCurrentPoints] = React.useState<number>(user?.points || 0);
   const insets = useSafeAreaInsets();
+  const layoutConfig = getLayoutConfig();
 
   // Real-time calculations for live updates
   const getLiveSessionDuration = () => {
@@ -288,11 +300,26 @@ const ProfileScreen = () => {
 
         {/* Fixed Header Section */}
         <Animated.View 
-          style={[styles.headerSection, headerAnimatedStyle]}
+          style={[
+            styles.headerSection, 
+            { 
+              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+            }, 
+            headerAnimatedStyle
+          ]}
           onTouchStart={handleTouchStart}
         >
         {/* Profile Header */}
-        <View style={styles.profileHeaderSection}>
+        <View style={[
+          styles.profileHeaderSection,
+          {
+            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+            alignSelf: 'center',
+            width: '100%',
+            flexDirection: layoutConfig.isTablet ? 'column' : 'row',
+            paddingHorizontal: 0,
+          }
+        ]}>
           <TouchableOpacity 
             style={styles.avatarContainer} 
             onPress={pickImage}
@@ -310,15 +337,22 @@ const ProfileScreen = () => {
               )}
               {isUploading && (
                 <View style={styles.avatarOverlay}>
-                  <Icon name="loading" size={24} color="#fff" />
+                  <Icon name="loading" size={rf(24, 28, 32)} color="#fff" />
                 </View>
               )}
             </View>
             <View style={styles.avatarEditIcon}>
-              <Icon name="camera" size={16} color="#fff" />
+              <Icon name="camera" size={rf(16, 18, 20)} color="#fff" />
             </View>
           </TouchableOpacity>
-          <View style={styles.profileInfoContainer}>
+          <View style={[
+            styles.profileInfoContainer,
+            {
+              marginLeft: layoutConfig.isTablet ? 0 : rs(20),
+              marginTop: layoutConfig.isTablet ? rs(16) : 0,
+              alignItems: layoutConfig.isTablet ? 'center' : 'flex-start',
+            }
+          ]}>
             <Text style={styles.profileName}>
               {user?.fullname || 'User'}
             </Text>
@@ -331,13 +365,25 @@ const ProfileScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+        style={[
+          styles.contentSection, 
+          { 
+            paddingBottom: insets.bottom,
+            paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+          }, 
+          contentAnimatedStyle
+        ]}
       >
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
+            { 
+              paddingBottom: insets.bottom + rs(90),
+              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+              alignSelf: 'center',
+              width: '100%'
+            }
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -350,83 +396,155 @@ const ProfileScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-            {/* Stats Card */}
-            <View style={styles.statsCard}>
-              <Text style={styles.cardTitle}>Your Impact</Text>
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Icon name="star" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>
-                  {isSessionActive ? getLiveTotalPoints() : currentPoints}
-                </Text>
-                  <Text style={styles.statLabel}>Points</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Icon name="tree" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{actualTreeCount}</Text>
-                  <Text style={styles.statLabel}>Trees</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Icon name="cloud-outline" size={24} color="#50AF27" />
-                  <Text style={styles.statValue}>{realTreeCount * 22}</Text>
-                  <Text style={styles.statLabel}>kg CO₂/year</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Settings Card */}
-            <View style={styles.settingsCard}>
-              <Text style={styles.cardTitle}>Settings</Text>
-              
-              <TouchableOpacity
-                style={styles.settingsItem}
-                onPress={() => router.push('/user-settings')}
+            {layoutConfig.isTablet ? (
+              <ResponsiveGrid 
+                baseColumns={1}
+                gap={20}
               >
-                <View style={styles.settingsItemLeft}>
-                  <Icon name="account-edit" size={24} color="#50AF27" />
-                  <Text style={styles.settingsItemText}>User Settings</Text>
+                {/* Stats Card */}
+                <View style={[styles.card, styles.statsCard]}>
+                  <Text style={styles.cardTitle}>Your Impact</Text>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <Icon name="star" size={rf(24, 28, 32)} color="#50AF27" />
+                      <Text style={styles.statValue}>
+                      {isSessionActive ? getLiveTotalPoints() : currentPoints}
+                    </Text>
+                      <Text style={styles.statLabel}>Points</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Icon name="tree" size={rf(24, 28, 32)} color="#50AF27" />
+                      <Text style={styles.statValue}>{actualTreeCount}</Text>
+                      <Text style={styles.statLabel}>Trees</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Icon name="cloud-outline" size={rf(24, 28, 32)} color="#50AF27" />
+                      <Text style={styles.statValue}>{realTreeCount * 22}</Text>
+                      <Text style={styles.statLabel}>kg CO₂/year</Text>
+                    </View>
+                  </View>
                 </View>
-                <Icon name="chevron-right" size={20} color="#666" />
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
-                onPress={() => router.push('/system-settings')}
-              >
-                <View style={styles.settingsItemLeft}>
-                  <Icon name="cog" size={24} color="#50AF27" />
-                  <Text style={styles.settingsItemText}>System Settings</Text>
+                {/* Settings Card */}
+                <View style={[styles.card, styles.settingsCard]}>
+                  <Text style={styles.cardTitle}>Settings</Text>
+                  
+                  <TouchableOpacity
+                    style={styles.settingsItem}
+                    onPress={() => router.push('/user-settings')}
+                  >
+                    <View style={styles.settingsItemLeft}>
+                      <Icon name="account-edit" size={rf(24, 28, 32)} color="#50AF27" />
+                      <Text style={styles.settingsItemText}>User Settings</Text>
+                    </View>
+                    <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                    onPress={() => router.push('/system-settings')}
+                  >
+                    <View style={styles.settingsItemLeft}>
+                      <Icon name="cog" size={rf(24, 28, 32)} color="#50AF27" />
+                      <Text style={styles.settingsItemText}>System Settings</Text>
+                    </View>
+                    <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.logoutButton}
+                    onPress={handleLogout}
+                  >
+                    <Icon name="logout" size={rf(24, 28, 32)} color="#FFA79D" />
+                    <Text style={styles.logoutButtonText}>Logout</Text>
+                  </TouchableOpacity>
                 </View>
-                <Icon name="chevron-right" size={20} color="#666" />
-              </TouchableOpacity>
+              </ResponsiveGrid>
+            ) : (
+              <>
+                {/* Stats Card */}
+                <View style={[styles.card, styles.statsCard]}>
+                  <Text style={styles.cardTitle}>Your Impact</Text>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <Icon name="star" size={24} color="#50AF27" />
+                      <Text style={styles.statValue}>
+                      {isSessionActive ? getLiveTotalPoints() : currentPoints}
+                    </Text>
+                      <Text style={styles.statLabel}>Points</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Icon name="tree" size={24} color="#50AF27" />
+                      <Text style={styles.statValue}>{actualTreeCount}</Text>
+                      <Text style={styles.statLabel}>Trees</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Icon name="cloud-outline" size={24} color="#50AF27" />
+                      <Text style={styles.statValue}>{realTreeCount * 22}</Text>
+                      <Text style={styles.statLabel}>kg CO₂/year</Text>
+                    </View>
+                  </View>
+                </View>
 
-              <TouchableOpacity
-                style={styles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Icon name="logout" size={24} color="#FFA79D" />
-                <Text style={styles.logoutButtonText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
+                {/* Settings Card */}
+                <View style={[styles.card, styles.settingsCard]}>
+                  <Text style={styles.cardTitle}>Settings</Text>
+                  
+                  <TouchableOpacity
+                    style={styles.settingsItem}
+                    onPress={() => router.push('/user-settings')}
+                  >
+                    <View style={styles.settingsItemLeft}>
+                      <Icon name="account-edit" size={24} color="#50AF27" />
+                      <Text style={styles.settingsItemText}>User Settings</Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color="#666" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                    onPress={() => router.push('/system-settings')}
+                  >
+                    <View style={styles.settingsItemLeft}>
+                      <Icon name="cog" size={24} color="#50AF27" />
+                      <Text style={styles.settingsItemText}>System Settings</Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color="#666" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.logoutButton}
+                    onPress={handleLogout}
+                  >
+                    <Icon name="logout" size={24} color="#FFA79D" />
+                    <Text style={styles.logoutButtonText}>Logout</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </ScrollView>
       </Animated.View>
 
       {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        <Image
-          source={require('../../assets/mascots/Unitree - Mascot-3.png')}
-          style={styles.mascotImage}
-          resizeMode="contain"
-        />
-      </View>
+      {!layoutConfig.isTablet && (
+        <View style={styles.mascotContainer}>
+          <Image
+            source={require('../../assets/mascots/Unitree - Mascot-3.png')}
+            style={styles.mascotImage}
+            resizeMode="contain"
+          />
+        </View>
+      )}
 
       {/* Logout Modal */}
       {showLogoutModal && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { width: getModalWidth() }]}>
             <Text style={styles.modalTitle}>Logout</Text>
             <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
             <View style={styles.modalButtons}>
@@ -458,26 +576,24 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#E8F2CD',
-    paddingBottom: rs(45),
-    paddingTop: rs(10),
+    paddingBottom: rs(45, 60, 75),
+    paddingTop: rs(10, 15, 20),
   },
   profileHeaderSection: {
     alignItems: 'center',
     display: 'flex',
-    flexDirection: 'row',
-    paddingHorizontal: rs(20),
-    marginTop: rs(30),
-    paddingTop: rs(30),
+    marginTop: rs(30, 40, 50),
+    paddingTop: rs(30, 40, 50),
   },
   avatarContainer: {
     position: 'relative',
   },
   avatar: {
-    width: rs(90),
-    height: rs(90),
-    borderRadius: rs(50),
+    width: rs(90, 110, 130),
+    height: rs(90, 110, 130),
+    borderRadius: rs(50, 60, 70),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: rs(16),
+    marginBottom: rs(16, 20, 24),
     borderWidth: 2,
     borderColor: '#fff',
     alignItems: 'center',
@@ -487,7 +603,7 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: rs(50),
+    borderRadius: rs(50, 60, 70),
   },
   avatarOverlay: {
     position: 'absolute',
@@ -498,39 +614,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: rs(50),
+    borderRadius: rs(50, 60, 70),
   },
   avatarEditIcon: {
     position: 'absolute',
-    bottom: rs(16),
+    bottom: rs(16, 20, 24),
     right: 0,
     backgroundColor: '#50AF27',
-    borderRadius: rs(12),
-    padding: rs(4),
+    borderRadius: rs(12, 16, 20),
+    padding: rs(4, 6, 8),
     borderWidth: 2,
     borderColor: '#fff',
   },
   avatarLabel: {
-    fontSize: rf(36),
+    fontSize: rf(36, 44, 52),
     color: '#fff',
     fontWeight: 'bold',
   },
   profileInfoContainer: {
     flexDirection: 'column',
-    alignItems: 'flex-start',
     justifyContent: 'center',
-    marginLeft: rs(20),
-    marginBottom: rs(10),
+    marginBottom: rs(10, 15, 20),
   },
   profileName: {
-    fontSize: rf(24),
+    fontSize: rf(24, 28, 32),
     fontWeight: 'bold',
     color: '#8BC24A',
-    marginBottom: rs(4),
+    marginBottom: rs(4, 6, 8),
     textAlign: 'center',
   },
   profileEmail: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#8BC24A',
     opacity: 0.8,
     textAlign: 'center',
@@ -538,10 +652,9 @@ const styles = StyleSheet.create({
   contentSection: {
     flex: 1,
     backgroundColor: '#98D56D',
-    borderTopLeftRadius: rs(30),
-    borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
-    paddingTop: rs(32),
+    borderTopLeftRadius: rs(30, 40, 50),
+    borderTopRightRadius: rs(30, 40, 50),
+    paddingTop: rs(32, 40, 48),
   },
   mascotContainer: {
     position: 'absolute',
@@ -555,39 +668,31 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    marginTop: rs(40),
-    borderRadius: rs(16),
+    marginTop: rs(40, 50, 60),
+    borderRadius: rs(16, 20, 24),
   },
   scrollContent: {
     flexGrow: 1,
   },
   content: {},
-  statsCard: {
+  card: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(20),
+    borderRadius: rs(16, 20, 24),
+    padding: rs(20, 24, 28),
+    marginBottom: rs(20, 24, 28),
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  settingsCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
+  statsCard: {},
+  settingsCard: {},
   cardTitle: {
-    fontSize: rf(20),
+    fontSize: rf(20, 24, 28),
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: rs(16),
+    marginBottom: rs(16, 20, 24),
   },
   statsRow: {
     flexDirection: 'row',
@@ -599,28 +704,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: rf(24),
+    fontSize: rf(24, 28, 32),
     fontWeight: 'bold',
     color: '#50AF27',
-    marginTop: rs(8),
-    marginBottom: rs(4),
+    marginTop: rs(8, 10, 12),
+    marginBottom: rs(4, 6, 8),
   },
   statLabel: {
-    fontSize: rf(12),
+    fontSize: rf(12, 14, 16),
     color: '#666',
     textAlign: 'center',
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: rs(40, 48, 56),
     backgroundColor: '#E0E0E0',
-    marginHorizontal: rs(16),
+    marginHorizontal: rs(16, 20, 24),
   },
   settingsItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: rs(16),
+    paddingVertical: rs(16, 20, 24),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
@@ -629,26 +734,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   settingsItemText: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#333',
-    marginLeft: rs(12),
+    marginLeft: rs(12, 16, 20),
     fontWeight: '500',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: rs(16),
-    marginTop: rs(16),
+    paddingVertical: rs(16, 20, 24),
+    marginTop: rs(16, 20, 24),
     borderWidth: 2,
     borderColor: '#FFA79D',
-    borderRadius: rs(12),
+    borderRadius: rs(12, 16, 20),
   },
   logoutButtonText: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#FFA79D',
     fontWeight: 'bold',
-    marginLeft: rs(8),
+    marginLeft: rs(8, 10, 12),
   },
   modalOverlay: {
     position: 'absolute',
@@ -662,31 +767,30 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(24),
-    width: '80%',
+    borderRadius: rs(16, 20, 24),
+    padding: rs(24, 28, 32),
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: rf(20),
+    fontSize: rf(20, 24, 28),
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: rs(12),
+    marginBottom: rs(12, 16, 20),
   },
   modalMessage: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#666',
-    marginBottom: rs(24),
+    marginBottom: rs(24, 28, 32),
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   modalButton: {
-    paddingHorizontal: rs(16),
-    paddingVertical: rs(8),
-    borderRadius: rs(8),
-    marginLeft: rs(12),
+    paddingHorizontal: rs(16, 20, 24),
+    paddingVertical: rs(8, 10, 12),
+    borderRadius: rs(8, 10, 12),
+    marginLeft: rs(12, 16, 20),
   },
   modalCancelButton: {
     backgroundColor: '#f5f5f5',
@@ -695,7 +799,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFA79D',
   },
   modalButtonText: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     fontWeight: '500',
     color: '#333',
   },

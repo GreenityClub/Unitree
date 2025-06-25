@@ -30,7 +30,18 @@ import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { treeService, Tree, RealTree } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
 import type { WiFiSession } from '../../services/wifiService';
-import { rf, rs, isSmallHeightDevice } from '../../utils/responsive';
+import { 
+  rf, 
+  rs, 
+  isSmallHeightDevice,
+  isTablet,
+  isTabletLarge,
+  getLayoutConfig,
+  getContainerPadding,
+  getMaxContentWidth,
+  getGridColumns
+} from '../../utils/responsive';
+import { ResponsiveGrid } from '../../components';
 import { router } from 'expo-router';
 
 // Tree stage images from assets
@@ -251,6 +262,7 @@ const TreesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
+  const layoutConfig = getLayoutConfig();
 
   useEffect(() => {
     loadAllTrees();
@@ -328,13 +340,31 @@ const TreesScreen = () => {
 
         {/* Fixed Header Section */}
         <Animated.View 
-          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          style={[
+            styles.headerSection, 
+            { 
+              paddingTop: insets.top,
+              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+            }, 
+            headerAnimatedStyle
+          ]}
           onTouchStart={handleTouchStart}
         >
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>Your Forest</Text>
-          <Text style={styles.subtitleText}>
+        <View style={[
+          styles.welcomeSection,
+          {
+            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+            alignSelf: 'center',
+            width: '100%',
+            paddingHorizontal: 0,
+            alignItems: layoutConfig.isTablet ? 'center' : 'flex-start',
+          }
+        ]}>
+          <Text style={[styles.titleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
+            Your Forest
+          </Text>
+          <Text style={[styles.subtitleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
             Watch your forest grow with each WiFi connection
           </Text>
         </View>
@@ -342,32 +372,47 @@ const TreesScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+        style={[
+          styles.contentSection, 
+          { 
+            paddingBottom: insets.bottom,
+            paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+          }, 
+          contentAnimatedStyle
+        ]}
       >
         {/* Fixed Forest Summary Card - Non-scrollable */}
-        <View style={styles.fixedSummaryContainer}>
+        <View style={[
+          styles.fixedSummaryContainer,
+          {
+            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+            alignSelf: 'center',
+            width: '100%',
+            paddingHorizontal: 0,
+          }
+        ]}>
           <View style={styles.summaryCard}>
             <View style={styles.cardHeader}>
-              <Icon name="forest" size={24} color="#50AF27" />
+              <Icon name="forest" size={rf(24, 28, 32)} color="#50AF27" />
               <Text style={styles.cardTitle}>Forest Summary</Text>
             </View>
             
             {/* Combined Statistics - Always show all 3 fields */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Icon name="tree" size={20} color="#50AF27" />
+                <Icon name="tree" size={rf(20, 24, 28)} color="#50AF27" />
                 <Text style={styles.statValue}>{aliveTrees.length}</Text>
                 <Text style={styles.statLabel}>Virtual Trees</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Icon name="pine-tree" size={20} color="#50AF27" />
+                <Icon name="pine-tree" size={rf(20, 24, 28)} color="#50AF27" />
                 <Text style={styles.statValue}>{aliveRealTrees.length}</Text>
                 <Text style={styles.statLabel}>Real Trees</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Icon name="earth" size={20} color="#50AF27" />
+                <Icon name="earth" size={rf(20, 24, 28)} color="#50AF27" />
                 <Text style={styles.statValue}>
                   {(aliveRealTrees.length * 22).toFixed(0)}
                 </Text>
@@ -378,7 +423,7 @@ const TreesScreen = () => {
             {/* Warning messages for dead trees */}
             {(deadTrees.length > 0 || deadRealTrees.length > 0) && (
               <View style={styles.deadTreesWarning}>
-                <Icon name="skull" size={16} color="#f44336" />
+                <Icon name="skull" size={rf(16, 18, 20)} color="#f44336" />
                 <Text style={styles.deadTreesText}>
                   {deadTrees.length > 0 && `${deadTrees.length} virtual tree${deadTrees.length !== 1 ? 's' : ''} died`}
                   {deadTrees.length > 0 && deadRealTrees.length > 0 && ', '}
@@ -428,7 +473,12 @@ const TreesScreen = () => {
           style={styles.scrollContainer}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
+            { 
+              paddingBottom: insets.bottom + rs(90),
+              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+              alignSelf: 'center',
+              width: '100%'
+            }
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -441,23 +491,37 @@ const TreesScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-
             {/* Tree List */}
             {loading ? (
               <Text style={styles.loadingText}>Loading your forest...</Text>
             ) : selectedTreeType === 'virtual' ? (
               // Virtual Trees List
               trees.length > 0 ? (
-                trees.map((tree) => (
-                  <TreeCard
-                    key={tree._id}
-                    tree={tree}
-                    onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
-                  />
-                ))
+                layoutConfig.isTablet ? (
+                  <ResponsiveGrid 
+                    baseColumns={1}
+                    gap={16}
+                  >
+                    {trees.map((tree) => (
+                      <TreeCard
+                        key={tree._id}
+                        tree={tree}
+                        onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
+                      />
+                    ))}
+                  </ResponsiveGrid>
+                ) : (
+                  trees.map((tree) => (
+                    <TreeCard
+                      key={tree._id}
+                      tree={tree}
+                      onPress={() => router.push({ pathname: '/tree-detail', params: { treeId: tree._id } })}
+                    />
+                  ))
+                )
               ) : (
                 <View style={styles.emptyState}>
-                  <Icon name="tree" size={64} color="#98D56D" />
+                  <Icon name="tree" size={rf(64, 72, 80)} color="#98D56D" />
                   <Text style={styles.emptyStateText}>
                     You haven't planted any virtual trees yet. Start by redeeming your points for a new tree!
                   </Text>
@@ -466,15 +530,29 @@ const TreesScreen = () => {
             ) : (
               // Real Trees List
               realTrees.length > 0 ? (
-                realTrees.map((realTree) => (
-                  <RealTreeCard
-                    key={realTree._id}
-                    realTree={realTree}
-                  />
-                ))
+                layoutConfig.isTablet ? (
+                  <ResponsiveGrid 
+                    baseColumns={1}
+                    gap={16}
+                  >
+                    {realTrees.map((realTree) => (
+                      <RealTreeCard
+                        key={realTree._id}
+                        realTree={realTree}
+                      />
+                    ))}
+                  </ResponsiveGrid>
+                ) : (
+                  realTrees.map((realTree) => (
+                    <RealTreeCard
+                      key={realTree._id}
+                      realTree={realTree}
+                    />
+                  ))
+                )
               ) : (
                 <View style={styles.emptyState}>
-                  <Icon name="pine-tree" size={64} color="#98D56D" />
+                  <Icon name="pine-tree" size={rf(64, 72, 80)} color="#98D56D" />
                   <Text style={styles.emptyStateText}>
                     You haven't planted any real trees yet. Redeem points for a real tree to make an actual environmental impact!
                   </Text>
@@ -486,13 +564,15 @@ const TreesScreen = () => {
       </Animated.View>
 
         {/* Mascot */}
-        <View style={styles.mascotContainer}>
-          <Image
-            source={require('../../assets/mascots/Unitree - Mascot-5.png')}
-            style={styles.mascotImage}
-            resizeMode="contain"
-          />
-        </View>
+        {!layoutConfig.isTablet && (
+          <View style={styles.mascotContainer}>
+            <Image
+              source={require('../../assets/mascots/Unitree - Mascot-5.png')}
+              style={styles.mascotImage}
+              resizeMode="contain"
+            />
+          </View>
+        )}
       </View>
     </GestureDetector>
   );
@@ -505,36 +585,30 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#FFCED2',
-    paddingBottom: isSmallHeightDevice() ? rs(60) : rs(90),
-    paddingTop: rs(10),
+    paddingBottom: isSmallHeightDevice() ? rs(60, 75, 90) : rs(90, 110, 130),
+    paddingTop: rs(10, 15, 20),
   },
   welcomeSection: {
-    alignItems: 'flex-start',
-    paddingHorizontal: rs(20),
-    marginTop: rs(10),
+    marginTop: rs(10, 15, 20),
   },
   titleText: {
-    fontSize: rf(32),
+    fontSize: rf(32, 40, 48),
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: rs(10),
-    textAlign: 'center',
+    marginBottom: rs(10, 12, 16),
   },
   subtitleText: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#fff',
     opacity: 0.9,
-    textAlign: 'left',
-    lineHeight: rf(24),
+    lineHeight: rf(24, 28, 32),
   },
   contentSection: {
     flex: 1,
     backgroundColor: '#98D56D',
-    borderTopLeftRadius: rs(30),
-    borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
-    paddingTop: rs(60),
-    
+    borderTopLeftRadius: rs(30, 40, 50),
+    borderTopRightRadius: rs(30, 40, 50),
+    paddingTop: rs(60, 75, 90),
   },
   mascotContainer: {
     position: 'absolute',
@@ -548,8 +622,8 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    marginTop: rs(20),
-    borderRadius: rs(16),
+    marginTop: rs(20, 25, 30),
+    borderRadius: rs(16, 20, 24),
   },
   scrollContent: {
     flexGrow: 1,
@@ -557,9 +631,9 @@ const styles = StyleSheet.create({
   content: {},
   summaryCard: {
     backgroundColor: '#fff',
-    borderRadius: rs(12),
-    padding: rs(12),
-    marginBottom: rs(12),
+    borderRadius: rs(12, 16, 20),
+    padding: rs(12, 16, 20),
+    marginBottom: rs(12, 16, 20),
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -569,13 +643,13 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(8),
+    marginBottom: rs(8, 10, 12),
   },
   cardTitle: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     fontWeight: 'bold',
     color: '#333',
-    marginLeft: rs(8),
+    marginLeft: rs(8, 10, 12),
   },
   statsRow: {
     flexDirection: 'row',
@@ -587,14 +661,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: rf(20),
+    fontSize: rf(20, 24, 28),
     fontWeight: 'bold',
     color: '#50AF27',
-    marginTop: rs(4),
-    marginBottom: rs(2),
+    marginTop: rs(4, 6, 8),
+    marginBottom: rs(2, 3, 4),
   },
   statLabel: {
-    fontSize: rf(11),
+    fontSize: rf(11, 13, 15),
     color: '#666',
     textAlign: 'center',
   },
@@ -625,9 +699,9 @@ const styles = StyleSheet.create({
   // Updated TreeCard styles
   treeCard: {
     backgroundColor: '#fff',
-    borderRadius: rs(12),
-    padding: rs(12),
-    marginBottom: rs(10),
+    borderRadius: rs(12, 16, 20),
+    padding: rs(12, 16, 20),
+    marginBottom: rs(10, 12, 16),
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -637,12 +711,12 @@ const styles = StyleSheet.create({
   treeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(8),
+    marginBottom: rs(8, 10, 12),
   },
   treeImageContainer: {
-    width: rs(40),
-    height: rs(40),
-    borderRadius: rs(6),
+    width: rs(40, 50, 60),
+    height: rs(40, 50, 60),
+    borderRadius: rs(6, 8, 10),
     overflow: 'hidden',
   },
   treeImage: {
@@ -651,22 +725,22 @@ const styles = StyleSheet.create({
   },
   treeInfo: {
     flex: 1,
-    marginLeft: rs(10),
+    marginLeft: rs(10, 12, 16),
   },
   treeName: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     fontWeight: 'bold',
     color: '#333',
   },
   treeStage: {
-    fontSize: rf(12),
+    fontSize: rf(12, 14, 16),
     color: '#666',
-    marginTop: rs(1),
+    marginTop: rs(1, 2, 3),
   },
   wifiHours: {
-    fontSize: rf(12),
+    fontSize: rf(12, 14, 16),
     color: '#666',
-    marginBottom: rs(10),
+    marginBottom: rs(10, 12, 16),
   },
   metricSection: {
     marginBottom: rs(8),

@@ -35,9 +35,15 @@ import {
   deviceValue, 
   getImageSize,
   SCREEN_DIMENSIONS,
-  isSmallHeightDevice
+  isSmallHeightDevice,
+  isTablet,
+  isTabletLarge,
+  getLayoutConfig,
+  getContainerPadding,
+  getMaxContentWidth
 } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { ResponsiveGrid } from '../../components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Types
@@ -49,8 +55,6 @@ type RootStackParamList = {
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-
 
 const HomeScreen = () => {
   const { user, updateUser } = useAuth();
@@ -74,6 +78,7 @@ const HomeScreen = () => {
   const [actualTreeCount, setActualTreeCount] = useState<number>(0);
   const [realTreeCount, setRealTreeCount] = useState<number>(0);
   const insets = useSafeAreaInsets();
+  const layoutConfig = getLayoutConfig();
 
   // Get last name from full name
   const getLastName = (fullname: string | undefined): string => {
@@ -245,15 +250,22 @@ const HomeScreen = () => {
 
         {/* Fixed Header Section */}
         <Animated.View 
-          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          style={[
+            styles.headerSection, 
+            { 
+              paddingTop: insets.top,
+              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+            }, 
+            headerAnimatedStyle
+          ]}
           onTouchStart={handleTouchStart}
         >
           {/* Welcome Section */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.titleText}>
+          <View style={[styles.welcomeSection, { maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%', alignSelf: 'center' }]}>
+            <Text style={[styles.titleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
               Welcome back, {getLastName(user?.fullname)}!
             </Text>
-            <Text style={styles.subtitleText}>
+            <Text style={[styles.subtitleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
               Track your WiFi sessions and plant more trees
             </Text>
           </View>
@@ -261,13 +273,25 @@ const HomeScreen = () => {
 
         {/* Scrollable Content Section */}
         <Animated.View 
-          style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+          style={[
+            styles.contentSection, 
+            { 
+              paddingBottom: insets.bottom,
+              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+            }, 
+            contentAnimatedStyle
+          ]}
         >
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
+            { 
+              paddingBottom: insets.bottom + rs(90),
+              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
+              alignSelf: 'center',
+              width: '100%'
+            }
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -280,100 +304,192 @@ const HomeScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-            {/* Points Card */}
-            <TouchableOpacity 
-              style={styles.pointsCard}
-              onPress={navigateToPoints}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <Icon name="star" size={24} color="#50AF27" />
-                <Text style={styles.cardTitle}>Available Points</Text>
-                <View style={styles.cardArrow}>
-                  <Icon name="chevron-right" size={20} color="#666" />
-                </View>
-              </View>
-              <Text style={styles.pointsValue}>
-                {isSessionActive ? getLiveTotalPoints() : currentPoints}
-              </Text>
-            </TouchableOpacity>
-
-            {/* WiFi Status Card */}
-            <TouchableOpacity 
-              style={styles.statusCard}
-              onPress={navigateToWifi}
-              activeOpacity={0.7}
-            >
-
-              <View style={styles.cardHeader}>
-                <Icon 
-                  name={getWifiStatusIcon()} 
-                  size={24} 
-                  color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
-                />
-                <Text style={styles.cardTitle}>WiFi Status</Text>
-                <View style={styles.cardArrow}>
-                  <Icon name="chevron-right" size={20} color="#666" />
-                </View>
-              </View>
-              <Text style={[
-                styles.statusText,
-                (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
-              ]}>
-                {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
-              </Text>
-
-              {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
-                <View style={styles.sessionInfo}>
-                  <Text style={styles.sessionText}>
-                    Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
+            {layoutConfig.isTablet ? (
+              <ResponsiveGrid 
+                baseColumns={1}
+                gap={16}
+              >
+                {/* Points Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.pointsCard]}
+                  onPress={navigateToPoints}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon name="star" size={rf(24, 28, 32)} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Available Points</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={styles.pointsValue}>
+                    {isSessionActive ? getLiveTotalPoints() : currentPoints}
                   </Text>
-                  <Text style={styles.sessionText}>
-                    Points earned: {getLiveSessionPoints()}
-                  </Text>
-                  <Text style={styles.sessionText}>
-                    Sessions today: {sessionCount}
-                  </Text>
-                </View>
-              )}
+                </TouchableOpacity>
 
-              {isInitialized && !(isConnected && isUniversityWifi) && (
-                <Text style={styles.tapHintText}>
-                  Tap to view WiFi details
-                </Text>
-              )}
-            </TouchableOpacity>
+                {/* WiFi Status Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.statusCard]}
+                  onPress={navigateToWifi}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon 
+                      name={getWifiStatusIcon()} 
+                      size={rf(24, 28, 32)} 
+                      color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
+                    />
+                    <Text style={styles.cardTitle}>WiFi Status</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.statusText,
+                    (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
+                  ]}>
+                    {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
+                  </Text>
 
-            {/* Trees Card */}
-            <TouchableOpacity 
-              style={styles.treesCard}
-              onPress={navigateToTrees}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <Icon name="tree" size={24} color="#50AF27" />
-                <Text style={styles.cardTitle}>Trees Planted</Text>
-                <View style={styles.cardArrow}>
-                  <Icon name="chevron-right" size={20} color="#666" />
-                </View>
-              </View>
-              <Text style={styles.treeCount}>{actualTreeCount}</Text>
-              <Text style={styles.co2Text}>
-                You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
-              </Text>
-            </TouchableOpacity>
+                  {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
+                    <View style={styles.sessionInfo}>
+                      <Text style={styles.sessionText}>
+                        Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Points earned: {getLiveSessionPoints()}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Sessions today: {sessionCount}
+                      </Text>
+                    </View>
+                  )}
+
+                  {isInitialized && !(isConnected && isUniversityWifi) && (
+                    <Text style={styles.tapHintText}>
+                      Tap to view WiFi details
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Trees Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.treesCard]}
+                  onPress={navigateToTrees}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon name="tree" size={rf(24, 28, 32)} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Trees Planted</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={styles.treeCount}>{actualTreeCount}</Text>
+                  <Text style={styles.co2Text}>
+                    You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
+                  </Text>
+                </TouchableOpacity>
+              </ResponsiveGrid>
+            ) : (
+              <>
+                {/* Points Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.pointsCard]}
+                  onPress={navigateToPoints}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon name="star" size={24} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Available Points</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={20} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={styles.pointsValue}>
+                    {isSessionActive ? getLiveTotalPoints() : currentPoints}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* WiFi Status Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.statusCard]}
+                  onPress={navigateToWifi}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon 
+                      name={getWifiStatusIcon()} 
+                      size={24} 
+                      color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
+                    />
+                    <Text style={styles.cardTitle}>WiFi Status</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={20} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.statusText,
+                    (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
+                  ]}>
+                    {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
+                  </Text>
+
+                  {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
+                    <View style={styles.sessionInfo}>
+                      <Text style={styles.sessionText}>
+                        Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Points earned: {getLiveSessionPoints()}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Sessions today: {sessionCount}
+                      </Text>
+                    </View>
+                  )}
+
+                  {isInitialized && !(isConnected && isUniversityWifi) && (
+                    <Text style={styles.tapHintText}>
+                      Tap to view WiFi details
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Trees Card */}
+                <TouchableOpacity 
+                  style={[styles.card, styles.treesCard]}
+                  onPress={navigateToTrees}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardHeader}>
+                    <Icon name="tree" size={24} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Trees Planted</Text>
+                    <View style={styles.cardArrow}>
+                      <Icon name="chevron-right" size={20} color="#666" />
+                    </View>
+                  </View>
+                  <Text style={styles.treeCount}>{actualTreeCount}</Text>
+                  <Text style={styles.co2Text}>
+                    You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </ScrollView>
       </Animated.View>
 
         {/* Mascot */}
-        <View style={styles.mascotContainer}>
-          <Image
-            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
-            style={styles.mascotImage}
-            resizeMode="contain"
-          />
-        </View>
+        {!layoutConfig.isTablet && (
+          <View style={styles.mascotContainer}>
+            <Image
+              source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+              style={styles.mascotImage}
+              resizeMode="contain"
+            />
+          </View>
+        )}
       </View>
     </GestureDetector>
   );
@@ -391,29 +507,26 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     alignItems: 'flex-start',
-    paddingHorizontal: rs(20),
     marginTop: rs(10),
+    width: '100%',
   },
   titleText: {
-    fontSize: rf(32),
+    fontSize: rf(32, 40, 48),
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: rs(10),
-    textAlign: 'center',
   },
   subtitleText: {
-    fontSize: rf(16),
+    fontSize: rf(16, 18, 20),
     color: '#fff',
     opacity: 0.9,
-    textAlign: 'left',
-    lineHeight: rf(24),
+    lineHeight: rf(24, 28, 32),
   },
   contentSection: {
     flex: 1,
     backgroundColor: '#98D56D',
     borderTopLeftRadius: rs(30),
     borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
     paddingTop: rs(32),
   },
   mascotContainer: {
@@ -435,63 +548,46 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   content: {},
-  pointsCard: {
+  card: {
     backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(16),
+    borderRadius: rs(16, 20, 24),
+    padding: rs(20, 24, 28),
+    marginBottom: rs(16, 20, 24),
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
   },
-  statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    marginBottom: rs(16),
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  treesCard: {
-    backgroundColor: '#fff',
-    borderRadius: rs(16),
-    padding: rs(20),
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
+  pointsCard: {},
+  statusCard: {},
+  treesCard: {},
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(12),
+    marginBottom: rs(12, 16, 20),
   },
   cardTitle: {
-    fontSize: rf(18),
+    fontSize: rf(18, 20, 24),
     fontWeight: 'bold',
     color: '#333',
-    marginLeft: rs(8),
+    marginLeft: rs(8, 10, 12),
+    flex: 1,
   },
   pointsValue: {
-    fontSize: rf(40),
+    fontSize: rf(40, 48, 56),
     fontWeight: 'bold',
     color: '#50AF27',
-    marginVertical: rs(8),
+    marginVertical: rs(8, 12, 16),
   },
   pointsSubtext: {
-    fontSize: rf(14),
+    fontSize: rf(14, 16, 18),
     color: '#666',
     fontStyle: 'italic',
   },
   statusText: {
-    fontSize: rf(16),
-    lineHeight: rf(24),
+    fontSize: rf(16, 18, 20),
+    lineHeight: rf(24, 28, 32),
   },
   connectedText: {
     color: '#50AF27',
@@ -501,42 +597,40 @@ const styles = StyleSheet.create({
     color: '#FFA79D',
     fontWeight: '600',
   },
-
   treeCount: {
-    fontSize: rf(30),
+    fontSize: rf(30, 36, 42),
     fontWeight: 'bold',
     color: '#50AF27',
-    marginVertical: rs(8),
+    marginVertical: rs(8, 12, 16),
   },
   co2Text: {
-    fontSize: rf(14),
+    fontSize: rf(14, 16, 18),
     color: '#666',
     fontStyle: 'italic',
-    lineHeight: rf(20),
+    lineHeight: rf(20, 24, 28),
   },
   cardArrow: {
     marginLeft: 'auto',
   },
   tapHintText: {
-    fontSize: rf(12),
+    fontSize: rf(12, 14, 16),
     color: '#666',
     fontStyle: 'italic',
     textAlign: 'center',
-    marginTop: rs(4),
+    marginTop: rs(4, 6, 8),
   },
   sessionInfo: {
     backgroundColor: '#F0F9FF',
-    borderRadius: rs(12),
-    padding: rs(16),
-    marginTop: rs(12),
+    borderRadius: rs(12, 16, 20),
+    padding: rs(16, 20, 24),
+    marginTop: rs(12, 16, 20),
   },
   sessionText: {
-    fontSize: rf(14),
+    fontSize: rf(14, 16, 18),
     color: '#50AF27',
     fontWeight: '500',
-    marginBottom: rs(4),
+    marginBottom: rs(4, 6, 8),
   },
-
 });
 
 export default HomeScreen; 
