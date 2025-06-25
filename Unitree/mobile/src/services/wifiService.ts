@@ -80,6 +80,19 @@ class WiFiService {
       const response = await api.post('/api/wifi/end');
       return response.data;
     } catch (error: any) {
+      // Handle 404 "No active session found" as a non-error case
+      if (error.response?.status === 404 && error.response?.data?.message?.includes('No active session found')) {
+        // Return a placeholder response for consistency, but don't throw an error
+        return {
+          _id: '',
+          user: '',
+          ipAddress: '',
+          startTime: new Date(),
+          duration: 0,
+          sessionDate: new Date(),
+          isActive: false
+        };
+      }
       throw new Error(error.response?.data?.message || 'Failed to end WiFi session');
     }
   }

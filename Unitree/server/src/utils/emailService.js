@@ -341,7 +341,7 @@ class EmailService {
             <p style="color: #4CAF50; font-weight: bold;">✅ If you received this, the email configuration is working correctly!</p>
             <hr style="margin: 20px 0; border: 1px solid #eee;">
             <p style="font-size: 14px; color: #666;">
-              Email sent at: ${new Date().toLocaleString()}<br>
+              Email sent at: ${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}<br>
               Service: Gmail SMTP<br>
               Status: Active
             </p>

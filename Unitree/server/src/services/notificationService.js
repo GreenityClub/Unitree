@@ -8,6 +8,23 @@ class NotificationService {
   }
 
   /**
+   * Get current time in Hanoi timezone (GMT+7)
+   */
+  getCurrentHanoiTime() {
+    const now = new Date();
+    // Convert to Hanoi time (GMT+7)
+    const hanoiTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
+    return hanoiTime;
+  }
+
+  /**
+   * Get current hour in Hanoi timezone
+   */
+  getCurrentHanoiHour() {
+    return this.getCurrentHanoiTime().getHours();
+  }
+
+  /**
    * Send a single push notification
    */
   async sendPushNotification(expoPushToken, title, body, data = {}) {
@@ -43,11 +60,14 @@ class NotificationService {
    */
   async sendAppReminderNotifications() {
     try {
-      const currentHour = new Date().getHours();
+      const currentHour = this.getCurrentHanoiHour();
+      const hanoiTime = this.getCurrentHanoiTime();
       
-      // Only send between 7 AM - 6 PM
+      logger.info(`Checking reminder notifications - Current Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})} (Hour: ${currentHour})`);
+      
+      // Only send between 7 AM - 6 PM (Hanoi time)
       if (currentHour < 7 || currentHour >= 18) {
-        logger.info('Outside app reminder hours (7 AM - 6 PM), skipping notifications');
+        logger.info(`Outside app reminder hours (7 AM - 6 PM Hanoi time), skipping notifications. Current hour: ${currentHour}`);
         return { success: false, error: 'Outside notification hours' };
       }
 
@@ -93,7 +113,7 @@ class NotificationService {
         { lastReminderSent: new Date() }
       );
       
-      logger.info(`App reminder notifications sent to ${successCount}/${inactiveUsers.length} users`);
+      logger.info(`App reminder notifications sent to ${successCount}/${inactiveUsers.length} users (Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})})`);
       return { success: true, sent: successCount };
       
     } catch (error) {

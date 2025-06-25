@@ -23,11 +23,11 @@ class CronService {
 
   /**
    * Schedule reminder notifications
-   * Runs every 2 hours between 7 AM - 6 PM (server time)
+   * Runs every 2 hours between 7 AM - 6 PM (Hanoi time - GMT+7)
    */
   scheduleReminderNotifications() {
     // Cron pattern: Every 2 hours from 7 AM to 6 PM
-    // 0 7,9,11,13,15,17 * * * - at 7AM, 9AM, 11AM, 1PM, 3PM, 5PM
+    // 0 7,9,11,13,15,17 * * * - at 7AM, 9AM, 11AM, 1PM, 3PM, 5PM (Hanoi time)
     const cronPattern = '0 7,9,11,13,15,17 * * *';
     
     const reminderJob = new cron.CronJob(
@@ -48,14 +48,14 @@ class CronService {
       },
       null, // onComplete callback
       false, // start immediately
-      'America/New_York' // timezone (adjust based on your server location)
+      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
     );
 
     // Start the job
     reminderJob.start();
     this.jobs.set('reminderNotifications', reminderJob);
     
-    logger.info('📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM');
+    logger.info('📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)');
   }
 
   /**
@@ -77,17 +77,17 @@ class CronService {
       },
       null,
       false,
-      'America/New_York'
+      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
     );
 
     testJob.start();
     this.jobs.set('testJob', testJob);
     
-    logger.info('🧪 Test cron job scheduled: Every 30 minutes');
+    logger.info('🧪 Test cron job scheduled: Every 30 minutes (Hanoi time - GMT+7)');
   }
 
   /**
-   * Schedule daily cleanup job (runs at midnight)
+   * Schedule daily cleanup job (runs at midnight Hanoi time)
    */
   scheduleDailyCleanup() {
     const cleanupPattern = '0 0 * * *'; // Every day at midnight
@@ -108,13 +108,13 @@ class CronService {
       },
       null,
       false,
-      'America/New_York'
+      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
     );
 
     cleanupJob.start();
     this.jobs.set('dailyCleanup', cleanupJob);
     
-    logger.info('🧹 Daily cleanup cron job scheduled: Every day at midnight');
+    logger.info('🧹 Daily cleanup cron job scheduled: Every day at midnight (Hanoi time - GMT+7)');
   }
 
   /**

@@ -106,6 +106,9 @@ const handleApiResponse = async (error: any) => {
   } else if (error.response?.status === 400 && error.config?.url?.includes('/api/wifi/start')) {
     // Don't log WiFi validation errors as errors - they're expected during location testing
     logger.wifi.info(`WiFi validation: ${error.response?.data?.message || 'Validation failed'}`);
+  } else if (error.response?.status === 404 && error.config?.url?.includes('/api/wifi/end')) {
+    // Don't log 404 for WiFi end session as error - user might not have an active session (e.g., during logout)
+    logger.wifi.info(`No active WiFi session to end: ${error.response?.data?.message || 'No active session'}`);
   } else if (error.response) {
     logger.api.error(`API Response Error: ${error.response?.status} ${error.config?.url}`, { data: error.response?.data });
   }

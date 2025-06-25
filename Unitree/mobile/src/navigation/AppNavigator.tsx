@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
+import LoadingSplashScreen from '../components/LoadingSplashScreen';
 
 // Import Navigators
 import MainTabs from './MainTabs';
@@ -62,7 +63,7 @@ const AppNavigator: React.FC = () => {
   }, [user, loading]);
 
   if (loading) {
-    return null;
+    return <LoadingSplashScreen />;
   }
 
   return (

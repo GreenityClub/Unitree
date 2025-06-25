@@ -256,8 +256,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await wifiService.endSession();
         logger.wifi.info('WiFi session ended successfully during logout');
       } catch (wifiError: any) {
-        console.log('ℹ️ No active WiFi session to end during logout:', wifiError.message);
-        // Don't treat this as an error - user might not have an active session
+        logger.wifi.info('No active WiFi session to end during logout - this is normal', { data: wifiError.message });
+        // This is expected behavior - user might not have an active session when logging out
       }
 
       // Call server logout endpoint to clear session

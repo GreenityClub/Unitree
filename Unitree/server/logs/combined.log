@@ -1213,3 +1213,117 @@
 {"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:03:35.291Z"}
 {"level":"info","message":"Memory Usage: RSS: 83MB, Heap: 37/39MB, External: 20MB","timestamp":"2025-06-25T16:06:35.303Z"}
 {"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:06:35.304Z"}
+{"level":"info","message":"Memory Usage: RSS: 85MB, Heap: 38/41MB, External: 20MB","timestamp":"2025-06-25T16:09:35.313Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:09:35.314Z"}
+{"level":"info","message":"Memory Usage: RSS: 84MB, Heap: 38/40MB, External: 20MB","timestamp":"2025-06-25T16:12:35.329Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:12:35.330Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-25T16:14:14.493Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[_jPetHNeAu5mxBr36lD3JH]","timestamp":"2025-06-25T16:14:15.802Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-25T16:14:44.350Z"}
+{"level":"info","message":"Memory Usage: RSS: 96MB, Heap: 41/52MB, External: 20MB","timestamp":"2025-06-25T16:15:35.342Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:15:35.343Z"}
+{"level":"info","message":"Memory Usage: RSS: 114MB, Heap: 42/72MB, External: 20MB","timestamp":"2025-06-25T16:18:35.353Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:18:35.354Z"}
+{"level":"info","message":"Memory Usage: RSS: 80MB, Heap: 31/36MB, External: 20MB","timestamp":"2025-06-25T16:21:35.364Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:21:35.365Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:21:54.413Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:21:54.449Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:21:54.450Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:21:54.529Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:21:54.531Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:21:55.691Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:02.308Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:02.338Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:02.339Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:02.390Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:02.391Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:04.169Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:11.912Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:11.941Z"}
+{"level":"info","message":"Memory Usage: RSS: 89MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:11.942Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:11.993Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:11.994Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:12.971Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:22.022Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:22.062Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:22.064Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:22.131Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:22.133Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:23.099Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:29.089Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:29.138Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:29.141Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:29.202Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:29.203Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:30.192Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:39.424Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:39.472Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:39.474Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:39.537Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:39.538Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:40.594Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:47.445Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:47.475Z"}
+{"level":"info","message":"Memory Usage: RSS: 89MB, Heap: 39/58MB, External: 20MB","timestamp":"2025-06-25T16:23:47.477Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:47.531Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:47.532Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:48.483Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:23:57.685Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:23:57.713Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:23:57.714Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:23:57.764Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:23:57.765Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:23:58.678Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:24:25.325Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:24:25.351Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:24:25.352Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:24:25.401Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:24:25.402Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:24:26.334Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:24:37.964Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:24:37.991Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:24:37.993Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:24:38.044Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:24:38.045Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:24:39.121Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:24:49.982Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:24:50.045Z"}
+{"level":"info","message":"Memory Usage: RSS: 88MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:24:50.051Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:24:50.173Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:24:50.174Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:24:51.995Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-06-25T16:24:59.731Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-06-25T16:24:59.761Z"}
+{"level":"info","message":"Memory Usage: RSS: 89MB, Heap: 38/59MB, External: 20MB","timestamp":"2025-06-25T16:24:59.762Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-06-25T16:24:59.811Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-06-25T16:24:59.812Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-06-25T16:25:00.730Z"}
+{"level":"info","message":"Memory Usage: RSS: 81MB, Heap: 34/36MB, External: 20MB","timestamp":"2025-06-25T16:27:59.772Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-25T16:28:06.694Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[_jPetHNeAu5mxBr36lD3JH]","timestamp":"2025-06-25T16:28:10.272Z"}
+{"level":"info","message":"Memory Usage: RSS: 84MB, Heap: 33/38MB, External: 20MB","timestamp":"2025-06-25T16:30:59.783Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:30:59.784Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-25T16:31:37.256Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[_jPetHNeAu5mxBr36lD3JH]","timestamp":"2025-06-25T16:31:37.924Z"}
+{"level":"info","message":"Memory Usage: RSS: 93MB, Heap: 34/47MB, External: 20MB","timestamp":"2025-06-25T16:33:59.789Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:33:59.790Z"}
+{"level":"info","message":"Memory Usage: RSS: 87MB, Heap: 32/41MB, External: 20MB","timestamp":"2025-06-25T16:36:59.790Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:36:59.792Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 33/40MB, External: 20MB","timestamp":"2025-06-25T16:39:59.794Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:39:59.796Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 32/40MB, External: 20MB","timestamp":"2025-06-25T16:42:59.797Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:42:59.798Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 33/40MB, External: 20MB","timestamp":"2025-06-25T16:45:59.797Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:45:59.799Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 32/40MB, External: 20MB","timestamp":"2025-06-25T16:48:59.806Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:48:59.807Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 32/40MB, External: 20MB","timestamp":"2025-06-25T16:51:59.811Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:51:59.812Z"}
+{"level":"info","message":"Memory Usage: RSS: 86MB, Heap: 33/40MB, External: 20MB","timestamp":"2025-06-25T16:54:59.822Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:54:59.823Z"}
+{"level":"info","message":"Running periodic maintenance...","timestamp":"2025-06-25T16:54:59.824Z"}
+{"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:54:59.824Z"}
+{"level":"info","message":"Memory cleanup completed","timestamp":"2025-06-25T16:54:59.825Z"}
+{"level":"info","message":"Periodic maintenance completed","timestamp":"2025-06-25T16:54:59.825Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 6852d10ba0a57324869852f6","timestamp":"2025-06-25T16:56:38.099Z"}
+{"level":"info","message":"Push token saved for user UyenBTGBH220312@fpt.edu.vn: ExponentPushToken[_jPetHNeAu5mxBr36lD3JH]","timestamp":"2025-06-25T16:56:38.483Z"}

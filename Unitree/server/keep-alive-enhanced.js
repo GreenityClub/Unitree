@@ -28,7 +28,7 @@ function pingServer(isRetry = false) {
       successfulPings++;
       consecutiveFailures = 0;
       
-      console.log(`✅ [${new Date().toISOString()}] Server is alive - Response time: ${responseTime}ms`);
+              console.log(`✅ [${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}] Server is alive - Response time: ${responseTime}ms`);
       console.log(`📊 Status: ${res.statusCode} | Success Rate: ${(successfulPings/totalPings*100).toFixed(1)}%`);
       
       try {
@@ -53,7 +53,7 @@ function pingServer(isRetry = false) {
 
   request.on('error', (err) => {
     consecutiveFailures++;
-    console.error(`❌ [${new Date().toISOString()}] Error pinging server (attempt ${consecutiveFailures}):`, err.message);
+          console.error(`❌ [${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}] Error pinging server (attempt ${consecutiveFailures}):`, err.message);
     
     if (consecutiveFailures < MAX_RETRIES && !isRetry) {
       console.log(`🔄 Retrying in ${RETRY_INTERVAL/1000} seconds...`);
@@ -68,7 +68,7 @@ function pingServer(isRetry = false) {
   request.on('timeout', () => {
     request.destroy();
     consecutiveFailures++;
-    console.error(`⏰ [${new Date().toISOString()}] Request timeout after 30 seconds`);
+          console.error(`⏰ [${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}] Request timeout after 30 seconds`);
     console.log('---');
   });
 

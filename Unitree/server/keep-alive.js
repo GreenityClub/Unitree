@@ -15,7 +15,7 @@ function pingServer() {
     
     res.on('end', () => {
       const responseTime = Date.now() - startTime;
-      console.log(`✅ [${new Date().toISOString()}] Server is alive - Response time: ${responseTime}ms`);
+              console.log(`✅ [${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}] Server is alive - Response time: ${responseTime}ms`);
       console.log(`📊 Status: ${res.statusCode}`);
       
       try {
@@ -29,7 +29,7 @@ function pingServer() {
       console.log('---');
     });
   }).on('error', (err) => {
-    console.error(`❌ [${new Date().toISOString()}] Error pinging server:`, err.message);
+          console.error(`❌ [${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}] Error pinging server:`, err.message);
     console.log('🔄 Will retry in next interval...');
     console.log('---');
   });

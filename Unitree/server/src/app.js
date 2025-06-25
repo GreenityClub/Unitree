@@ -112,7 +112,7 @@ app.get('/health', async (req, res) => {
       return res.status(503).json({
         status: 'unhealthy',
         reason: 'Database disconnected',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})
       });
     }
     
@@ -122,7 +122,7 @@ app.get('/health', async (req, res) => {
       return res.status(503).json({
         status: 'unhealthy',
         reason: `Critical memory usage: ${memStats.current}MB`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})
       });
     }
     
@@ -134,7 +134,7 @@ app.get('/health', async (req, res) => {
       memoryTrend: memStats.trend,
       averageMemory: `${memStats.average}MB`,
       maxMemory: `${memStats.maximum}MB`,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}),
       uptime: Math.floor(process.uptime()),
       version: process.env.npm_package_version || '1.0.0',
       nodeVersion: process.version,
@@ -145,7 +145,7 @@ app.get('/health', async (req, res) => {
     res.status(503).json({
       status: 'unhealthy',
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})
     });
   }
 });

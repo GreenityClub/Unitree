@@ -144,7 +144,6 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
           const token = await AsyncStorage.getItem('authToken');
           if (token) {
             // Token is already saved by auth service
-            logger.background.debug('Auth token available for background sync');
           } else {
             logger.background.warn('No auth token found - background sync may fail');
           }
