@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, StatusBar, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -61,15 +62,15 @@ const SystemSettingsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar style="dark" />
       {/* Header */}
       <View style={[styles.header]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
+          <Icon name="arrow-left" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>System Settings</Text>
         <View style={styles.headerSpacer} />
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: rf(20),
     fontWeight: 'bold',
-    color: colors.textPrimary,
+    color: colors.primary,
     textAlign: 'center',
     marginHorizontal: rs(16),
   },
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: rf(18),
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.primary,
     marginLeft: rs(12),
   },
   card: {
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: rf(16),
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: colors.primary,
   },
   settingDescription: {
     fontSize: rf(12),
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: rf(14),
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: colors.primary,
   },
 });
 

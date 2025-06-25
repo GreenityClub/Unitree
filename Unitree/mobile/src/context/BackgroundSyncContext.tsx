@@ -93,10 +93,25 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
         }
       } else if (nextAppState === 'background') {
         // App is going to background
-        logger.background.debug('App going to background');
+        logger.background.info('App going to background');
         
         // Reset the sync flag so we sync again when coming back
         hasPerformedInitialSync.current = false;
+        
+        // Handle background mode in WiFi service
+        if (isBackgroundMonitoringEnabled && isAuthenticated) {
+          try {
+            await BackgroundWifiService.handleAppGoingToBackground();
+          } catch (error) {
+            logger.background.error('Failed to handle app going to background', { data: error });
+          }
+        }
+      } else if (nextAppState === 'inactive') {
+        // App is becoming inactive (might be closing)
+        logger.background.debug('App becoming inactive');
+        
+        // Note: We can't reliably detect complete app closure here
+        // The system handles termination after this state
       }
 
       appState.current = nextAppState;
@@ -105,7 +120,7 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
     // Perform initial sync if we haven't done so already and app is active
-            if (isAuthenticated && isInitialized && AppState.currentState === 'active' && !hasPerformedInitialSync.current) {
+    if (isAuthenticated && isInitialized && AppState.currentState === 'active' && !hasPerformedInitialSync.current) {
       performForegroundSync().then(() => {
         hasPerformedInitialSync.current = true;
       });
@@ -119,7 +134,7 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
     }
 
     return () => subscription?.remove();
-  }, [isAuthenticated, isInitialized]);
+  }, [isAuthenticated, isInitialized, isBackgroundMonitoringEnabled]);
 
   // Save authentication token for background service
   useEffect(() => {

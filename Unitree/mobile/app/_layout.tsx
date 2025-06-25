@@ -12,6 +12,8 @@ import { BackgroundSyncProvider } from '../src/context/BackgroundSyncContext';
 import { NotificationProvider } from '../src/context/NotificationContext';
 import ENV, { validateEnvironment } from '../src/config/env';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import BackgroundWifiService from '../src/services/BackgroundWifiService';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -34,6 +36,27 @@ export default function RootLayout() {
     }
   }, []);
 
+  // Handle app termination events
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      // When app becomes inactive, it might be closing
+      if (nextAppState === 'inactive' || nextAppState === 'background') {
+        // Note: Complete termination can't be reliably detected
+        // but this helps with backgrounding scenarios
+        console.log('App state changing to:', nextAppState);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Cleanup function that may run when component unmounts (app closing)
+    return () => {
+      subscription?.remove();
+      // This may execute during app termination
+      console.log('RootLayout cleanup - app may be terminating');
+    };
+  }, []);
+
   if (!loaded) {
     // Async font loading only occurs in development.
     return null;
@@ -52,6 +75,7 @@ export default function RootLayout() {
                       <Stack.Screen name="auth" options={{ headerShown: false }} />
                       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                       <Stack.Screen name="user-settings" options={{ headerShown: false }} />
+                      <Stack.Screen name="system-settings" options={{ headerShown: false }} />
                       <Stack.Screen name="+not-found" />
                     </Stack>
                     <StatusBar style="auto" />

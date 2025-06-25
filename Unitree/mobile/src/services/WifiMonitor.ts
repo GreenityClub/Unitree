@@ -209,7 +209,9 @@ class WifiMonitor {
     }
 
     // If we reach here, we are NOT connected to the university WiFi
+    // End session IMMEDIATELY regardless of foreground/background state
     if (this.sessionStartTime) {
+      logger.wifi.info('Not connected to university WiFi, ending session immediately');
       await this.endSession();
     } else {
       this.notifyListeners({ isConnected: false, sessionInfo: null });
@@ -245,16 +247,21 @@ class WifiMonitor {
 
   private async endSession(): Promise<void> {
     try {
+      // End session on server
       await wifiService.endSession();
+      logger.wifi.info('Session ended on server');
     } catch (err) {
-      console.error('Failed to end WiFi session', err);
+      logger.wifi.error('Failed to end WiFi session on server', { data: err });
     }
 
+    // Clear local session state
     this.sessionStartTime = null;
     this.currentIPAddress = null;
 
     this.notifyListeners({ isConnected: false, sessionInfo: null });
     this.notifyStatsUpdate();
+    
+    logger.wifi.info('Local session state cleared');
   }
 
   private buildSessionInfo(): SessionInfo | null {

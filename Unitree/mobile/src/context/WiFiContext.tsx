@@ -207,6 +207,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
             });
             await refreshStats();
             await refreshSessionCount();
+            logger.wifi.info('WiFi session started', { ipAddress });
           } catch (error: any) {
             // If we get "Active session already exists" error, try cleanup and retry
             if (error.message.includes('Active session already exists')) {
@@ -233,10 +234,16 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
             }
           }
         } else if (!isUniversityWifi && isSessionActive) {
-          // End session if not connected to university WiFi but session is active
-          await wifiService.endSession();
-          await refreshStats();
-          await refreshSessionCount();
+          // End session IMMEDIATELY if not connected to university WiFi but session is active
+          logger.wifi.info('Not on university WiFi, ending session immediately');
+          try {
+            await wifiService.endSession();
+            await refreshStats();
+            await refreshSessionCount();
+            logger.wifi.info('WiFi session ended successfully');
+          } catch (error: any) {
+            logger.wifi.error('Failed to end WiFi session', { data: error });
+          }
         }
       } catch (err: any) {
         // Don't log validation errors as errors - they're expected during testing

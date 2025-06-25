@@ -25,6 +25,10 @@ interface BackgroundSession {
   duration: number; // seconds
   isActive: boolean;
   timestamp: string;
+  metadata?: {
+    backgroundModeStartTime?: string;
+    isInBackground?: boolean;
+  };
 }
 
 interface PendingSessionData {
@@ -134,7 +138,7 @@ class BackgroundWifiService {
     }
 
     await BackgroundTask.registerTaskAsync(WIFI_MONITOR_TASK, {
-      minimumInterval: 15, // Minimum interval is 15 minutes for Android, iOS determines automatically
+      minimumInterval: 5, // More frequent checks (5 minutes) to detect disconnections faster
     });
   }
 
@@ -165,16 +169,16 @@ class BackgroundWifiService {
             await this.updateBackgroundSession();
           }
         } else {
-          // Not on university WiFi, end any active session
+          // Not on university WiFi, end any active session IMMEDIATELY
           if (currentSession?.isActive) {
-            console.log('❌ Not on university WiFi, ending session');
+            console.log('❌ Not on university WiFi, ending session immediately');
             await this.endCurrentBackgroundSession();
           }
         }
       } else {
-        // Not connected to WiFi, end any active session
+        // Not connected to WiFi, end any active session IMMEDIATELY
         if (currentSession?.isActive) {
-          console.log('📵 WiFi disconnected, ending session');
+          console.log('📵 WiFi disconnected, ending session immediately');
           await this.endCurrentBackgroundSession();
         }
       }
@@ -216,6 +220,42 @@ class BackgroundWifiService {
   }
 
   /**
+   * Handle app going to background - mark session for proper handling
+   */
+  async handleAppGoingToBackground(): Promise<void> {
+    console.log('📱 App going to background...');
+    
+    const currentSession = await this.getCurrentSession();
+    if (currentSession?.isActive) {
+      // Mark session as background mode for proper tracking
+      const updatedSession = {
+        ...currentSession,
+        metadata: {
+          ...currentSession.metadata,
+          backgroundModeStartTime: new Date().toISOString(),
+          isInBackground: true
+        }
+      };
+      
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(updatedSession));
+      console.log('📱 Session marked as background mode');
+    }
+  }
+
+  /**
+   * Handle app being completely closed/terminated
+   */
+  async handleAppClosed(): Promise<void> {
+    console.log('📱 App being closed/terminated...');
+    
+    const currentSession = await this.getCurrentSession();
+    if (currentSession?.isActive) {
+      console.log('⏹️ Ending session due to app closure');
+      await this.endCurrentBackgroundSession();
+    }
+  }
+
+  /**
    * Handle app reopen - end any previous session and start new if on university WiFi
    */
   async handleAppReopen(): Promise<{ sessionEnded: boolean; sessionStarted: boolean }> {
@@ -227,7 +267,7 @@ class BackgroundWifiService {
     // Check if there's an active background session that needs to be ended
     const currentSession = await this.getCurrentSession();
     if (currentSession?.isActive) {
-      console.log('⏹️ Ending previous background session from before app was closed');
+      console.log('⏹️ Ending previous session from before app was closed/backgrounded');
       await this.endCurrentBackgroundSession();
       sessionEnded = true;
     }

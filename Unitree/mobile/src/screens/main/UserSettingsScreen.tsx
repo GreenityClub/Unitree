@@ -97,7 +97,7 @@ const UserSettingsScreen = () => {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Icon name="arrow-left" size={24} color={colors.text} />
+          <Icon name="arrow-left" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>User Settings</Text>
         <View style={styles.headerSpacer} />
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: rf(20),
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.primary,
     textAlign: 'center',
     marginHorizontal: rs(16),
   },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: rf(18),
     fontWeight: '600',
-    color: colors.text,
+    color: colors.primary,
     marginLeft: rs(12),
   },
   card: {
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: rf(14),
     fontWeight: '500',
-    color: colors.text,
+    color: colors.primary,
   },
   inputContainer: {
     marginBottom: rs(16),
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: rf(14),
     fontWeight: '500',
-    color: colors.text,
+    color: colors.primary,
     marginBottom: rs(8),
   },
   input: {
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: rf(16),
     fontWeight: '500',
-    color: colors.text,
+    color: colors.primary,
   },
   actionDescription: {
     fontSize: rf(12),
