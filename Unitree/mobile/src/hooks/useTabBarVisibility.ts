@@ -30,6 +30,18 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
     });
   };
 
+  const resetInactivityTimer = () => {
+    if (inactivityTimer.current) {
+      clearTimeout(inactivityTimer.current as any);
+    }
+    
+    inactivityTimer.current = setTimeout(() => {
+      if (!isScrolling.current) {
+        runOnJS(hideTabBar)();
+      }
+    }, inactivityTimeout);
+  };
+
   const showTabBar = () => {
     'worklet';
     // Clear any existing inactivity timer when showing manually
@@ -52,18 +64,6 @@ export const useTabBarVisibility = (options: UseTabBarVisibilityOptions = {}) =>
     
     // Reset inactivity timer after showing
     runOnJS(resetInactivityTimer)();
-  };
-
-  const resetInactivityTimer = () => {
-    if (inactivityTimer.current) {
-      clearTimeout(inactivityTimer.current as any);
-    }
-    
-    inactivityTimer.current = setTimeout(() => {
-      if (!isScrolling.current) {
-        runOnJS(hideTabBar)();
-      }
-    }, inactivityTimeout);
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

@@ -256,17 +256,17 @@ export default function NotificationSettings() {
                 <Button
                   title="Daily"
                   onPress={() => handleTestNotification('daily')}
-                  style={[styles.testButton, { backgroundColor: colors.secondary }]}
+                  style={{...styles.testButton, backgroundColor: colors.secondary}}
                 />
                 <Button
                   title="Weekly"
                   onPress={() => handleTestNotification('weekly')}
-                  style={[styles.testButton, { backgroundColor: colors.secondary }]}
+                  style={{...styles.testButton, backgroundColor: colors.secondary}}
                 />
                 <Button
                   title="Monthly"
                   onPress={() => handleTestNotification('monthly')}
-                  style={[styles.testButton, { backgroundColor: colors.secondary }]}
+                  style={{...styles.testButton, backgroundColor: colors.secondary}}
                 />
               </View>
             </View>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   loadingText: {
     textAlign: 'center',
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   settingDescription: {
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   testTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   testButtons: {

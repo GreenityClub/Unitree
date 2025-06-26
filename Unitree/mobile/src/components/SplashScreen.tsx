@@ -101,7 +101,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
         ]}
       >
         <Text style={styles.appName}>UniTree</Text>
-        <Text style={styles.tagline}>Trồng cây cho tương lai xanh</Text>
+        <Text style={styles.tagline}>Sprout to Forest</Text>
       </Animated.View>
 
       {/* Loading indicator */}

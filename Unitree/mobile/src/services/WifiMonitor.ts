@@ -55,7 +55,7 @@ class WifiMonitor {
     await this.refreshSessionCount();
 
     // Subscribe to realtime network changes
-    this.unsubscribeNetInfo = NetInfo.addEventListener(this.handleNetInfo);
+    this.unsubscribeNetInfo = NetInfo.addEventListener(this.handleNetInfo.bind(this));
 
     // Perform an initial check immediately
     const info = await NetInfo.fetch();
@@ -63,7 +63,7 @@ class WifiMonitor {
 
     // Periodically refresh local session info so UI stays up to date
     this.sessionUpdateTimer = setInterval(() => {
-      if (this.sessionStartTime) {
+      if (this.monitoring && this.sessionStartTime) {
         this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
         this.notifyStatsUpdate();
       }
@@ -71,7 +71,7 @@ class WifiMonitor {
 
     // Update session statistics every minute
     this.statsUpdateTimer = setInterval(async () => {
-      if (this.sessionStartTime) {
+      if (this.monitoring && this.sessionStartTime) {
         try {
           await wifiService.updateSession();
           this.notifyStatsUpdate();
@@ -169,6 +169,11 @@ class WifiMonitor {
   }
 
   private async handleNetInfo(state: NetInfoState): Promise<void> {
+    // Safety check - ensure we're still monitoring
+    if (!this.monitoring) {
+      return;
+    }
+
     // We only care about WiFi connections
     if (state.type === 'wifi' && state.isConnected && state.details) {
       const details: any = state.details;

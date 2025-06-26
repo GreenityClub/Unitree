@@ -13,7 +13,15 @@ const STORAGE_KEYS = {
   PENDING_SESSIONS: 'bg_pending_sessions',
   LAST_SYNC: 'bg_last_sync',
   USER_TOKEN: 'authToken',
-  IS_BACKGROUND_ENABLED: 'bg_wifi_enabled'
+  IS_BACKGROUND_ENABLED: 'bg_wifi_enabled',
+  LAST_APP_ACTIVITY: 'bg_last_app_activity', // New key to track app activity
+};
+
+// Constants for session management
+const SESSION_CONSTANTS = {
+  MAX_BACKGROUND_DURATION: 5 * 60 * 60, // 5 hours max in background before ending session
+  STALE_SESSION_THRESHOLD: 10 * 60, // 10 minutes without app activity = stale session
+  BACKGROUND_CHECK_INTERVAL: 5 * 60 * 1000, // 5 minutes in milliseconds
 };
 
 // Minimal session data for background tracking
@@ -150,6 +158,16 @@ class BackgroundWifiService {
       const netInfo = await NetInfo.fetch();
       const currentSession = await this.getCurrentSession();
       
+      // First, check if current session is stale (app has been closed)
+      if (currentSession?.isActive) {
+        const isStale = await this.isSessionStale(currentSession);
+        if (isStale) {
+          console.log('🕐 Detected stale session - app likely closed, ending session');
+          await this.endStaleSession(currentSession);
+          return;
+        }
+      }
+      
       if (netInfo.type === 'wifi' && netInfo.isConnected && netInfo.details) {
         const wifiDetails = netInfo.details as any;
         const ipAddress = wifiDetails.ipAddress;
@@ -165,8 +183,8 @@ class BackgroundWifiService {
             await this.endCurrentBackgroundSession();
             await this.startBackgroundSession(ipAddress);
           } else {
-            // Same session, just update duration
-            await this.updateBackgroundSession();
+            // Same session, update duration carefully
+            await this.updateBackgroundSessionWithStaleCheck();
           }
         } else {
           // Not on university WiFi, end any active session IMMEDIATELY
@@ -227,19 +245,23 @@ class BackgroundWifiService {
     
     const currentSession = await this.getCurrentSession();
     if (currentSession?.isActive) {
-      // Mark session as background mode for proper tracking
+      // Mark session as background mode and record the time
+      const backgroundStartTime = new Date().toISOString();
       const updatedSession = {
         ...currentSession,
         metadata: {
           ...currentSession.metadata,
-          backgroundModeStartTime: new Date().toISOString(),
+          backgroundModeStartTime: backgroundStartTime,
           isInBackground: true
         }
       };
       
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(updatedSession));
-      console.log('📱 Session marked as background mode');
+      console.log('📱 Session marked as background mode at:', backgroundStartTime);
     }
+    
+    // Update last app activity
+    await this.updateLastAppActivity();
   }
 
   /**
@@ -260,6 +282,9 @@ class BackgroundWifiService {
    */
   async handleAppReopen(): Promise<{ sessionEnded: boolean; sessionStarted: boolean }> {
     console.log('📱 App reopened, handling session transition...');
+    
+    // Update app activity immediately when app reopens
+    await this.updateLastAppActivity();
     
     let sessionEnded = false;
     let sessionStarted = false;
@@ -299,15 +324,54 @@ class BackgroundWifiService {
   }
 
   /**
-   * Update current background session
+   * Update current background session with stale check
    */
-  private async updateBackgroundSession(): Promise<void> {
+  private async updateBackgroundSessionWithStaleCheck(): Promise<void> {
     const session = await this.getCurrentSession();
     if (!session || !session.isActive) return;
 
+    // Check if session has been in background too long
+    if (session.metadata?.isInBackground && session.metadata?.backgroundModeStartTime) {
+      const backgroundStart = new Date(session.metadata.backgroundModeStartTime);
+      const now = new Date();
+      const backgroundDuration = Math.floor((now.getTime() - backgroundStart.getTime()) / 1000);
+      
+      if (backgroundDuration > SESSION_CONSTANTS.MAX_BACKGROUND_DURATION) {
+        const hours = Math.floor(backgroundDuration / 3600);
+        const minutes = Math.floor((backgroundDuration % 3600) / 60);
+        console.log(`⏰ Session exceeded max background duration (${hours}h ${minutes}m), ending session`);
+        await this.endStaleSession(session);
+        return;
+      }
+    }
+
+    // Only update duration if not stale
+    const isStale = await this.isSessionStale(session);
+    if (isStale) {
+      console.log('🕐 Session detected as stale during update, ending session');
+      await this.endStaleSession(session);
+      return;
+    }
+
+    // Calculate duration based on when app went to background (not current time)
     const now = new Date();
     const startTime = new Date(session.startTime);
-    const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+    
+    let effectiveEndTime = now;
+    
+    // If in background mode, cap the duration to when it went to background + some grace period
+    if (session.metadata?.isInBackground && session.metadata?.backgroundModeStartTime) {
+      const backgroundStart = new Date(session.metadata.backgroundModeStartTime);
+      const gracePeriod = 5 * 60 * 1000; // 5 minutes grace period
+      const maxBackgroundTime = new Date(backgroundStart.getTime() + gracePeriod);
+      
+      if (now.getTime() > maxBackgroundTime.getTime()) {
+        effectiveEndTime = maxBackgroundTime;
+        console.log('⏱️ Capping session duration to background start + grace period');
+      }
+    }
+    
+    const duration = Math.floor((effectiveEndTime.getTime() - startTime.getTime()) / 1000);
 
     const updatedSession: BackgroundSession = {
       ...session,
@@ -319,7 +383,103 @@ class BackgroundWifiService {
   }
 
   /**
-   * End current background session
+   * Check if a session is stale (app likely closed)
+   */
+  private async isSessionStale(session: BackgroundSession): Promise<boolean> {
+    try {
+      const lastActivity = await AsyncStorage.getItem(STORAGE_KEYS.LAST_APP_ACTIVITY);
+      if (!lastActivity) {
+        // No activity recorded, assume app was just opened
+        await this.updateLastAppActivity();
+        return false;
+      }
+
+      const lastActivityTime = new Date(lastActivity);
+      const now = new Date();
+      const timeSinceActivity = Math.floor((now.getTime() - lastActivityTime.getTime()) / 1000);
+
+      // If it's been more than threshold since last activity, session is stale
+      return timeSinceActivity > SESSION_CONSTANTS.STALE_SESSION_THRESHOLD;
+    } catch (error) {
+      console.error('Error checking if session is stale:', error);
+      return false;
+    }
+  }
+
+  /**
+   * End a stale session with appropriate duration calculation
+   */
+  private async endStaleSession(session: BackgroundSession): Promise<void> {
+    console.log('🕐 Ending stale session:', session.id);
+
+    try {
+      const lastActivity = await AsyncStorage.getItem(STORAGE_KEYS.LAST_APP_ACTIVITY);
+      const startTime = new Date(session.startTime);
+      
+      let endTime: Date;
+      let duration: number;
+
+      if (lastActivity) {
+        // Use last app activity as end time
+        endTime = new Date(lastActivity);
+        duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+        console.log('📊 Using last app activity for stale session end time');
+      } else if (session.metadata?.backgroundModeStartTime) {
+        // Use background start time + grace period as end time
+        const backgroundStart = new Date(session.metadata.backgroundModeStartTime);
+        endTime = new Date(backgroundStart.getTime() + (5 * 60 * 1000)); // 5 minute grace
+        duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+        console.log('📊 Using background start time for stale session end time');
+      } else {
+        // Fallback to current time
+        endTime = new Date();
+        duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+        console.log('📊 Using current time for stale session end time (fallback)');
+      }
+
+      const endedSession: BackgroundSession = {
+        ...session,
+        endTime: endTime.toISOString(),
+        duration,
+        isActive: false,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          ...session.metadata,
+          endReason: 'stale_session'
+        }
+      };
+
+      // Save to pending sessions for later sync
+      await this.addToPendingSessions(endedSession);
+      
+      // Clear current session
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+      
+      const minutes = Math.floor(duration / 60);
+      const seconds = duration % 60;
+      console.log('⏹️ Stale session ended:', endedSession.id, 
+        `Duration: ${minutes}m ${seconds}s`, 
+        `IP: ${session.ipAddress}`);
+    } catch (error) {
+      console.error('Error ending stale session:', error);
+      // Fallback to regular session ending
+      await this.endCurrentBackgroundSession();
+    }
+  }
+
+  /**
+   * Update last app activity timestamp
+   */
+  private async updateLastAppActivity(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LAST_APP_ACTIVITY, new Date().toISOString());
+    } catch (error) {
+      console.error('Error updating last app activity:', error);
+    }
+  }
+
+  /**
+   * End current background session (regular ending)
    */
   private async endCurrentBackgroundSession(): Promise<void> {
     const session = await this.getCurrentSession();
@@ -337,7 +497,11 @@ class BackgroundWifiService {
       endTime: now.toISOString(),
       duration,
       isActive: false,
-      timestamp: now.toISOString()
+      timestamp: now.toISOString(),
+      metadata: {
+        ...session.metadata,
+        endReason: 'manual_end'
+      }
     };
 
     // Save to pending sessions for later sync

@@ -4,6 +4,7 @@ import notificationService, { NotificationSettings, StatsData } from '../service
 import { useAuth } from './AuthContext';
 import pointsService from '../services/pointsService';
 import { format, startOfDay, startOfWeek, startOfMonth } from 'date-fns';
+import { logger } from '../utils/logger';
 
 interface NotificationContextType {
   notificationSettings: NotificationSettings | null;
@@ -56,7 +57,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
         setIsInitialized(true);
         console.log('✅ Notification context initialized');
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Failed to initialize notification context:', error);
         
         // Still mark as initialized if it's just a Firebase configuration issue
@@ -123,25 +124,29 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Get current user stats for notifications
   const getCurrentStats = async (): Promise<StatsData> => {
     try {
+      // Get current points from service
+      const currentPoints = pointsService.getPoints();
+      const transactions = pointsService.getTransactions();
+
+      // Calculate basic stats from available data
       const now = new Date();
       const today = startOfDay(now);
-      const thisWeek = startOfWeek(now);
-      const thisMonth = startOfMonth(now);
+      
+      // Filter transactions for today (if any)
+      const todayTransactions = transactions.filter(transaction => {
+        const transactionDate = new Date(transaction.createdAt);
+        return transactionDate >= today;
+      });
 
-      // Get stats for different periods
-      const [dailyStats, weeklyStats, monthlyStats] = await Promise.all([
-        pointsService.getPointsHistory('daily', format(today, 'yyyy-MM-dd')),
-        pointsService.getPointsHistory('weekly', format(thisWeek, 'yyyy-MM-dd')),
-        pointsService.getPointsHistory('monthly', format(thisMonth, 'yyyy-MM-dd')),
-      ]);
+      const dailyPoints = todayTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
 
       return {
-        dailyTime: dailyStats?.totalTime || 0,
-        weeklyTime: weeklyStats?.totalTime || 0,
-        monthlyTime: monthlyStats?.totalTime || 0,
-        dailyPoints: dailyStats?.totalPoints || 0,
-        weeklyPoints: weeklyStats?.totalPoints || 0,
-        monthlyPoints: monthlyStats?.totalPoints || 0,
+        dailyTime: 0, // Time tracking not available from points service
+        weeklyTime: 0,
+        monthlyTime: 0,
+        dailyPoints: dailyPoints,
+        weeklyPoints: currentPoints, // Use total points as approximation
+        monthlyPoints: currentPoints,
       };
     } catch (error) {
       console.error('❌ Failed to get current stats:', error);

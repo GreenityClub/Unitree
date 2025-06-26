@@ -81,7 +81,7 @@ const LoadingSplashScreen: React.FC = () => {
           color={theme.colors?.primaryLight || fallbackColors.primaryLight} 
           style={styles.spinner}
         />
-        <Text style={styles.loadingText}>Đang khởi tạo...</Text>
+        <Text style={styles.loadingText}>Loading...</Text>
       </Animated.View>
     </SafeAreaView>
   );
