@@ -18,13 +18,13 @@ const requiredEnvVars = {
   PORT: process.env.PORT || 3000,
   
   // WiFi & Points Configuration
-  UNIVERSITY_IP_PREFIX: process.env.UNIVERSITY_IP_PREFIX || '10.22',
+  UNIVERSITY_IP_PREFIX: process.env.UNIVERSITY_IP_PREFIX || '192.168',
   MIN_SESSION_DURATION: process.env.MIN_SESSION_DURATION || '300',
   POINTS_PER_HOUR: process.env.POINTS_PER_HOUR || '60',
   
   // University Location Configuration
-  UNIVERSITY_LAT: process.env.UNIVERSITY_LAT || '21.023883446210807',
-  UNIVERSITY_LNG: process.env.UNIVERSITY_LNG || '105.79044010261333',
+  UNIVERSITY_LAT: process.env.UNIVERSITY_LAT || '20.6116942',
+  UNIVERSITY_LNG: process.env.UNIVERSITY_LNG || '105.1161451',
   UNIVERSITY_RADIUS: process.env.UNIVERSITY_RADIUS || '100',
   
   // Tree Configuration

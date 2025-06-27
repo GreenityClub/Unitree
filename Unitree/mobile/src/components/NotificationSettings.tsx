@@ -7,6 +7,7 @@ import { NotificationSettings as NotificationSettingsType } from '../services/no
 import Button from './common/Button';
 import Card from './common/Card';
 import { colors } from '../theme';
+import NotificationTester from '../utils/notificationTest';
 
 export default function NotificationSettings() {
   const { 
@@ -73,6 +74,33 @@ export default function NotificationSettings() {
       Alert.alert('Test Sent', `${type.charAt(0).toUpperCase() + type.slice(1)} notification sent successfully!`);
     } catch (error) {
       Alert.alert('Error', 'Failed to send test notification');
+    }
+  };
+
+  const handleFullNotificationTest = async () => {
+    try {
+      setIsSaving(true);
+      const result = await NotificationTester.runFullTest();
+      
+      const statusEmoji = result.error ? '❌' : '✅';
+      const title = result.error ? 'Test Failed' : 'Test Completed';
+      
+      const message = `
+Device: ${result.deviceType}
+Permissions: ${result.hasPermissions ? '✅' : '❌'}
+Push Token: ${result.pushToken ? '✅' : '❌'}
+Server Save: ${result.tokenSavedToServer ? '✅' : '❌'}
+EAS Project: ${result.projectId}
+Firebase Project: ${result.firebaseProjectId}
+
+${result.error ? `Error: ${result.error}` : 'All systems working correctly!'}
+      `.trim();
+
+      Alert.alert(title, message);
+    } catch (error) {
+      Alert.alert('Test Error', `Failed to run test: ${error.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -251,7 +279,16 @@ export default function NotificationSettings() {
 
             {/* Test Notifications */}
             <View style={styles.testSection}>
-              <Text style={styles.testTitle}>Test Notifications</Text>
+              <Text style={styles.testTitle}>🧪 Test Notifications</Text>
+              
+              <Button
+                title="Run Full System Test"
+                onPress={handleFullNotificationTest}
+                disabled={isSaving}
+                style={{...styles.fullTestButton, backgroundColor: colors.primary, marginBottom: 10}}
+              />
+              
+              <Text style={styles.testSubtitle}>Test Individual Notifications:</Text>
               <View style={styles.testButtons}>
                 <Button
                   title="Daily"
@@ -373,5 +410,15 @@ const styles = StyleSheet.create({
   testButton: {
     flex: 1,
     paddingVertical: 8,
+  },
+  fullTestButton: {
+    width: '100%',
+    paddingVertical: 12,
+  },
+  testSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+    marginTop: 8,
   },
 }); 
