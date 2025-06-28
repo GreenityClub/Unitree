@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
-import { AuthProvider } from '../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { WiFiProvider } from '../src/context/WiFiContext';
 import { TabBarProvider } from '../src/context/TabBarContext';
 import { BackgroundSyncProvider } from '../src/context/BackgroundSyncContext';
@@ -15,16 +15,45 @@ import ENV, { validateEnvironment } from '../src/config/env';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import BackgroundWifiService from '../src/services/BackgroundWifiService';
-import SplashScreen from '../src/components/SplashScreen';
+import CustomSplashScreen from '../src/components/SplashScreen';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+
+function SplashScreenManager() {
+  const { isLoading } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashComplete = () => {
+    // Only hide splash when both font loading and auth checking are complete
+    if (!isLoading) {
+      setShowSplash(false);
+    }
+  };
+
+  // Hide splash when auth loading is complete
+  useEffect(() => {
+    if (!isLoading && !showSplash) {
+      // Auth is ready, we can proceed
+    }
+  }, [isLoading]);
+
+  if (showSplash || isLoading) {
+    return (
+      <CustomSplashScreen 
+        onAnimationComplete={handleSplashComplete}
+        isAuthLoading={isLoading}
+      />
+    );
+  }
+
+  return null;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     // Validate environment variables on app startup
@@ -60,16 +89,8 @@ export default function RootLayout() {
     };
   }, []);
 
-  if (!loaded || showSplash) {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <SplashScreen 
-            onAnimationComplete={() => setShowSplash(false)}
-          />
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    );
+  if (!loaded) {
+    return null;
   }
 
   return (
@@ -77,14 +98,16 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PaperProvider>
           <AuthProvider>
+            <SplashScreenManager />
             <WiFiProvider>
               <BackgroundSyncProvider>
                 <NotificationProvider>
                   <TabBarProvider>
                     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                       <Stack>
-                        <Stack.Screen name="auth" options={{ headerShown: false }} />
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="auth" options={{ headerShown: false }} />
                         <Stack.Screen name="user-settings" options={{ headerShown: false }} />
                         <Stack.Screen name="system-settings" options={{ headerShown: false }} />
                         <Stack.Screen name="+not-found" />

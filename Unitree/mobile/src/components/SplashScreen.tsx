@@ -23,9 +23,10 @@ const { width, height } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onAnimationComplete?: () => void;
+  isAuthLoading?: boolean;
 }
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete, isAuthLoading = false }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -54,17 +55,31 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
           duration: 600,
           useNativeDriver: true,
         }),
-        // Hold for a moment
-        Animated.delay(1000),
+        // Hold for longer to allow auth check to complete
+        Animated.delay(isAuthLoading ? 500 : 1000),
       ]);
 
       animationSequence.start(() => {
-        onAnimationComplete?.();
+        // Only call onAnimationComplete if auth is not loading
+        if (!isAuthLoading) {
+          onAnimationComplete?.();
+        }
       });
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, scaleAnim, slideAnim, onAnimationComplete]);
+  }, [fadeAnim, scaleAnim, slideAnim, onAnimationComplete, isAuthLoading]);
+
+  // Watch for auth loading changes and call completion when auth is done
+  useEffect(() => {
+    if (!isAuthLoading) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        onAnimationComplete?.();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthLoading, onAnimationComplete]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

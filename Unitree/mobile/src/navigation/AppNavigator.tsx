@@ -3,7 +3,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
-import LoadingSplashScreen from '../components/LoadingSplashScreen';
 
 // Import Navigators
 import MainTabs from './MainTabs';
@@ -40,10 +39,10 @@ export function navigate(name: keyof RootStackParamList, params?: any) {
 const Stack = createStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!loading && navigationRef.isReady()) {
+    if (!isLoading && navigationRef.isReady()) {
       if (user) {
         navigationRef.dispatch(
           CommonActions.reset({
@@ -60,12 +59,9 @@ const AppNavigator: React.FC = () => {
         );
       }
     }
-  }, [user, loading]);
+  }, [user, isLoading]);
 
-  if (loading) {
-    return <LoadingSplashScreen />;
-  }
-
+  // No loading screen here as main splash screen handles all loading
   return (
     <Stack.Navigator 
       key={user ? 'authenticated' : 'unauthenticated'}
