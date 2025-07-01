@@ -23,7 +23,7 @@ import { useWiFi } from '../../context/WiFiContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { 
   rf, 
   rs, 
@@ -33,9 +33,10 @@ import {
   getLayoutConfig,
   getContainerPadding,
   getMaxContentWidth,
-  getModalWidth
+  getModalWidth,
+  isSmallHeightDevice
 } from '../../utils/responsive';
-import { ResponsiveGrid } from '../../components';
+// ResponsiveGrid không cần thiết nữa vì tablet dùng layout giống mobile
 import userService from '../../services/userService';
 import { treeService } from '../../services/treeService';
 import { eventService } from '../../services/eventService';
@@ -293,7 +294,7 @@ const ProfileScreen = () => {
     }
   };
 
-  return (
+  const renderScreen = () => (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#E8F2CD" />
@@ -303,7 +304,7 @@ const ProfileScreen = () => {
           style={[
             styles.headerSection, 
             { 
-              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(20),
             }, 
             headerAnimatedStyle
           ]}
@@ -313,9 +314,8 @@ const ProfileScreen = () => {
         <View style={[
           styles.profileHeaderSection,
           {
-            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-            alignSelf: 'center',
             width: '100%',
+            alignSelf: 'center',
             flexDirection: layoutConfig.isTablet ? 'column' : 'row',
             paddingHorizontal: 0,
           }
@@ -369,7 +369,7 @@ const ProfileScreen = () => {
           styles.contentSection, 
           { 
             paddingBottom: insets.bottom,
-            paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+            paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(24),
           }, 
           contentAnimatedStyle
         ]}
@@ -380,8 +380,6 @@ const ProfileScreen = () => {
             styles.scrollContent,
             { 
               paddingBottom: insets.bottom + rs(90),
-              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-              alignSelf: 'center',
               width: '100%'
             }
           ]}
@@ -396,150 +394,78 @@ const ProfileScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-            {layoutConfig.isTablet ? (
-              <ResponsiveGrid 
-                baseColumns={1}
-                gap={20}
+            {/* Stats Card */}
+            <View style={[styles.card, styles.statsCard]}>
+              <Text style={styles.cardTitle}>Your Impact</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Icon name="star" size={rf(24)} color="#50AF27" />
+                  <Text style={styles.statValue}>
+                  {isSessionActive ? getLiveTotalPoints() : currentPoints}
+                </Text>
+                  <Text style={styles.statLabel}>Points</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Icon name="tree" size={rf(24)} color="#50AF27" />
+                  <Text style={styles.statValue}>{actualTreeCount}</Text>
+                  <Text style={styles.statLabel}>Trees</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Icon name="cloud-outline" size={rf(24)} color="#50AF27" />
+                  <Text style={styles.statValue}>{realTreeCount * 22}</Text>
+                  <Text style={styles.statLabel}>kg CO₂/year</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Settings Card */}
+            <View style={[styles.card, styles.settingsCard]}>
+              <Text style={styles.cardTitle}>Settings</Text>
+              
+              <TouchableOpacity
+                style={styles.settingsItem}
+                onPress={() => router.push('/user-settings')}
               >
-                {/* Stats Card */}
-                <View style={[styles.card, styles.statsCard]}>
-                  <Text style={styles.cardTitle}>Your Impact</Text>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Icon name="star" size={rf(24, 28, 32)} color="#50AF27" />
-                      <Text style={styles.statValue}>
-                      {isSessionActive ? getLiveTotalPoints() : currentPoints}
-                    </Text>
-                      <Text style={styles.statLabel}>Points</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Icon name="tree" size={rf(24, 28, 32)} color="#50AF27" />
-                      <Text style={styles.statValue}>{actualTreeCount}</Text>
-                      <Text style={styles.statLabel}>Trees</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Icon name="cloud-outline" size={rf(24, 28, 32)} color="#50AF27" />
-                      <Text style={styles.statValue}>{realTreeCount * 22}</Text>
-                      <Text style={styles.statLabel}>kg CO₂/year</Text>
-                    </View>
-                  </View>
+                <View style={styles.settingsItemLeft}>
+                  <Icon name="account-edit" size={rf(24)} color="#50AF27" />
+                  <Text style={styles.settingsItemText}>User Settings</Text>
                 </View>
+                <Icon name="chevron-right" size={rf(20)} color="#666" />
+              </TouchableOpacity>
 
-                {/* Settings Card */}
-                <View style={[styles.card, styles.settingsCard]}>
-                  <Text style={styles.cardTitle}>Settings</Text>
-                  
-                  <TouchableOpacity
-                    style={styles.settingsItem}
-                    onPress={() => router.push('/user-settings')}
-                  >
-                    <View style={styles.settingsItemLeft}>
-                      <Icon name="account-edit" size={rf(24, 28, 32)} color="#50AF27" />
-                      <Text style={styles.settingsItemText}>User Settings</Text>
-                    </View>
-                    <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.settingsItem, { borderBottomWidth: 0 }]}
-                    onPress={() => router.push('/system-settings')}
-                  >
-                    <View style={styles.settingsItemLeft}>
-                      <Icon name="cog" size={rf(24, 28, 32)} color="#50AF27" />
-                      <Text style={styles.settingsItemText}>System Settings</Text>
-                    </View>
-                    <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={handleLogout}
-                  >
-                    <Icon name="logout" size={rf(24, 28, 32)} color="#FFA79D" />
-                    <Text style={styles.logoutButtonText}>Logout</Text>
-                  </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                onPress={() => router.push('/system-settings')}
+              >
+                <View style={styles.settingsItemLeft}>
+                  <Icon name="cog" size={rf(24)} color="#50AF27" />
+                  <Text style={styles.settingsItemText}>System Settings</Text>
                 </View>
-              </ResponsiveGrid>
-            ) : (
-              <>
-                {/* Stats Card */}
-                <View style={[styles.card, styles.statsCard]}>
-                  <Text style={styles.cardTitle}>Your Impact</Text>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Icon name="star" size={24} color="#50AF27" />
-                      <Text style={styles.statValue}>
-                      {isSessionActive ? getLiveTotalPoints() : currentPoints}
-                    </Text>
-                      <Text style={styles.statLabel}>Points</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Icon name="tree" size={24} color="#50AF27" />
-                      <Text style={styles.statValue}>{actualTreeCount}</Text>
-                      <Text style={styles.statLabel}>Trees</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Icon name="cloud-outline" size={24} color="#50AF27" />
-                      <Text style={styles.statValue}>{realTreeCount * 22}</Text>
-                      <Text style={styles.statLabel}>kg CO₂/year</Text>
-                    </View>
-                  </View>
-                </View>
+                <Icon name="chevron-right" size={rf(20)} color="#666" />
+              </TouchableOpacity>
 
-                {/* Settings Card */}
-                <View style={[styles.card, styles.settingsCard]}>
-                  <Text style={styles.cardTitle}>Settings</Text>
-                  
-                  <TouchableOpacity
-                    style={styles.settingsItem}
-                    onPress={() => router.push('/user-settings')}
-                  >
-                    <View style={styles.settingsItemLeft}>
-                      <Icon name="account-edit" size={24} color="#50AF27" />
-                      <Text style={styles.settingsItemText}>User Settings</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color="#666" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.settingsItem, { borderBottomWidth: 0 }]}
-                    onPress={() => router.push('/system-settings')}
-                  >
-                    <View style={styles.settingsItemLeft}>
-                      <Icon name="cog" size={24} color="#50AF27" />
-                      <Text style={styles.settingsItemText}>System Settings</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color="#666" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={handleLogout}
-                  >
-                    <Icon name="logout" size={24} color="#FFA79D" />
-                    <Text style={styles.logoutButtonText}>Logout</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={handleLogout}
+              >
+                <Icon name="logout" size={rf(24)} color="#FFA79D" />
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </Animated.View>
 
       {/* Mascot */}
-      {!layoutConfig.isTablet && (
-        <View style={styles.mascotContainer}>
-          <Image
-            source={require('../../assets/mascots/Unitree - Mascot-3.png')}
-            style={styles.mascotImage}
-            resizeMode="contain"
-          />
-        </View>
-      )}
+      <View style={styles.mascotContainer}>
+        <Image
+          source={require('../../assets/mascots/Unitree - Mascot-3.png')}
+          style={styles.mascotImage}
+          resizeMode="contain"
+        />
+      </View>
 
       {/* Logout Modal */}
       {showLogoutModal && (
@@ -567,6 +493,17 @@ const ProfileScreen = () => {
       </View>
     </GestureDetector>
   );
+
+  // For tablet, wrap with SafeAreaView since we bypass ScreenLayout
+  if (layoutConfig.isTablet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#E8F2CD' }} edges={['left', 'right']}>
+        {renderScreen()}
+      </SafeAreaView>
+    );
+  }
+
+  return renderScreen();
 };
 
 const styles = StyleSheet.create({
@@ -659,12 +596,12 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: deviceValue(115, 125, 135),
+    top: isSmallHeightDevice() ? rs(115) : rs(235),
     zIndex: 9999,
   },
   mascotImage: {
-    width: rs(160),
-    height: rs(160),
+    width: rs(160, 180, 200),
+    height: rs(160, 180, 200),
   },
   scrollContainer: {
     flex: 1,

@@ -75,8 +75,9 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
         logger.auth.debug('Authentication required for WiFi stats');
         return;
       }
-      logger.wifi.error('Failed to refresh WiFi stats', { data: err });
-      setError('Failed to refresh WiFi stats');
+      logger.wifi.error('WiFi stats refresh error', { data: err });
+      // Silently handle refresh errors without showing error message
+      setError(null);
     }
   };
 

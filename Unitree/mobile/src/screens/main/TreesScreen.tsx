@@ -21,7 +21,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
 import { useTabBarContext } from '../../context/TabBarContext';
@@ -333,7 +333,7 @@ const TreesScreen = () => {
     setSelectedTreeType(type);
   };
 
-  return (
+  const renderScreen = () => (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
@@ -344,7 +344,7 @@ const TreesScreen = () => {
             styles.headerSection, 
             { 
               paddingTop: insets.top,
-              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(20),
             }, 
             headerAnimatedStyle
           ]}
@@ -354,17 +354,16 @@ const TreesScreen = () => {
         <View style={[
           styles.welcomeSection,
           {
-            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-            alignSelf: 'center',
             width: '100%',
+            alignSelf: 'center',
             paddingHorizontal: 0,
-            alignItems: layoutConfig.isTablet ? 'center' : 'flex-start',
+            alignItems: 'flex-start',
           }
         ]}>
-          <Text style={[styles.titleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
+          <Text style={[styles.titleText, { textAlign: 'left' }]}>
             Your Forest
           </Text>
-          <Text style={[styles.subtitleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
+          <Text style={[styles.subtitleText, { textAlign: 'left' }]}>
             Watch your forest grow with each WiFi connection
           </Text>
         </View>
@@ -376,7 +375,7 @@ const TreesScreen = () => {
           styles.contentSection, 
           { 
             paddingBottom: insets.bottom,
-            paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+            paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(24),
           }, 
           contentAnimatedStyle
         ]}
@@ -385,9 +384,8 @@ const TreesScreen = () => {
         <View style={[
           styles.fixedSummaryContainer,
           {
-            maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-            alignSelf: 'center',
             width: '100%',
+            alignSelf: 'center',
             paddingHorizontal: 0,
           }
         ]}>
@@ -475,8 +473,6 @@ const TreesScreen = () => {
             styles.scrollContent,
             { 
               paddingBottom: insets.bottom + rs(90),
-              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-              alignSelf: 'center',
               width: '100%'
             }
           ]}
@@ -564,7 +560,6 @@ const TreesScreen = () => {
       </Animated.View>
 
         {/* Mascot */}
-        {!layoutConfig.isTablet && (
           <View style={styles.mascotContainer}>
             <Image
               source={require('../../assets/mascots/Unitree - Mascot-5.png')}
@@ -572,10 +567,20 @@ const TreesScreen = () => {
               resizeMode="contain"
             />
           </View>
-        )}
       </View>
     </GestureDetector>
   );
+
+  // For tablet, wrap with SafeAreaView since we bypass ScreenLayout
+  if (layoutConfig.isTablet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFCED2' }} edges={['left', 'right']}>
+        {renderScreen()}
+      </SafeAreaView>
+    );
+  }
+
+  return renderScreen();
 };
 
 const styles = StyleSheet.create({
@@ -617,8 +622,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   mascotImage: {
-    width: rs(160),
-    height: rs(160),
+    width: rs(160, 180, 200),
+    height: rs(160, 180, 200),
   },
   scrollContainer: {
     flex: 1,

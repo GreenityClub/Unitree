@@ -6,7 +6,6 @@ import {
   Image,
   StatusBar,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
 import { Text, ProgressBar } from 'react-native-paper';
@@ -16,7 +15,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useWiFi } from '../../context/WiFiContext';
 import { useBackgroundSync } from '../../context/BackgroundSyncContext';
@@ -26,7 +25,22 @@ import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { wifiService } from '../../services/wifiService';
 import { pointsService } from '../../services/pointsService';
 
-import { rf, rs, wp, hp, deviceValue, getImageSize, SCREEN_DIMENSIONS, isSmallHeightDevice } from '../../utils/responsive';
+import { 
+  rf, 
+  rs, 
+  wp, 
+  hp, 
+  deviceValue, 
+  getImageSize, 
+  SCREEN_DIMENSIONS, 
+  isSmallHeightDevice,
+  isTablet,
+  isTabletLarge,
+  getLayoutConfig,
+  getContainerPadding,
+  getMaxContentWidth
+} from '../../utils/responsive';
+import { ResponsiveGrid } from '../../components';
 
 interface StatItemProps {
   label: string;
@@ -38,7 +52,7 @@ interface StatItemProps {
 const StatItem: React.FC<StatItemProps> = ({ label, duration, points, icon }) => (
   <View style={styles.statItem}>
     <View style={styles.statHeader}>
-      <Icon name={icon} size={20} color="#50AF27" />
+      <Icon name={icon} size={rf(20, 24, 28)} color="#50AF27" />
       <Text style={styles.statLabel}>{label}</Text>
     </View>
     <View style={styles.statDetails}>
@@ -74,6 +88,7 @@ const WifiStatusScreen: React.FC = () => {
     wifiMonitor 
   } = useWiFi();
   const { syncStats, isSyncing } = useBackgroundSync();
+  const layoutConfig = getLayoutConfig();
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -163,22 +178,36 @@ const WifiStatusScreen: React.FC = () => {
     return stats?.currentSession?.points || 0;
   };
 
-  return (
+  const renderScreen = () => (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#FFCED2" />
 
         {/* Fixed Header Section */}
         <Animated.View 
-          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          style={[
+            styles.headerSection, 
+            { 
+              paddingTop: insets.top,
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(20),
+            }, 
+            headerAnimatedStyle
+          ]}
           onTouchStart={handleTouchStart}
         >
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>
+        <View style={[
+          styles.welcomeSection,
+          {
+            width: '100%',
+            paddingHorizontal: 0,
+            alignItems: 'flex-start', // Always align left
+          }
+        ]}>
+          <Text style={[styles.titleText, { textAlign: 'left' }]}>
             WiFi Status
           </Text>
-          <Text style={styles.subtitleText}>
+          <Text style={[styles.subtitleText, { textAlign: 'left' }]}>
             {(isConnected && isUniversityWifi)
               ? 'Keep connected to earn more points!'
               : 'Connect to university WiFi to start earning'}
@@ -188,13 +217,23 @@ const WifiStatusScreen: React.FC = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+          style={[
+            styles.contentSection, 
+            { 
+              paddingBottom: insets.bottom,
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(24),
+            }, 
+            contentAnimatedStyle
+          ]}
       >
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
+              { 
+                paddingBottom: insets.bottom + rs(90),
+                width: '100%'
+              }
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -207,6 +246,151 @@ const WifiStatusScreen: React.FC = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
+            {layoutConfig.isTablet ? (
+              <View style={{ flex: 1, width: '100%' }}>
+                {/* WiFi Status Card */}
+                <View style={styles.statusCard}>
+                  {(isConnected && isUniversityWifi && isSessionActive) && <LiveBadge />}
+                  <View style={styles.cardHeader}>
+                    <Icon 
+                      name={getWifiStatusIcon()} 
+                      size={rf(28, 32, 36)} 
+                      color={(isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
+                    />
+                    <Text style={styles.cardTitle}>WiFi Status</Text>
+                  </View>
+                  <Text style={[
+                    styles.statusText,
+                    (isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
+                  ]}>
+                    {getConnectionStatus()}
+                  </Text>
+                  {(isConnected && isUniversityWifi) && (
+                    <Text style={styles.bssidInfo}>
+                      {process.env.EXPO_PUBLIC_UNIVERSITY_SSIDS} ✓
+                    </Text>
+                  )}
+                  {(isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
+                    <View style={styles.sessionInfo}>
+                      <Text style={styles.sessionText}>
+                        Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Points earned: {getLiveSessionPoints()}
+                      </Text>
+                      <Text style={styles.sessionText}>
+                        Sessions today: {sessionCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Current Points Card */}
+                <View style={styles.pointsCard}>
+                  {isSessionActive && <LiveBadge />}
+                  <View style={styles.cardHeader}>
+                    <Icon name="star" size={rf(28, 32, 36)} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Total Points</Text>
+                  </View>
+                  <Text style={styles.pointsValue}>{liveTotalPoints}</Text>
+                  {isSessionActive && (
+                    <Text style={styles.activeSessionText}>• Session Active - Earning 1 point per minute</Text>
+                  )}
+                </View>
+
+                {/* Stats Summary Card */}
+                <View style={styles.summaryCard}>
+                  <View style={styles.cardHeader}>
+                    <Icon name="chart-bar" size={rf(28, 32, 36)} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Connection Statistics</Text>
+                  </View>
+
+                  {stats ? (
+                    <>
+                      {/* Session Count Display */}
+                      <View style={styles.statItem}>
+                        <View style={styles.statHeader}>
+                          <Icon name="counter" size={rf(20, 24, 28)} color="#50AF27" />
+                          <Text style={styles.statLabel}>Sessions Today</Text>
+                        </View>
+                        <View style={styles.statDetails}>
+                          <Text style={styles.statText}>Count: {sessionCount}</Text>
+                          <Text style={styles.statText}>Status: {isSessionActive ? 'Active' : 'Inactive'}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.divider} />
+
+                      <StatItem 
+                        label="Today" 
+                        duration={stats.periods.today.duration}
+                        points={stats.periods.today.points}
+                        icon="calendar-today"
+                      />
+                      <View style={styles.divider} />
+                      
+                      <StatItem 
+                        label="This Week" 
+                        duration={stats.periods.thisWeek.duration}
+                        points={stats.periods.thisWeek.points}
+                        icon="calendar-week"
+                      />
+                      <View style={styles.divider} />
+                      
+                      <StatItem 
+                        label="This Month" 
+                        duration={stats.periods.thisMonth.duration}
+                        points={stats.periods.thisMonth.points}
+                        icon="calendar-month"
+                      />
+                      <View style={styles.divider} />
+
+                      <StatItem 
+                        label="Total Time" 
+                        duration={stats.periods.allTime.duration}
+                        points={stats.periods.allTime.points}
+                        icon="clock-outline"
+                      />
+                    </>
+                  ) : (
+                    <Text style={styles.loadingText}>Loading statistics...</Text>
+                  )}
+                </View>
+
+                {error && (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                )}
+
+                {/* Background Sync Status */}
+                {syncStats && (
+                  <View style={styles.backgroundSyncCard}>
+                    <View style={styles.cardHeader}>
+                      <Icon name="sync" size={rf(28, 32, 36)} color="#50AF27" />
+                      <Text style={styles.cardTitle}>Background Sync Status</Text>
+                      {isSyncing && <Icon name="loading" size={rf(20, 24, 28)} color="#50AF27" />}
+                    </View>
+                    
+                    <View style={styles.backgroundSyncRow}>
+                      <Text style={styles.backgroundSyncLabel}>Pending Sessions:</Text>
+                      <Text style={styles.backgroundSyncValue}>{syncStats.pendingCount}</Text>
+                    </View>
+                    
+                    {syncStats.currentSession && (
+                      <View style={styles.backgroundSyncRow}>
+                        <Text style={styles.backgroundSyncLabel}>Background Session:</Text>
+                        <Text style={[styles.backgroundSyncValue, { color: '#50AF27' }]}>Active</Text>
+                      </View>
+                    )}
+                    
+                    <Text style={styles.backgroundSyncNote}>
+                      Go to User Settings to enable/disable background monitoring
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <>
             {/* WiFi Status Card */}
             <View style={styles.statusCard}>
               {(isConnected && isUniversityWifi && isSessionActive) && <LiveBadge />}
@@ -347,7 +531,8 @@ const WifiStatusScreen: React.FC = () => {
                 </Text>
               </View>
             )}
-            
+              </>
+            )}
           </View>
         </ScrollView>
       </Animated.View>
@@ -365,6 +550,17 @@ const WifiStatusScreen: React.FC = () => {
       </View>
     </GestureDetector>
   );
+
+  // For tablet, wrap with SafeAreaView since we bypass ScreenLayout
+  if (layoutConfig.isTablet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFCED2' }} edges={['left', 'right']}>
+        {renderScreen()}
+      </SafeAreaView>
+    );
+  }
+
+  return renderScreen();
 };
 
 const styles = StyleSheet.create({
@@ -379,7 +575,7 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     alignItems: 'flex-start',
-    paddingHorizontal: rs(20),
+    paddingHorizontal: 0,
     marginTop: rs(10),
   },
   titleText: {
@@ -387,7 +583,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: rs(10),
-    textAlign: 'center',
+    textAlign: 'left',
   },
   subtitleText: {
     fontSize: rf(16),
@@ -401,7 +597,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#98D56D',
     borderTopLeftRadius: rs(30),
     borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
     paddingTop: rs(32),
     marginTop: rs(10),
   },
@@ -412,8 +607,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   mascotImage: {
-    width: rs(160),
-    height: rs(160),
+    width: rs(160, 180, 200),
+    height: rs(160, 180, 200),
   },
   scrollContainer: {
     flex: 1,

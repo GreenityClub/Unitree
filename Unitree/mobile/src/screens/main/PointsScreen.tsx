@@ -9,7 +9,6 @@ import {
   Image,
   StatusBar,
   RefreshControl,
-  SafeAreaView,
   Modal,
   TextInput,
 } from 'react-native';
@@ -26,7 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { useTabBarContext } from '../../context/TabBarContext';
@@ -34,8 +33,18 @@ import { useWiFi } from '../../context/WiFiContext';
 import { useScreenLoadingAnimation } from '../../hooks/useScreenLoadingAnimation';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { formatDistanceToNow } from 'date-fns';
-import { rf, rs, isSmallHeightDevice } from '../../utils/responsive';
+import { 
+  rf, 
+  rs, 
+  isSmallHeightDevice,
+  isTablet,
+  isTabletLarge,
+  getLayoutConfig,
+  getContainerPadding,
+  getMaxContentWidth
+} from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { ResponsiveGrid } from '../../components';
 import { wifiService, WiFiSession, WifiStats } from '../../services/wifiService';
 import { treeService, Tree, RedeemTreeData } from '../../services/treeService';
 import { pointsService, Transaction, PointsState } from '../../services/pointsService';
@@ -56,7 +65,7 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     alignItems: 'flex-start',
-    paddingHorizontal: rs(20),
+    paddingHorizontal: 0,
     marginTop: rs(10),
   },
   titleText: {
@@ -64,7 +73,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: rs(10),
-    textAlign: 'center',
+    textAlign: 'left',
   },
   subtitleText: {
     fontSize: rf(16),
@@ -78,7 +87,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#98D56D',
     borderTopLeftRadius: rs(30),
     borderTopRightRadius: rs(30),
-    paddingHorizontal: rs(24),
     paddingTop: rs(32),
   },
   mascotContainer: {
@@ -88,8 +96,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   mascotImage: {
-    width: rs(160),
-    height: rs(160),
+    width: rs(160, 180, 200),
+    height: rs(160, 180, 200),
   },
   scrollContainer: {
     flex: 1,
@@ -828,6 +836,7 @@ const PointsScreen = () => {
     sessionCount, 
     ipAddress 
   } = useWiFi();
+  const layoutConfig = getLayoutConfig();
   const [pointsState, setPointsState] = useState<PointsState>({ points: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -1092,20 +1101,34 @@ const PointsScreen = () => {
     );
   };
 
-  return (
+  const renderScreen = () => (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
 
         {/* Fixed Header Section */}
         <Animated.View 
-          style={[styles.headerSection, { paddingTop: insets.top }, headerAnimatedStyle]}
+          style={[
+            styles.headerSection, 
+            { 
+              paddingTop: insets.top,
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(20),
+            }, 
+            headerAnimatedStyle
+          ]}
           onTouchStart={handleTouchStart}
         >
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.titleText}>Your Points</Text>
-          <Text style={styles.subtitleText}>
+        <View style={[
+          styles.welcomeSection,
+          {
+            width: '100%',
+            paddingHorizontal: 0,
+            alignItems: 'flex-start', // Always align left
+          }
+        ]}>
+          <Text style={[styles.titleText, { textAlign: 'left' }]}>Your Points</Text>
+          <Text style={[styles.subtitleText, { textAlign: 'left' }]}>
             Earn points by connecting to university WiFi
           </Text>
         </View>
@@ -1113,13 +1136,23 @@ const PointsScreen = () => {
 
       {/* Scrollable Content Section */}
       <Animated.View 
-        style={[styles.contentSection, { paddingBottom: insets.bottom }, contentAnimatedStyle]}
+        style={[
+          styles.contentSection, 
+          { 
+            paddingBottom: insets.bottom,
+            paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(24),
+          }, 
+          contentAnimatedStyle
+        ]}
       >
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + rs(90) }
+            { 
+              paddingBottom: insets.bottom + rs(90),
+              width: '100%'
+            }
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1132,6 +1165,88 @@ const PointsScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
+            {layoutConfig.isTablet ? (
+              <View style={{ flex: 1, width: '100%' }}>
+                {/* Points Summary Card - Split Design */}
+                <Animated.View style={[styles.pointsCard, animatedStyle]}>
+                  <View style={styles.splitContainer}>
+                    {/* Left Side - Total Points */}
+                    <View style={styles.pointsSection}>
+                      <View style={styles.cardHeader}>
+                        <Icon name="star" size={rf(24, 28, 32)} color="#50AF27" />
+                        <Text style={styles.cardTitle}>Total Points</Text>
+                      </View>
+                      <Text style={styles.pointsValue}>
+                        {isSessionActive ? getLiveTotalPoints() : pointsState.points}
+                      </Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={styles.dividerVertical} />
+
+                    {/* Right Side - Leaderboard */}
+                    <TouchableOpacity 
+                      style={styles.leaderboardSection}
+                      onPress={() => navigation.navigate('leaderboard')}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.cardHeader}>
+                        <Icon name="trophy" size={rf(24, 28, 32)} color="#FFD700" />
+                        <Text style={styles.leaderboardTitle}>Leaderboard</Text>
+                      </View>
+                      <Icon name="chevron-right" size={rf(32, 36, 40)} color="#98D56D" />
+                      <Text style={styles.leaderboardSubtext}>
+                        View Rankings
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+
+                {/* Redeem Card */}
+                <View style={styles.redeemCard}>
+                  <View style={styles.cardHeader}>
+                    <Icon name="star" size={rf(28, 32, 36)} color="#50AF27" />
+                    <Text style={styles.cardTitle}>Redeem Points</Text>
+                  </View>
+                  
+                  <Text style={styles.redeemText}>
+                    Choose from virtual tree species that grow as you use WiFi!
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.redeemButton}
+                    onPress={handleRedeem}
+                  >
+                    <Icon name="gift" size={rf(20, 24, 28)} color="#fff" />
+                    <Text style={styles.redeemButtonText}>
+                      Redeem Point
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* History Card */}
+                <View style={styles.historySection}>
+                  <Text style={styles.historyTitle}>Recent Activity</Text>
+                  {loading ? (
+                    <Text style={styles.loadingText}>Loading...</Text>
+                  ) : pointsState.transactions.length > 0 ? (
+                    <FlatList
+                      data={pointsState.transactions.slice(0, 5)} // Show only recent 5
+                      renderItem={renderTransaction}
+                      keyExtractor={(item, index) => {
+                        const key = item.id || item._id || `${item.createdAt}-${index}` || `transaction-${index}`;
+                        return key.toString();
+                      }}
+                      scrollEnabled={false}
+                    />
+                  ) : (
+                    <Text style={styles.noTransactionsText}>
+                      No transactions yet. Start connecting to WiFi to earn points!
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : (
+              <>
             {/* Points Summary Card - Split Design */}
             <Animated.View style={[styles.pointsCard, animatedStyle]}>
               <View style={styles.splitContainer}>
@@ -1209,6 +1324,8 @@ const PointsScreen = () => {
                 </Text>
               )}
             </View>
+              </>
+            )}
           </View>
         </ScrollView>
       </Animated.View>
@@ -1267,6 +1384,17 @@ const PointsScreen = () => {
       </View>
     </GestureDetector>
   );
+
+  // For tablet, wrap with SafeAreaView since we bypass ScreenLayout
+  if (layoutConfig.isTablet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#B7DDE6' }} edges={['left', 'right']}>
+        {renderScreen()}
+      </SafeAreaView>
+    );
+  }
+
+  return renderScreen();
 };
 
 export default PointsScreen; 

@@ -6,7 +6,6 @@ import {
   Image,
   StatusBar,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -43,8 +42,8 @@ import {
   getMaxContentWidth
 } from '../../utils/responsive';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
-import { ResponsiveGrid } from '../../components';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// ResponsiveGrid không cần thiết nữa vì tablet dùng layout giống mobile
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 
 // Types
 type RootStackParamList = {
@@ -243,7 +242,7 @@ const HomeScreen = () => {
     }
   };
 
-  return (
+  const renderScreen = () => (
     <GestureDetector gesture={panGesture}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#B7DDE6" />
@@ -254,18 +253,18 @@ const HomeScreen = () => {
             styles.headerSection, 
             { 
               paddingTop: insets.top,
-              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(20),
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(20),
             }, 
             headerAnimatedStyle
           ]}
           onTouchStart={handleTouchStart}
         >
           {/* Welcome Section */}
-          <View style={[styles.welcomeSection, { maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%', alignSelf: 'center' }]}>
-            <Text style={[styles.titleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
+          <View style={[styles.welcomeSection, { width: '100%', alignSelf: 'center' }]}>
+            <Text style={[styles.titleText, { textAlign: 'left' }]}>
               Welcome back, {getLastName(user?.fullname)}!
             </Text>
-            <Text style={[styles.subtitleText, { textAlign: layoutConfig.isTablet ? 'center' : 'left' }]}>
+            <Text style={[styles.subtitleText, { textAlign: 'left' }]}>
               Track your WiFi sessions and plant more trees
             </Text>
           </View>
@@ -277,7 +276,7 @@ const HomeScreen = () => {
             styles.contentSection, 
             { 
               paddingBottom: insets.bottom,
-              paddingHorizontal: layoutConfig.isTablet ? layoutConfig.containerPadding : rs(24),
+              paddingHorizontal: layoutConfig.isTablet ? rs(40) : rs(24),
             }, 
             contentAnimatedStyle
           ]}
@@ -288,8 +287,6 @@ const HomeScreen = () => {
             styles.scrollContent,
             { 
               paddingBottom: insets.bottom + rs(90),
-              maxWidth: layoutConfig.isTablet ? getMaxContentWidth() : '100%',
-              alignSelf: 'center',
               width: '100%'
             }
           ]}
@@ -304,195 +301,113 @@ const HomeScreen = () => {
           scrollEventThrottle={16}
         >
           <View style={styles.content}>
-            {layoutConfig.isTablet ? (
-              <ResponsiveGrid 
-                baseColumns={1}
-                gap={16}
-              >
-                {/* Points Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.pointsCard]}
-                  onPress={navigateToPoints}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon name="star" size={rf(24, 28, 32)} color="#50AF27" />
-                    <Text style={styles.cardTitle}>Available Points</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={styles.pointsValue}>
-                    {isSessionActive ? getLiveTotalPoints() : currentPoints}
+            {/* Points Card */}
+            <TouchableOpacity 
+              style={[styles.card, styles.pointsCard]}
+              onPress={navigateToPoints}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <Icon name="star" size={rf(24)} color="#50AF27" />
+                <Text style={styles.cardTitle}>Available Points</Text>
+                <View style={styles.cardArrow}>
+                  <Icon name="chevron-right" size={rf(20)} color="#666" />
+                </View>
+              </View>
+              <Text style={styles.pointsValue}>
+                {isSessionActive ? getLiveTotalPoints() : currentPoints}
+              </Text>
+            </TouchableOpacity>
+
+            {/* WiFi Status Card */}
+            <TouchableOpacity 
+              style={[styles.card, styles.statusCard]}
+              onPress={navigateToWifi}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <Icon 
+                  name={getWifiStatusIcon()} 
+                  size={rf(24)} 
+                  color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
+                />
+                <Text style={styles.cardTitle}>WiFi Status</Text>
+                <View style={styles.cardArrow}>
+                  <Icon name="chevron-right" size={rf(20)} color="#666" />
+                </View>
+              </View>
+              <Text style={[
+                styles.statusText,
+                (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
+              ]}>
+                {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
+              </Text>
+
+              {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
+                <View style={styles.sessionInfo}>
+                  <Text style={styles.sessionText}>
+                    Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
                   </Text>
-                </TouchableOpacity>
-
-                {/* WiFi Status Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.statusCard]}
-                  onPress={navigateToWifi}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon 
-                      name={getWifiStatusIcon()} 
-                      size={rf(24, 28, 32)} 
-                      color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
-                    />
-                    <Text style={styles.cardTitle}>WiFi Status</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={[
-                    styles.statusText,
-                    (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
-                  ]}>
-                    {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
+                  <Text style={styles.sessionText}>
+                    Points earned: {getLiveSessionPoints()}
                   </Text>
-
-                  {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
-                    <View style={styles.sessionInfo}>
-                      <Text style={styles.sessionText}>
-                        Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
-                      </Text>
-                      <Text style={styles.sessionText}>
-                        Points earned: {getLiveSessionPoints()}
-                      </Text>
-                      <Text style={styles.sessionText}>
-                        Sessions today: {sessionCount}
-                      </Text>
-                    </View>
-                  )}
-
-                  {isInitialized && !(isConnected && isUniversityWifi) && (
-                    <Text style={styles.tapHintText}>
-                      Tap to view WiFi details
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Trees Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.treesCard]}
-                  onPress={navigateToTrees}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon name="tree" size={rf(24, 28, 32)} color="#50AF27" />
-                    <Text style={styles.cardTitle}>Trees Planted</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={rf(20, 24, 28)} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={styles.treeCount}>{actualTreeCount}</Text>
-                  <Text style={styles.co2Text}>
-                    You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
+                  <Text style={styles.sessionText}>
+                    Sessions today: {sessionCount}
                   </Text>
-                </TouchableOpacity>
-              </ResponsiveGrid>
-            ) : (
-              <>
-                {/* Points Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.pointsCard]}
-                  onPress={navigateToPoints}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon name="star" size={24} color="#50AF27" />
-                    <Text style={styles.cardTitle}>Available Points</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={20} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={styles.pointsValue}>
-                    {isSessionActive ? getLiveTotalPoints() : currentPoints}
-                  </Text>
-                </TouchableOpacity>
+                </View>
+              )}
 
-                {/* WiFi Status Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.statusCard]}
-                  onPress={navigateToWifi}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon 
-                      name={getWifiStatusIcon()} 
-                      size={24} 
-                      color={(isInitialized && isConnected && isUniversityWifi) ? "#50AF27" : "#FFA79D"} 
-                    />
-                    <Text style={styles.cardTitle}>WiFi Status</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={20} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={[
-                    styles.statusText,
-                    (isInitialized && isConnected && isUniversityWifi) ? styles.connectedText : styles.disconnectedText
-                  ]}>
-                    {isInitialized ? getWifiStatusText() : 'Checking WiFi status...'}
-                  </Text>
+              {isInitialized && !(isConnected && isUniversityWifi) && (
+                <Text style={styles.tapHintText}>
+                  Tap to view WiFi details
+                </Text>
+              )}
+            </TouchableOpacity>
 
-                  {(isInitialized && isConnected && isUniversityWifi) && isSessionActive && stats?.currentSession && (
-                    <View style={styles.sessionInfo}>
-                      <Text style={styles.sessionText}>
-                        Current session: {wifiService.formatWifiTime(getLiveSessionDuration())}
-                      </Text>
-                      <Text style={styles.sessionText}>
-                        Points earned: {getLiveSessionPoints()}
-                      </Text>
-                      <Text style={styles.sessionText}>
-                        Sessions today: {sessionCount}
-                      </Text>
-                    </View>
-                  )}
-
-                  {isInitialized && !(isConnected && isUniversityWifi) && (
-                    <Text style={styles.tapHintText}>
-                      Tap to view WiFi details
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Trees Card */}
-                <TouchableOpacity 
-                  style={[styles.card, styles.treesCard]}
-                  onPress={navigateToTrees}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardHeader}>
-                    <Icon name="tree" size={24} color="#50AF27" />
-                    <Text style={styles.cardTitle}>Trees Planted</Text>
-                    <View style={styles.cardArrow}>
-                      <Icon name="chevron-right" size={20} color="#666" />
-                    </View>
-                  </View>
-                  <Text style={styles.treeCount}>{actualTreeCount}</Text>
-                  <Text style={styles.co2Text}>
-                    You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {/* Trees Card */}
+            <TouchableOpacity 
+              style={[styles.card, styles.treesCard]}
+              onPress={navigateToTrees}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <Icon name="tree" size={rf(24)} color="#50AF27" />
+                <Text style={styles.cardTitle}>Trees Planted</Text>
+                <View style={styles.cardArrow}>
+                  <Icon name="chevron-right" size={rf(20)} color="#666" />
+                </View>
+              </View>
+              <Text style={styles.treeCount}>{actualTreeCount}</Text>
+              <Text style={styles.co2Text}>
+                You've helped reduce CO₂ by approximately {(realTreeCount * 22)}kg per year!
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </Animated.View>
 
         {/* Mascot */}
-        {!layoutConfig.isTablet && (
-          <View style={styles.mascotContainer}>
-            <Image
-              source={require('../../assets/mascots/Unitree - Mascot-4.png')}
-              style={styles.mascotImage}
-              resizeMode="contain"
-            />
-          </View>
-        )}
+        <View style={styles.mascotContainer}>
+          <Image
+            source={require('../../assets/mascots/Unitree - Mascot-4.png')}
+            style={styles.mascotImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
     </GestureDetector>
   );
+
+  // For tablet, wrap with SafeAreaView since we bypass ScreenLayout
+  if (layoutConfig.isTablet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#B7DDE6' }} edges={['left', 'right']}>
+        {renderScreen()}
+      </SafeAreaView>
+    );
+  }
+
+  return renderScreen();
 };
 
 const styles = StyleSheet.create({
@@ -536,8 +451,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   mascotImage: {
-    width: rs(160),
-    height: rs(160),
+    width: rs(160, 180, 200),
+    height: rs(160, 180, 200),
   },
   scrollContainer: {
     flex: 1,
