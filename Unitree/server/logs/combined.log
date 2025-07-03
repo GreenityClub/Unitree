@@ -1331,3 +1331,16 @@
 {"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T16:57:59.832Z"}
 {"level":"info","message":"Memory Usage: RSS: 79MB, Heap: 31/39MB, External: 20MB","timestamp":"2025-06-25T17:00:59.844Z"}
 {"level":"warn","message":"Garbage collection not available (run with --expose-gc flag)","timestamp":"2025-06-25T17:00:59.845Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-07-02T10:41:34.700Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-07-02T10:41:34.727Z"}
+{"level":"info","message":"Memory Usage: RSS: 64MB, Heap: 28/30MB, External: 20MB","timestamp":"2025-07-02T10:41:34.728Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-07-02T10:41:34.834Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-07-02T10:41:34.836Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-07-02T10:41:35.870Z"}
+{"level":"info","message":"Memory Usage: RSS: 79MB, Heap: 32/36MB, External: 20MB","timestamp":"2025-07-02T10:44:34.737Z"}
+{"level":"info","message":"Memory Usage: RSS: 81MB, Heap: 34/41MB, External: 20MB","timestamp":"2025-07-02T10:47:34.740Z"}
+{"level":"info","message":"Memory Usage: RSS: 78MB, Heap: 31/37MB, External: 20MB","timestamp":"2025-07-02T10:50:34.748Z"}
+{"level":"warn","message":"MongoDB disconnected. Attempting to reconnect...","timestamp":"2025-07-02T10:51:01.017Z"}
+{"level":"info","message":"MongoDB reconnected successfully","timestamp":"2025-07-02T10:51:02.123Z"}
+{"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-07-02T10:51:20.803Z"}
+{"level":"info","message":"Push token saved for user QuanLDGCH230163@gmail.com: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-07-02T10:51:21.786Z"}

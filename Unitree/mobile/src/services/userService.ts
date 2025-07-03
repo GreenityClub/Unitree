@@ -93,6 +93,15 @@ class UserService {
       throw new Error(error.response?.data?.message || 'Failed to get leaderboard');
     }
   }
+
+  async deleteAccount() {
+    try {
+      const response = await api.delete('/api/users/account');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to delete account');
+    }
+  }
 }
 
 const userService = new UserService();

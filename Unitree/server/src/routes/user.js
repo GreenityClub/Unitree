@@ -430,6 +430,71 @@ router.get('/leaderboard', auth, async (req, res) => {
   }
 });
 
+// Delete account
+router.delete('/account', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    logger.info(`Starting account deletion for user: ${userId}`);
+
+    // Import required models
+    const Point = require('../models/Point');
+    const Tree = require('../models/Tree');
+    const WifiSession = require('../models/WifiSession');
+
+    // 1. Delete user's points
+    const pointsDeleted = await Point.deleteMany({ userId: userId });
+    logger.info(`Deleted ${pointsDeleted.deletedCount} points for user ${userId}`);
+
+    // 2. Delete user's trees
+    const treesDeleted = await Tree.deleteMany({ userId: userId });
+    logger.info(`Deleted ${treesDeleted.deletedCount} trees for user ${userId}`);
+
+    // 3. Delete user's wifi sessions
+    const wifiSessionsDeleted = await WifiSession.deleteMany({ userId: userId });
+    logger.info(`Deleted ${wifiSessionsDeleted.deletedCount} wifi sessions for user ${userId}`);
+
+    // 4. Delete user's avatar files
+    if (user.avatar) {
+      if (cloudStorage.isAvailable() && user.avatar.includes('cloudinary.com')) {
+        // Delete from cloud storage
+        try {
+          const publicId = `unitree/avatars/avatar-${userId}`;
+          await cloudStorage.deleteAvatar(publicId);
+          logger.info(`Avatar deleted from cloud storage for user ${userId}`);
+        } catch (cloudError) {
+          logger.error('Failed to delete avatar from cloud storage:', cloudError);
+        }
+      } else {
+        // Delete from local storage
+        avatarUtils.cleanupUserAvatars(userId);
+        logger.info(`Avatar deleted from local storage for user ${userId}`);
+      }
+    }
+
+    // 5. Finally delete the user account
+    await User.findByIdAndDelete(userId);
+    logger.info(`User account ${userId} deleted successfully`);
+
+    res.json({ 
+      message: 'Account deleted successfully',
+      deletedData: {
+        points: pointsDeleted.deletedCount,
+        trees: treesDeleted.deletedCount,
+        wifiSessions: wifiSessionsDeleted.deletedCount
+      }
+    });
+  } catch (error) {
+    logger.error('Delete account error:', error);
+    res.status(500).json({ message: 'Failed to delete account. Please try again.' });
+  }
+});
+
 // Helper function to format WiFi time
 function formatWifiTime(seconds) {
   const hours = Math.floor(seconds / 3600);

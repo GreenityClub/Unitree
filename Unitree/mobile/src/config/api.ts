@@ -24,6 +24,11 @@ const authApi = axios.create({
 
 // Request interceptor to add auth token
 const addAuthToken = async (config: any) => {
+  // Don't add auth token for refresh endpoint as it uses refreshToken in body
+  if (config.url?.includes('/api/auth/refresh')) {
+    return config;
+  }
+  
   const token = await AsyncStorage.getItem('authToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -96,7 +101,8 @@ const handleApiResponse = async (error: any) => {
     // Only log auth errors for non-routine endpoints to reduce noise
     const isRoutineEndpoint = error.config?.url?.includes('/stats') || 
                              error.config?.url?.includes('/session-count') ||
-                             error.config?.url?.includes('/me');
+                             error.config?.url?.includes('/me') ||
+                             error.config?.url?.includes('/api/auth/refresh');
     if (!isRoutineEndpoint) {
       logger.auth.warn(`Authentication required: ${error.config?.url}`);
     }

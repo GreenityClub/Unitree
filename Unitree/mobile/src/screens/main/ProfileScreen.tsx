@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
   mascotContainer: {
     position: 'absolute',
     right: rs(20),
-    top: isSmallHeightDevice() ? rs(115) : rs(235),
+    top: isSmallHeightDevice() ? rs(75) : (isTabletLarge() ? rs(235) : rs(125)),
     zIndex: 9999,
   },
   mascotImage: {

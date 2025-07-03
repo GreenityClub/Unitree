@@ -11,7 +11,7 @@ import { colors } from '../../theme';
 
 const UserSettingsScreen = () => {
   const insets = useSafeAreaInsets();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -22,6 +22,7 @@ const UserSettingsScreen = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const handleSaveProfile = async () => {
     try {
@@ -86,6 +87,51 @@ const UserSettingsScreen = () => {
       Alert.alert('Error', error.message || 'Failed to change password');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Xóa Tài Khoản',
+      'Bạn có chắc chắn muốn xóa tài khoản? Hành động này không thể hoàn tác và sẽ xóa vĩnh viễn:\n\n• Tất cả điểm của bạn\n• Tất cả cây đã trồng\n• Lịch sử kết nối WiFi\n• Ảnh đại diện\n• Tất cả dữ liệu cá nhân',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Xóa Tài Khoản',
+          style: 'destructive',
+          onPress: confirmDeleteAccount,
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    try {
+      setIsDeletingAccount(true);
+      await userService.deleteAccount();
+      
+      Alert.alert(
+        'Thành Công',
+        'Tài khoản của bạn đã được xóa thành công.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              // Logout and redirect to login
+              await logout();
+              router.replace('/auth/login');
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -381,6 +427,40 @@ const UserSettingsScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Danger Zone Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="alert-circle" size={24} color="#e74c3c" />
+            <Text style={[styles.sectionTitle, { color: '#e74c3c' }]}>Vùng Nguy Hiểm</Text>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.dangerItem}>
+              <View style={styles.actionLeft}>
+                <Icon name="account-remove" size={20} color="#e74c3c" />
+                <View style={styles.actionTextContainer}>
+                  <Text style={[styles.actionTitle, { color: '#e74c3c' }]}>Xóa Tài Khoản</Text>
+                  <Text style={styles.actionDescription}>
+                    Xóa vĩnh viễn tài khoản và tất cả dữ liệu của bạn
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            <Button
+              mode="contained"
+              onPress={handleDeleteAccount}
+              style={[styles.actionButton, styles.deleteButton]}
+              buttonColor="#e74c3c"
+              icon="account-remove"
+              loading={isDeletingAccount}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? 'Đang xóa...' : 'Xóa Tài Khoản'}
+            </Button>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -535,6 +615,14 @@ const styles = StyleSheet.create({
     marginBottom: rs(16),
     lineHeight: rf(16),
     fontStyle: 'italic',
+  },
+  dangerItem: {
+    paddingVertical: rs(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  deleteButton: {
+    marginTop: rs(16),
   },
 });
 
