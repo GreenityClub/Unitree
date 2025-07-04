@@ -1,5 +1,6 @@
 const cron = require('cron');
 const notificationService = require('./notificationService');
+const notificationServiceV1 = require('./notificationServiceV1');
 const logger = require('../utils/logger');
 
 class CronService {
@@ -34,8 +35,8 @@ class CronService {
       cronPattern,
       async () => {
         try {
-          logger.info('🔔 Starting scheduled reminder notifications...');
-          const result = await notificationService.sendAppReminderNotifications();
+          logger.info('🔔 Starting scheduled reminder notifications (V1 API)...');
+          const result = await notificationServiceV1.sendAppReminderNotifications();
           
           if (result.success) {
             logger.info(`✅ Scheduled reminders completed: ${result.sent} notifications sent`);
@@ -164,8 +165,8 @@ class CronService {
    */
   async triggerReminderNotifications() {
     try {
-      logger.info('🔔 Manually triggering reminder notifications...');
-      const result = await notificationService.sendAppReminderNotifications();
+      logger.info('🔔 Manually triggering reminder notifications (V1 API)...');
+      const result = await notificationServiceV1.sendAppReminderNotifications();
       logger.info('✅ Manual reminder trigger completed:', result);
       return result;
     } catch (error) {

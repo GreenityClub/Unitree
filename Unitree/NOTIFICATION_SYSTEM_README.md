@@ -182,7 +182,7 @@ await Notifications.scheduleNotificationAsync({
 TZ=America/New_York
 
 # Expo project ID (from app.json)
-EXPO_PROJECT_ID=b53a2dd3-f93c-4eb5-aa1e-3620e8834198
+EXPO_PROJECT_ID=1a55c11b-0205-42e6-961f-496539f0161d
 ```
 
 ## 🎯 Notification Types

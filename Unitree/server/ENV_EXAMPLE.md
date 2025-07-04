@@ -54,6 +54,17 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 # Logging Configuration
 LOG_LEVEL=info
+
+# Push Notifications Configuration (V1 API - REQUIRED)
+# Method 1: Service Account JSON as environment variable (recommended for production)
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"your-project",...}
+
+# Method 2: Service Account JSON file path (for local development)
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+
+# Legacy Configuration (deprecated - Firebase disabled Legacy API)
+# FCM_SERVER_KEY=your-fcm-server-key-here
+# EXPO_ACCESS_TOKEN=your-expo-access-token-here
 ```
 
 ## Security Checklist

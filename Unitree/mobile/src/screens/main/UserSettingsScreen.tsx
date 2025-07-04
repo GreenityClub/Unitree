@@ -92,15 +92,15 @@ const UserSettingsScreen = () => {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Xóa Tài Khoản',
-      'Bạn có chắc chắn muốn xóa tài khoản? Hành động này không thể hoàn tác và sẽ xóa vĩnh viễn:\n\n• Tất cả điểm của bạn\n• Tất cả cây đã trồng\n• Lịch sử kết nối WiFi\n• Ảnh đại diện\n• Tất cả dữ liệu cá nhân',
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and will permanently delete:\n\n• All your points\n• All trees you have planted\n• WiFi connection history\n• Profile picture\n• All personal data',
       [
         {
-          text: 'Hủy',
+          text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Xóa Tài Khoản',
+          text: 'Delete Account',
           style: 'destructive',
           onPress: confirmDeleteAccount,
         },
@@ -114,8 +114,8 @@ const UserSettingsScreen = () => {
       await userService.deleteAccount();
       
       Alert.alert(
-        'Thành Công',
-        'Tài khoản của bạn đã được xóa thành công.',
+        'Success',
+        'Your account has been deleted successfully.',
         [
           {
             text: 'OK',
@@ -129,7 +129,7 @@ const UserSettingsScreen = () => {
       );
     } catch (error: any) {
       console.error('Error deleting account:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
+      Alert.alert('Error', error.message || 'Cannot delete account. Please try again.');
     } finally {
       setIsDeletingAccount(false);
     }
@@ -432,7 +432,7 @@ const UserSettingsScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Icon name="alert-circle" size={24} color="#e74c3c" />
-            <Text style={[styles.sectionTitle, { color: '#e74c3c' }]}>Vùng Nguy Hiểm</Text>
+            <Text style={[styles.sectionTitle, { color: '#e74c3c' }]}>Delete Account</Text>
           </View>
 
           <View style={styles.card}>
@@ -440,9 +440,9 @@ const UserSettingsScreen = () => {
               <View style={styles.actionLeft}>
                 <Icon name="account-remove" size={20} color="#e74c3c" />
                 <View style={styles.actionTextContainer}>
-                  <Text style={[styles.actionTitle, { color: '#e74c3c' }]}>Xóa Tài Khoản</Text>
+                  <Text style={[styles.actionTitle, { color: '#e74c3c' }]}>Delete Account</Text>
                   <Text style={styles.actionDescription}>
-                    Xóa vĩnh viễn tài khoản và tất cả dữ liệu của bạn
+                    Delete your account and all data permanently
                   </Text>
                 </View>
               </View>
@@ -457,7 +457,7 @@ const UserSettingsScreen = () => {
               loading={isDeletingAccount}
               disabled={isDeletingAccount}
             >
-              {isDeletingAccount ? 'Đang xóa...' : 'Xóa Tài Khoản'}
+              {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
             </Button>
           </View>
         </View>

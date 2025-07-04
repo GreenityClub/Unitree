@@ -1,10 +1,27 @@
 const { Expo } = require('expo-server-sdk');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { env } = require('../config/env');
 
 class NotificationService {
   constructor() {
-    this.expo = new Expo();
+    // Initialize Expo client with access token if available
+    const options = {};
+    if (env.EXPO_ACCESS_TOKEN) {
+      options.accessToken = env.EXPO_ACCESS_TOKEN;
+      logger.info('🔑 Expo client initialized with access token for production');
+    } else {
+      logger.warn('⚠️ No Expo access token provided - using default configuration');
+    }
+    
+    this.expo = new Expo(options);
+    
+    // Log FCM configuration status
+    if (env.FCM_SERVER_KEY) {
+      logger.info('🔥 FCM Server Key configured for push notifications');
+    } else {
+      logger.warn('⚠️ No FCM Server Key provided - some push notification features may be limited');
+    }
   }
 
   /**
