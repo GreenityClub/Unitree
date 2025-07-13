@@ -3,6 +3,7 @@ import * as BackgroundTask from 'expo-background-task';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ENV from '../config/env';
+import locationStorageService, { LocationData } from './locationStorageService';
 
 // Background task names
 const WIFI_MONITOR_TASK = 'wifi-monitor-background';
@@ -36,6 +37,12 @@ interface BackgroundSession {
   metadata?: {
     backgroundModeStartTime?: string;
     isInBackground?: boolean;
+    location?: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: string;
+    };
   };
 }
 
@@ -43,6 +50,9 @@ interface PendingSessionData {
   sessions: BackgroundSession[];
   lastUpdate: string;
 }
+
+// Thêm hằng số cho thời gian tối thiểu giữa các phiên
+const MIN_SESSION_GAP = 60 * 1000; // 1 phút
 
 class BackgroundWifiService {
   private static instance: BackgroundWifiService;
@@ -172,24 +182,44 @@ class BackgroundWifiService {
         const wifiDetails = netInfo.details as any;
         const ipAddress = wifiDetails.ipAddress;
         
-        if (this.isUniversityIP(ipAddress)) {
-          // Connected to university WiFi
+        // Kiểm tra cả IP và location
+        const isValidIP = this.isUniversityIP(ipAddress);
+        let isValidLocation = false;
+        let locationData = null;
+        
+        try {
+          // Lấy vị trí đã lưu gần đây nhất
+          const locationString = await AsyncStorage.getItem('last_known_location');
+          if (locationString) {
+            locationData = JSON.parse(locationString);
+            // Kiểm tra vị trí có nằm trong bán kính trường học
+            isValidLocation = this.isLocationOnCampus(locationData);
+          } else {
+            console.log('No location data available, cannot validate location');
+          }
+        } catch (error) {
+          console.log('Failed to get location data:', error);
+        }
+        
+        // Chỉ bắt đầu hoặc tiếp tục phiên khi CẢ HAI điều kiện đều thỏa mãn
+        if (isValidIP && isValidLocation) {
+          console.log('✅ Valid university WiFi and on campus, managing session...');
           if (!currentSession || !currentSession.isActive) {
             // No active session, start a new one
-            await this.startBackgroundSession(ipAddress);
+            await this.startBackgroundSession(ipAddress, locationData);
           } else if (currentSession.ipAddress !== ipAddress) {
             // IP address changed, end current session and start new one
             console.log('📶 IP address changed, ending previous session and starting new one');
             await this.endCurrentBackgroundSession();
-            await this.startBackgroundSession(ipAddress);
+            await this.startBackgroundSession(ipAddress, locationData);
           } else {
             // Same session, update duration carefully
             await this.updateBackgroundSessionWithStaleCheck();
           }
         } else {
-          // Not on university WiFi, end any active session IMMEDIATELY
+          // Invalid WiFi or location, end any active session IMMEDIATELY
           if (currentSession?.isActive) {
-            console.log('❌ Not on university WiFi, ending session immediately');
+            console.log(`❌ Validation failed: IP=${isValidIP}, Location=${isValidLocation}, ending session`);
             await this.endCurrentBackgroundSession();
           }
         }
@@ -208,18 +238,68 @@ class BackgroundWifiService {
   /**
    * Start a new background session
    */
-  private async startBackgroundSession(ipAddress: string): Promise<void> {
-    const session: BackgroundSession = {
-      id: this.generateSessionId(),
-      startTime: new Date().toISOString(),
-      ipAddress,
-      duration: 0,
-      isActive: true,
-      timestamp: new Date().toISOString()
-    };
+  private async startBackgroundSession(ipAddress: string, locationData?: any): Promise<void> {
+    try {
+      // Đầu tiên, kiểm tra và kết thúc TẤT CẢ các phiên đang hoạt động
+      // để đảm bảo không có phiên nào đang hoạt động trước khi bắt đầu phiên mới
+      const currentSession = await this.getCurrentSession();
+      if (currentSession?.isActive) {
+        console.log('⚠️ Phát hiện phiên đang hoạt động, kết thúc trước khi bắt đầu phiên mới');
+        await this.endCurrentBackgroundSession();
+      }
+      
+      // Kiểm tra thời gian tối thiểu giữa các phiên
+      const lastSession = await this.getCurrentSession();
+      
+      if (lastSession && lastSession.endTime) {
+        const lastEndTime = new Date(lastSession.endTime).getTime();
+        const now = Date.now();
+        
+        if (now - lastEndTime < MIN_SESSION_GAP) {
+          console.log(`⚠️ Trying to start new session too soon after previous one (${Math.floor((now - lastEndTime)/1000)}s), waiting...`);
+          return; // Không bắt đầu phiên mới quá sớm
+        }
+      }
+      
+      // Kiểm tra và lưu location
+      let validatedLocationData = locationData;
+      if (!locationData) {
+        try {
+          // Lấy location đã lưu hoặc lấy location mới
+          validatedLocationData = await locationStorageService.getLocationFromStorage();
+        } catch (error) {
+          console.log('Could not get location data');
+        }
+      } else {
+        // Lưu location đã cung cấp
+        await locationStorageService.saveLocationToStorage(locationData);
+      }
 
-    await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(session));
-    console.log('🔄 Background session started:', session.id, 'on IP:', ipAddress);
+      // Tạo ID phiên với timestamp để tránh trùng lặp
+      const sessionId = this.generateSessionId();
+      
+      const session: BackgroundSession = {
+        id: sessionId,
+        startTime: new Date().toISOString(),
+        ipAddress,
+        duration: 0,
+        isActive: true,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          backgroundModeStartTime: new Date().toISOString(),
+          isInBackground: true,
+          location: validatedLocationData // Lưu location cùng với phiên
+        }
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(session));
+      console.log('🔄 Background session started:', session.id, 'on IP:', ipAddress);
+      
+      // Cập nhật thời gian hoạt động gần nhất của app
+      await this.updateLastAppActivity();
+    } catch (error) {
+      console.error('❌ Lỗi khi bắt đầu phiên mới:', error);
+    }
   }
 
   /**
@@ -280,7 +360,11 @@ class BackgroundWifiService {
   /**
    * Handle app reopen - end any previous session and start new if on university WiFi
    */
-  async handleAppReopen(): Promise<{ sessionEnded: boolean; sessionStarted: boolean }> {
+  async handleAppReopen(): Promise<{ 
+    sessionEnded: boolean; 
+    sessionStarted: boolean;
+    endedSessionId?: string;
+  }> {
     console.log('📱 App reopened, handling session transition...');
     
     // Update app activity immediately when app reopens
@@ -288,39 +372,67 @@ class BackgroundWifiService {
     
     let sessionEnded = false;
     let sessionStarted = false;
+    let endedSessionId: string | undefined = undefined;
 
-    // Check if there's an active background session that needs to be ended
-    const currentSession = await this.getCurrentSession();
-    if (currentSession?.isActive) {
-      console.log('⏹️ Ending previous session from before app was closed/backgrounded');
-      await this.endCurrentBackgroundSession();
-      sessionEnded = true;
-    }
-
-    // Check current WiFi status and start new session if appropriate
     try {
+      // Kiểm tra TẤT CẢ các phiên đang hoạt động và kết thúc chúng
+      // 1. Kiểm tra phiên hiện tại
+      const currentSession = await this.getCurrentSession();
+      if (currentSession?.isActive) {
+        console.log('⏹️ Kết thúc phiên hiện tại khi mở lại ứng dụng:', currentSession.id);
+        endedSessionId = currentSession.id;
+        await this.endCurrentBackgroundSession();
+        sessionEnded = true;
+      }
+      
+      // 2. Đảm bảo không có phiên nào khác đang hoạt động (gọi API để kiểm tra)
+      try {
+        // Đây là nơi bạn có thể thêm code để gọi API kiểm tra phiên đang hoạt động
+        // và kết thúc nó nếu cần
+      } catch (apiError) {
+        console.warn('Không thể kiểm tra phiên đang hoạt động từ server:', apiError);
+      }
+
+      // Đợi một khoảng thời gian ngắn để đảm bảo phiên cũ đã được kết thúc hoàn toàn
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Kiểm tra WiFi hiện tại và bắt đầu phiên mới nếu thích hợp
       const netInfo = await NetInfo.fetch();
       
       if (netInfo.type === 'wifi' && netInfo.isConnected && netInfo.details) {
         const wifiDetails = netInfo.details as any;
         const ipAddress = wifiDetails.ipAddress;
         
-        if (this.isUniversityIP(ipAddress)) {
-          console.log('🔄 Starting new session after app reopen on university WiFi');
-          await this.startBackgroundSession(ipAddress);
+        // Kiểm tra cả IP và location trước khi bắt đầu phiên mới
+        const isValidIP = this.isUniversityIP(ipAddress);
+        let locationData = null;
+        let isValidLocation = false;
+        
+        try {
+          // Lấy vị trí hiện tại
+          locationData = await locationStorageService.getCurrentAndSaveLocation();
+          isValidLocation = locationData?.isValid || false;
+        } catch (locationError) {
+          console.error('Không thể lấy vị trí hiện tại:', locationError);
+        }
+        
+        // Chỉ bắt đầu phiên mới khi CẢ HAI điều kiện đều thỏa mãn
+        if (isValidIP && isValidLocation) {
+          console.log('🔄 Bắt đầu phiên mới sau khi mở lại ứng dụng trên WiFi trường học');
+          await this.startBackgroundSession(ipAddress, locationData);
           sessionStarted = true;
         } else {
-          console.log('📵 Not on university WiFi after app reopen');
+          console.log(`📵 Không bắt đầu phiên mới - IP hợp lệ: ${isValidIP}, Vị trí hợp lệ: ${isValidLocation}`);
         }
       } else {
-        console.log('📵 No WiFi connection after app reopen');
+        console.log('📵 Không có kết nối WiFi sau khi mở lại ứng dụng');
       }
     } catch (error) {
-      console.error('❌ Failed to check WiFi status on app reopen:', error);
+      console.error('❌ Lỗi khi xử lý mở lại ứng dụng:', error);
     }
 
-    console.log(`📱 App reopen handled - Session ended: ${sessionEnded}, Session started: ${sessionStarted}`);
-    return { sessionEnded, sessionStarted };
+    console.log(`📱 Đã xử lý mở lại ứng dụng - Phiên đã kết thúc: ${sessionEnded}, Phiên đã bắt đầu: ${sessionStarted}`);
+    return { sessionEnded, sessionStarted, endedSessionId };
   }
 
   /**
@@ -607,38 +719,105 @@ class BackgroundWifiService {
   }
 
   /**
+   * Filter duplicate sessions based on start time
+   */
+  private filterDuplicateSessions(sessions: BackgroundSession[]): BackgroundSession[] {
+    // Create a Map to group sessions by similar start time
+    const uniqueSessionMap = new Map<string, BackgroundSession>();
+    
+    for (const session of sessions) {
+      // Create a key based on rounded start time (to nearest minute) and IP address
+      const startTimeMs = new Date(session.startTime).getTime();
+      const roundedStartTime = Math.floor(startTimeMs / (60 * 1000)) * 60 * 1000;
+      const key = `${roundedStartTime}_${session.ipAddress}`;
+      
+      // If no session with this key exists, or current session has longer duration
+      if (!uniqueSessionMap.has(key) || uniqueSessionMap.get(key)!.duration < session.duration) {
+        uniqueSessionMap.set(key, session);
+      }
+    }
+    
+    // Convert back to array
+    const filteredSessions = Array.from(uniqueSessionMap.values());
+    
+    // Log filtering results
+    if (filteredSessions.length < sessions.length) {
+      console.log(`🔍 Filtered ${sessions.length} sessions to ${filteredSessions.length} unique sessions to prevent duplicate sync`);
+    }
+    
+    return filteredSessions;
+  }
+
+  /**
    * Sync pending sessions to server (call when app comes to foreground)
    */
-  async syncPendingSessions(): Promise<{ synced: number; failed: number }> {
-    const pendingSessions = await this.getPendingSessions();
+  async syncPendingSessions(alreadySyncedIds: string[] = []): Promise<{ synced: number; failed: number }> {
+    let pendingSessions = await this.getPendingSessions();
     if (pendingSessions.length === 0) {
       return { synced: 0, failed: 0 };
+    }
+
+    console.log(`🔍 Đang xử lý ${pendingSessions.length} phiên đang chờ đồng bộ`);
+    
+    // Ghi log chi tiết về các phiên đang chờ đồng bộ để debug
+    pendingSessions.forEach((session, index) => {
+      const startTime = new Date(session.startTime).toLocaleString();
+      const endTime = session.endTime ? new Date(session.endTime).toLocaleString() : 'đang hoạt động';
+      console.log(`📋 Phiên #${index + 1}: ID=${session.id}, Bắt đầu=${startTime}, Kết thúc=${endTime}, Thời lượng=${session.duration}s`);
+    });
+
+    // Filter out any sessions that have already been synced in this app run
+    if (alreadySyncedIds.length > 0) {
+      console.log(`🔍 Lọc ra ${alreadySyncedIds.length} phiên đã được đồng bộ trong lần chạy này`);
+      pendingSessions = pendingSessions.filter(session => !alreadySyncedIds.includes(session.id));
+      if (pendingSessions.length === 0) {
+        console.log('Tất cả phiên đang chờ đã được đồng bộ trong lần chạy này');
+        return { synced: 0, failed: 0 };
+      }
+    }
+
+    // Sắp xếp phiên theo thời gian bắt đầu để xử lý theo thứ tự thời gian
+    pendingSessions.sort((a, b) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    // Filter duplicate sessions by start time, IP and keep the one with highest duration
+    const uniqueSessions = this.filterDuplicateSessions(pendingSessions);
+
+    // Kiểm tra phiên trùng lặp dựa trên khoảng thời gian chồng chéo
+    const nonOverlappingSessions = this.filterOverlappingSessions(uniqueSessions);
+    
+    if (nonOverlappingSessions.length < uniqueSessions.length) {
+      console.log(`⚠️ Đã phát hiện ${uniqueSessions.length - nonOverlappingSessions.length} phiên chồng chéo và đã lọc`);
     }
 
     // Check if user is authenticated before attempting sync
     const hasValidToken = await this.hasValidAuthToken();
     if (!hasValidToken) {
-      console.warn('⚠️ No valid authentication token - skipping sync until user is authenticated');
-      return { synced: 0, failed: pendingSessions.length };
+      console.warn('⚠️ Không có token xác thực hợp lệ - bỏ qua đồng bộ cho đến khi người dùng đăng nhập');
+      return { synced: 0, failed: nonOverlappingSessions.length };
     }
 
     let synced = 0;
     let failed = 0;
     const successfulSessions: string[] = [];
 
-    for (const session of pendingSessions) {
+    // Đồng bộ các phiên đã lọc bất kể đang kết nối WiFi nào
+    console.log(`🔄 Đang cố gắng đồng bộ ${nonOverlappingSessions.length} phiên WiFi`);
+
+    for (const session of nonOverlappingSessions) {
       try {
         await this.syncSessionToServer(session);
         synced++;
         successfulSessions.push(session.id);
-        console.log(`✅ Synced session: ${session.id}`);
+        console.log(`✅ Đã đồng bộ phiên: ${session.id}, thời lượng: ${session.duration}s`);
       } catch (error: any) {
-        console.error('Failed to sync session:', session.id, error);
+        console.error('Không thể đồng bộ phiên:', session.id, error);
         failed++;
         
         // Check if it's an auth error
         if (error?.message?.includes('authentication token') || error?.message?.includes('Authentication failed')) {
-          console.warn('🔐 Authentication token invalid - will retry when token is refreshed');
+          console.warn('🔐 Token xác thực không hợp lệ - sẽ thử lại khi token được làm mới');
         }
       }
     }
@@ -653,8 +832,47 @@ class BackgroundWifiService {
       await AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
     }
     
-    console.log(`📊 Sync complete: ${synced} synced, ${failed} failed`);
+    console.log(`📊 Đồng bộ hoàn tất: ${synced} thành công, ${failed} thất bại`);
     return { synced, failed };
+  }
+  
+  /**
+   * Filter sessions to remove overlapping time periods
+   */
+  private filterOverlappingSessions(sessions: BackgroundSession[]): BackgroundSession[] {
+    if (sessions.length <= 1) return sessions;
+    
+    // Sắp xếp phiên theo thời gian bắt đầu
+    const sortedSessions = [...sessions].sort((a, b) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+    
+    const result: BackgroundSession[] = [sortedSessions[0]];
+    
+    for (let i = 1; i < sortedSessions.length; i++) {
+      const currentSession = sortedSessions[i];
+      const lastAcceptedSession = result[result.length - 1];
+      
+      const currentStart = new Date(currentSession.startTime).getTime();
+      const lastEnd = lastAcceptedSession.endTime 
+        ? new Date(lastAcceptedSession.endTime).getTime()
+        : Date.now(); // Nếu phiên cuối chưa kết thúc, sử dụng thời gian hiện tại
+      
+      // Nếu phiên hiện tại bắt đầu sau khi phiên trước kết thúc (có thêm khoảng cách tối thiểu)
+      if (currentStart >= lastEnd + MIN_SESSION_GAP) {
+        result.push(currentSession);
+      } else {
+        // Nếu phiên hiện tại dài hơn, thay thế phiên trước đó
+        if (currentSession.duration > lastAcceptedSession.duration) {
+          console.log(`⚠️ Phát hiện phiên chồng chéo, giữ lại phiên dài hơn: ${currentSession.id} (${currentSession.duration}s)`);
+          result[result.length - 1] = currentSession;
+        } else {
+          console.log(`⚠️ Phát hiện phiên chồng chéo, bỏ qua phiên ngắn hơn: ${currentSession.id} (${currentSession.duration}s)`);
+        }
+      }
+    }
+    
+    return result;
   }
 
   /**
@@ -667,6 +885,31 @@ class BackgroundWifiService {
         throw new Error('No authentication token');
       }
 
+      // Ưu tiên sử dụng location đã lưu cùng với phiên
+      let location = session.metadata?.location;
+      
+      // Nếu phiên không có location, thử lấy location đã lưu trước đó
+      if (!location) {
+        try {
+          location = await locationStorageService.getLocationFromStorage();
+          if (location) {
+            console.log('Using stored location for session sync');
+          } else {
+            console.log('No stored location available for sync');
+          }
+        } catch (error) {
+          console.log('Error getting stored location:', error);
+        }
+      }
+
+      // Ghi log chi tiết về phiên đang đồng bộ
+      console.log('📡 Syncing session:', {
+        id: session.id,
+        start: new Date(session.startTime).toLocaleTimeString(),
+        duration: session.duration,
+        hasLocation: !!location
+      });
+
       const response = await fetch(`${ENV.API_URL}/api/wifi/background-sync`, {
         method: 'POST',
         headers: {
@@ -678,7 +921,8 @@ class BackgroundWifiService {
           startTime: session.startTime,
           endTime: session.endTime,
           duration: session.duration,
-          ipAddress: session.ipAddress
+          ipAddress: session.ipAddress,
+          location: location
         })
       });
 
@@ -741,6 +985,32 @@ class BackgroundWifiService {
     if (!ipAddress) return false;
     const prefix = this.extractIPPrefix(ipAddress);
     return prefix === ENV.UNIVERSITY_IP_PREFIX.toLowerCase();
+  }
+
+  /**
+   * Check if a location is on campus
+   */
+  private isLocationOnCampus(locationData: any): boolean {
+    if (!locationData || !locationData.latitude || !locationData.longitude) {
+      return false;
+    }
+    
+    // Tính khoảng cách đến tọa độ trung tâm trường học
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = (locationData.latitude * Math.PI) / 180;
+    const φ2 = (ENV.UNIVERSITY_LAT * Math.PI) / 180;
+    const Δφ = ((ENV.UNIVERSITY_LAT - locationData.latitude) * Math.PI) / 180;
+    const Δλ = ((ENV.UNIVERSITY_LNG - locationData.longitude) * Math.PI) / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    
+    // Kiểm tra nếu nằm trong bán kính cho phép
+    const isWithinRadius = distance <= ENV.UNIVERSITY_RADIUS;
+    console.log(`📍 Location distance to campus: ${distance.toFixed(0)}m, within radius: ${isWithinRadius}`);
+    return isWithinRadius;
   }
 
   private extractIPPrefix(ipAddress: string): string {

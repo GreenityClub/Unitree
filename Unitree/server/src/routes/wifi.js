@@ -89,7 +89,9 @@ const checkAndResetTimePeriods = async (userId) => {
 // Background sync endpoint for minimal bandwidth usage
 router.post('/background-sync', auth, async (req, res) => {
   try {
-    const { sessionId, startTime, endTime, duration, ipAddress } = req.body;
+    const { sessionId, startTime, endTime, duration, ipAddress, location } = req.body;
+
+    logger.info(`Background sync request: sessionId=${sessionId}, duration=${duration}s, IP=${ipAddress}, hasLocation=${!!location}`);
 
     // Validate required fields
     if (!sessionId || !startTime || !duration || !ipAddress) {
@@ -98,20 +100,55 @@ router.post('/background-sync', auth, async (req, res) => {
       });
     }
 
-    // Validate IP address
+    // Validate session data - Kiểm tra IP đã lưu trong phiên (không kiểm tra IP hiện tại của người dùng)
     if (!isValidUniversityIP(ipAddress)) {
-      return res.status(400).json({ message: 'Invalid university WiFi IP address' });
+      logger.warn(`Background sync rejected: Invalid IP ${ipAddress}`);
+      return res.status(400).json({ 
+        message: 'Invalid university WiFi IP address in session data' 
+      });
     }
 
-    // Check if session already exists to prevent duplicates
+    // Validate session location if provided (không kiểm tra location hiện tại của người dùng)
+    let locationValid = true;
+    if (location) {
+      locationValid = isValidUniversityLocation(location);
+      if (!locationValid) {
+        // Ghi log nhưng không từ chối đồng bộ nếu IP hợp lệ
+        logger.info(`Background session ${sessionId} has invalid location data, but continuing with valid IP`);
+      }
+    } else {
+      // Phiên cũ không có location, ghi log nhưng không từ chối đồng bộ
+      logger.info(`Background session ${sessionId} has no location data (likely created before update)`);
+    }
+
+    // Enhanced duplicate session check
     const existingSession = await WifiSession.findOne({
-      user: req.user._id,
-      'metadata.backgroundSessionId': sessionId
+      $or: [
+        // Kiểm tra theo ID phiên
+        {'metadata.backgroundSessionId': sessionId},
+        // Kiểm tra theo thời gian + user + độ dài phiên (trong trường hợp sessionId không khớp)
+        {
+          user: req.user._id,
+          startTime: {
+            $gte: new Date(new Date(startTime).getTime() - 60000), // -1 phút
+            $lte: new Date(new Date(startTime).getTime() + 60000)  // +1 phút
+          },
+          duration: { 
+            $gte: parseInt(duration, 10) * 0.9, 
+            $lte: parseInt(duration, 10) * 1.1 
+          },
+          'metadata.source': 'background'
+        }
+      ]
     });
 
     if (existingSession) {
-      logger.info(`Background session ${sessionId} already synced for user ${req.user._id}`);
-      return res.json({ message: 'Session already synced', session: existingSession });
+      logger.info(`Background session ${sessionId} already synced for user ${req.user._id} (or similar session exists)`);
+      return res.json({ 
+        message: 'Session already synced', 
+        session: existingSession,
+        alreadySynced: true
+      });
     }
 
     // Calculate points: 1 minute = 1 point
@@ -128,9 +165,12 @@ router.post('/background-sync', auth, async (req, res) => {
     // Reset time periods if needed
     await checkAndResetTimePeriods(req.user._id);
 
+    // Ghi log thông tin chi tiết trước khi tạo phiên
+    logger.info(`Creating new WiFi session for user ${req.user._id}: ${pointsEarned} points for ${durationSeconds}s duration`);
+
     // Use transactions if available
     const result = await executeWithOptionalTransaction(async (session) => {
-      // Create WiFi session record
+      // Create WiFi session record with location if available
       const wifiSession = new WifiSession({
         user: req.user._id,
         ipAddress,
@@ -140,10 +180,20 @@ router.post('/background-sync', auth, async (req, res) => {
         pointsEarned,
         sessionDate: new Date(startTime),
         isActive: false,
+        location: location ? {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          timestamp: new Date(location.timestamp || startTime)
+        } : undefined,
         metadata: {
           backgroundSessionId: sessionId,
           syncedAt: new Date(),
-          source: 'background'
+          source: 'background',
+          validationMethods: {
+            ipAddress: true,
+            location: locationValid
+          }
         }
       });
 
@@ -176,6 +226,11 @@ router.post('/background-sync', auth, async (req, res) => {
           endTime: endTime ? new Date(endTime) : new Date(),
           duration: durationSeconds,
           description: `Background WiFi session on ${ipAddress}`,
+          location: location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : undefined,
+          validationMethods: {
+            ipAddress: true,
+            location: locationValid
+          }
         }
       });
 

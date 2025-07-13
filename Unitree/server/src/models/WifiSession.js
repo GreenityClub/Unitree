@@ -36,6 +36,13 @@ const wifiSessionSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Location data
+  location: {
+    latitude: Number,
+    longitude: Number,
+    accuracy: Number,
+    timestamp: Date
+  },
   // Time period tracking
   sessionDate: {
     type: Date,
@@ -45,6 +52,16 @@ const wifiSessionSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  // Metadata for additional info
+  metadata: {
+    backgroundSessionId: String,
+    syncedAt: Date,
+    source: String,
+    validationMethods: {
+      ipAddress: Boolean,
+      location: Boolean
+    }
   }
 }, {
   timestamps: true

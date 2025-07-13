@@ -35,14 +35,21 @@ interface BackgroundSyncProviderProps {
   children: ReactNode;
 }
 
-export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ children }) => {
-  const { isAuthenticated, user } = useAuth();
-  const [isBackgroundMonitoringEnabled, setIsBackgroundMonitoringEnabled] = useState(false);
-  const [syncStats, setSyncStats] = useState<any>(null);
+export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({
+  children,
+}) => {
+  const { isAuthenticated } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isBackgroundMonitoringEnabled, setIsBackgroundMonitoringEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const appState = useRef(AppState.currentState);
+  const [syncStats, setSyncStats] = useState<BackgroundSyncStats>({
+    pendingCount: 0,
+    lastSync: null,
+    currentSession: null,
+  });
+  const appState = useRef<AppStateStatus>(AppState.currentState);
   const hasPerformedInitialSync = useRef(false);
+  const syncedSessionIds = useRef<string[]>([]);
 
   // Initialize background monitoring state
   useEffect(() => {
@@ -133,7 +140,9 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
       });
     }
 
-    return () => subscription?.remove();
+    return () => {
+      subscription.remove();
+    };
   }, [isAuthenticated, isInitialized, isBackgroundMonitoringEnabled]);
 
   // Save authentication token for background service
@@ -204,6 +213,8 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
     }
 
     setIsSyncing(true);
+    // Clear tracked sessions from previous sync
+    syncedSessionIds.current = [];
     
     try {
       logger.background.info('Starting foreground sync...');
@@ -212,12 +223,23 @@ export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({ 
       if (isBackgroundMonitoringEnabled) {
         const sessionTransition = await BackgroundWifiService.handleAppReopen();
         if (sessionTransition.sessionEnded || sessionTransition.sessionStarted) {
-          logger.background.info('Session transition completed during app reopen');
+          logger.background.info('Session transition completed during app reopen', {
+            ended: sessionTransition.sessionEnded,
+            started: sessionTransition.sessionStarted,
+            endedSessionId: sessionTransition.endedSessionId || 'none'
+          });
+          
+          // Store the ID of any session that was ended to avoid duplicate sync
+          if (sessionTransition.sessionEnded && sessionTransition.endedSessionId) {
+            syncedSessionIds.current.push(sessionTransition.endedSessionId);
+            logger.background.info('Tracking ended session to prevent duplicate sync');
+          }
         }
       }
       
-      // Then, sync any pending background sessions
-      const syncResult = await BackgroundWifiService.syncPendingSessions();
+      // Then, sync any pending background sessions, passing the IDs we've already processed
+      // Đồng bộ các phiên từ AsyncStorage bất kể WiFi và location hiện tại là gì
+      const syncResult = await BackgroundWifiService.syncPendingSessions(syncedSessionIds.current);
       logger.background.info('Background sessions synced', { data: syncResult });
 
       // Then refresh all app data

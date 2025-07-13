@@ -1,10 +1,11 @@
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import { wifiService } from './wifiService';
-import ENV from '../config/env';
-import * as Location from 'expo-location';
 import { Platform } from 'react-native';
-import locationService, { LocationData } from './locationService';
+import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import * as Location from 'expo-location';
+import wifiService from './wifiService';
+import locationService, { WiFiValidationResult } from './locationService';
+import locationStorageService from './locationStorageService';
 import { logger } from '../utils/logger';
+import ENV from '../config/env';
 
 // ---- Types -----------------------------------------------------------------
 interface SessionInfo {
@@ -182,26 +183,32 @@ class WifiMonitor {
       // Enhanced validation using both IP address and location
       const validationResult = await locationService.validateWiFiSession(ipAddress || '');
 
+      // Kiểm tra riêng rẽ IP và location
+      const isValidIP = validationResult.validationMethods.ipAddress;
+      const isValidLocation = validationResult.validationMethods.location;
+
       logger.wifi.debug('Enhanced WiFi connection check', {
         data: {
           ipAddress,
-          isValidIP: validationResult.validationMethods.ipAddress,
-          isValidLocation: validationResult.validationMethods.location,
-          isOverallValid: validationResult.isValid,
+          isValidIP,
+          isValidLocation,
+          isOverallValid: isValidIP && isValidLocation,
           requiresBoth: true,
           distance: validationResult.distance,
           campus: validationResult.campus
         }
       });
 
-      if (validationResult.isValid) {
+      // Chỉ bắt đầu phiên khi CẢ HAI điều kiện đều thỏa mãn
+      if (isValidIP && isValidLocation) {
+        logger.wifi.info('✅ Valid university WiFi AND on campus, session can start/continue');
         // Connected to university WiFi AND on campus
         if (!this.sessionStartTime) {
           // No active session, start a new one
           await this.startSession(ipAddress, validationResult);
         } else if (this.currentIPAddress !== ipAddress) {
           // IP address changed, end current session and start new one
-          logger.wifi.info('IP address changed in foreground, ending previous session and starting new one');
+          logger.wifi.info('📶 IP address changed in foreground, ending previous session and starting new one');
           await this.endSession();
           await this.startSession(ipAddress, validationResult);
         } else {
@@ -210,23 +217,62 @@ class WifiMonitor {
           this.notifyListeners({ isConnected: true, sessionInfo: this.buildSessionInfo() });
         }
         return;
+      } else {
+        // Log detailed reason for validation failure
+        logger.wifi.info(`❌ Validation failed: IP=${isValidIP}, Location=${isValidLocation}`);
       }
     }
 
-    // If we reach here, we are NOT connected to the university WiFi
+    // If we reach here, we are NOT connected to the university WiFi or not on campus
     // End session IMMEDIATELY regardless of foreground/background state
     if (this.sessionStartTime) {
-      logger.wifi.info('Not connected to university WiFi, ending session immediately');
+      logger.wifi.info('Not connected to university WiFi or not on campus, ending session immediately');
       await this.endSession();
     } else {
       this.notifyListeners({ isConnected: false, sessionInfo: null });
     }
   }
 
-  private async startSession(ipAddress: string | null, validationResult?: any): Promise<void> {
+  private async startSession(ipAddress: string | null, validationResult?: WiFiValidationResult): Promise<void> {
+    // Chỉ cho phép bắt đầu phiên khi cả hai điều kiện đều thỏa mãn
+    if (validationResult && (!validationResult.validationMethods.ipAddress || 
+        !validationResult.validationMethods.location)) {
+      logger.wifi.info('⚠️ Cannot start session - IP or location validation failed');
+      return;
+    }
+
+    // Implement minimum gap between sessions (e.g., 10 seconds)
+    const minSessionGap = 10 * 1000; // 10 seconds
+    const lastSessionEnd = this.lastSessionEndTime;
+    const now = Date.now();
+    
+    if (lastSessionEnd && (now - lastSessionEnd < minSessionGap)) {
+      logger.wifi.info(`⚠️ Trying to start new session too soon (${Math.floor((now - lastSessionEnd)/1000)}s), waiting...`);
+      return; // Don't start a session too soon after ending one
+    }
+    
     this.sessionStartTime = new Date();
     this.currentIPAddress = ipAddress;
     this.sessionCount += 1;
+
+    // Lưu location nếu có
+    if (validationResult && validationResult.location) {
+      try {
+        // Sử dụng service mới để lưu location
+        const locationData = {
+          latitude: validationResult.location.latitude,
+          longitude: validationResult.location.longitude,
+          accuracy: validationResult.location.accuracy || 0,
+          timestamp: new Date().toISOString(),
+          campus: validationResult.campus
+        };
+        
+        // Lưu location vào storage
+        await locationStorageService.saveLocationToStorage(locationData);
+      } catch (error) {
+        logger.wifi.error('Failed to save location data', { data: error });
+      }
+    }
 
     try {
       await wifiService.startSession({ 
@@ -250,6 +296,9 @@ class WifiMonitor {
     this.notifyStatsUpdate();
   }
 
+  // Property to track last session end time
+  private lastSessionEndTime: number | null = null;
+
   private async endSession(): Promise<void> {
     try {
       // End session on server
@@ -258,6 +307,9 @@ class WifiMonitor {
     } catch (err) {
       logger.wifi.error('Failed to end WiFi session on server', { data: err });
     }
+
+    // Record when this session ended
+    this.lastSessionEndTime = Date.now();
 
     // Clear local session state
     this.sessionStartTime = null;

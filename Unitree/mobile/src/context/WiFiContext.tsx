@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { wifiService, WifiStats } from '../services/wifiService';
 import WifiMonitor from '../services/WifiMonitor';
 import BackgroundWifiService from '../services/BackgroundWifiService';
+import locationStorageService from '../services/locationStorageService';
 import { useAuth } from './AuthContext';
 import ENV from '../config/env';
 import { logger } from '../utils/logger';
@@ -11,6 +12,7 @@ interface WiFiContextType {
   isConnected: boolean;
   ipAddress: string | null;
   isUniversityWifi: boolean;
+  isValidLocation: boolean;
   isSessionActive: boolean;
   currentSessionDuration: number;
   sessionCount: number;
@@ -48,6 +50,9 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const wifiMonitorListenerRef = useRef<(() => void) | null>(null);
   const realTimeUpdateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Thêm state mới để theo dõi location
+  const [isValidLocation, setIsValidLocation] = useState(false);
 
   const refreshStats = async () => {
     if (!isAuthenticated) return;
@@ -97,6 +102,41 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     }
   };
 
+  // Kiểm tra cả IP và location
+  const checkUniversityWifi = async (networkIPAddress: string | null): Promise<boolean> => {
+    // Kiểm tra IP
+    const isValidIP = networkIPAddress && wifiService.isValidUniversityIP(networkIPAddress);
+    
+    // Kiểm tra location
+    let locationValid = false;
+    try {
+      // Lấy location đã lưu hoặc lấy location mới
+      const locationData = await locationStorageService.getCurrentAndSaveLocation();
+      locationValid = locationData?.isValid || false;
+      setIsValidLocation(locationValid);
+    } catch (error) {
+      logger.wifi.error('Failed to check location validity', { data: error });
+    }
+    
+    // Ghi log thông tin kiểm tra
+    logger.wifi.debug('University WiFi Check', {
+      data: {
+        ipAddress: networkIPAddress,
+        isValidIP,
+        isValidLocation: locationValid,
+        isOverallValid: isValidIP && locationValid,
+        ipPrefix: wifiService.extractIPPrefix(networkIPAddress),
+        expectedPrefix: ENV.UNIVERSITY_IP_PREFIX
+      }
+    });
+    
+    // Kết quả chỉ hợp lệ khi cả IP và location đều hợp lệ
+    const isValid = isValidIP && locationValid;
+    setIsUniversityWifi(isValid);
+    
+    return isValid;
+  };
+
   // Monitor network state
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -144,29 +184,21 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
         
         setIpAddress(networkIPAddress);
         
-        // Check if connected to university WiFi using IP address only
-        const isValidIP = wifiService.isValidUniversityIP(networkIPAddress);
-        logger.wifi.debug('University WiFi Check', {
-          data: {
-            ipAddress: networkIPAddress,
-            isValidIP: isValidIP,
-            ipPrefix: wifiService.extractIPPrefix(networkIPAddress),
-            expectedPrefix: ENV.UNIVERSITY_IP_PREFIX
+        // Kiểm tra cả IP và location
+        checkUniversityWifi(networkIPAddress).then(isValid => {
+          // End session if not valid and session is active
+          if (!isValid && isSessionActive && isAuthenticated) {
+            logger.wifi.info('WiFi or location not valid, ending session');
+            wifiService.endSession().catch(err => 
+              logger.wifi.error('Failed to end session on invalid connection', { data: err })
+            );
           }
         });
-        setIsUniversityWifi(isValidIP);
-
-        // End session if connected to wrong WiFi and session is active
-        if (!isValidIP && isSessionActive && isAuthenticated) {
-          logger.wifi.info('Connected to wrong WiFi, ending session');
-          wifiService.endSession().catch(err => 
-            logger.wifi.error('Failed to end session on wrong WiFi', { data: err })
-          );
-        }
       } else {
         logger.wifi.debug('Clearing WiFi State - Not connected to WiFi');
         setIpAddress(null);
         setIsUniversityWifi(false);
+        setIsValidLocation(false);
 
         // End session if disconnected from WiFi and session is active
         if (isSessionActive && isAuthenticated) {
@@ -200,43 +232,54 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
 
     const manageSession = async () => {
       try {
+        // Kiểm tra cả IP và location để quyết định bắt đầu phiên
         if (isUniversityWifi && !isSessionActive) {
-          // Start session if connected to university WiFi but no active session
-          try {
-            await wifiService.startSession({ 
-              ipAddress: ipAddress || '' 
-            });
-            await refreshStats();
-            await refreshSessionCount();
-            logger.wifi.info('WiFi session started', { ipAddress });
-          } catch (error: any) {
-            // If we get "Active session already exists" error, try cleanup and retry
-            if (error.message.includes('Active session already exists')) {
-              console.log('🧹 Active session conflict detected, cleaning up orphaned sessions...');
-              try {
-                await wifiService.cleanupOrphanedSessions();
-                // Wait a moment then try starting session again
-                setTimeout(async () => {
-                  try {
-                    await wifiService.startSession({ 
-                      ipAddress: ipAddress || '' 
-                    });
-                    await refreshStats();
-                    await refreshSessionCount();
-                  } catch (retryError) {
-                    console.error('Failed to start session after cleanup:', retryError);
-                  }
-                }, 1000);
-              } catch (cleanupError) {
-                console.error('Failed to cleanup orphaned sessions:', cleanupError);
+          // Cập nhật location trước khi bắt đầu phiên
+          const locationData = await locationStorageService.getCurrentAndSaveLocation();
+          const locationValid = locationData?.isValid || false;
+          
+          if (locationValid) {
+            // Start session if both IP and location are valid
+            try {
+              await wifiService.startSession({ 
+                ipAddress: ipAddress || '',
+                location: locationData 
+              });
+              await refreshStats();
+              await refreshSessionCount();
+              logger.wifi.info('WiFi session started', { ipAddress, locationValid: true });
+            } catch (error: any) {
+              // If we get "Active session already exists" error, try cleanup and retry
+              if (error.message.includes('Active session already exists')) {
+                console.log('🧹 Active session conflict detected, cleaning up orphaned sessions...');
+                try {
+                  await wifiService.cleanupOrphanedSessions();
+                  // Wait a moment then try starting session again
+                  setTimeout(async () => {
+                    try {
+                      await wifiService.startSession({ 
+                        ipAddress: ipAddress || '',
+                        location: locationData
+                      });
+                      await refreshStats();
+                      await refreshSessionCount();
+                    } catch (retryError) {
+                      console.error('Failed to start session after cleanup:', retryError);
+                    }
+                  }, 1000);
+                } catch (cleanupError) {
+                  console.error('Failed to cleanup orphaned sessions:', cleanupError);
+                }
+              } else {
+                throw error;
               }
-            } else {
-              throw error;
             }
+          } else {
+            logger.wifi.info('Not starting session - location is not valid');
           }
         } else if (!isUniversityWifi && isSessionActive) {
-          // End session IMMEDIATELY if not connected to university WiFi but session is active
-          logger.wifi.info('Not on university WiFi, ending session immediately');
+          // End session IMMEDIATELY if criteria not met
+          logger.wifi.info('Not on university WiFi or not on campus, ending session immediately');
           try {
             await wifiService.endSession();
             await refreshStats();
@@ -258,7 +301,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     };
 
     manageSession();
-  }, [isAuthenticated, isUniversityWifi, isSessionActive, ipAddress]);
+  }, [isAuthenticated, isUniversityWifi, isSessionActive, ipAddress, isValidLocation]);
 
   // WiFi Monitor integration with enhanced session tracking
   useEffect(() => {
@@ -372,6 +415,7 @@ export const WiFiProvider: React.FC<WiFiProviderProps> = ({ children }) => {
     error,
     wifiMonitor: WifiMonitor,
     isInitialized,
+    isValidLocation, // Thêm trường mới
   };
 
   return (
