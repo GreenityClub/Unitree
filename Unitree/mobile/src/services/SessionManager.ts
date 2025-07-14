@@ -120,7 +120,7 @@ class SessionManager {
         this.sessionState = {
           ...this.sessionState,
           isActive: true,
-          sessionId: response.sessionId || 'unknown',
+          sessionId: response._id || 'unknown',
           startTime: new Date(),
           lastUpdate: new Date(),
           ipAddress

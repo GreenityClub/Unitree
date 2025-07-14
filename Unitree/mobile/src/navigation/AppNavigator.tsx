@@ -15,7 +15,7 @@ import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import UserSettingsScreen from '../screens/main/UserSettingsScreen';
 import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
-import ForgotPasswordFromProfileScreen from '../screens/auth/ForgotPasswordFromProfileScreen';
+import ForgotPasswordFromProfileScreen from '../screens/main/ForgotPasswordFromProfileScreen';
 
 // Types
 type RootStackParamList = {
@@ -40,10 +40,10 @@ export function navigate(name: keyof RootStackParamList, params?: any) {
 const Stack = createStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!loading && navigationRef.isReady()) {
+    if (!isLoading && navigationRef.isReady()) {
       if (user) {
         navigationRef.dispatch(
           CommonActions.reset({
@@ -60,9 +60,9 @@ const AppNavigator: React.FC = () => {
         );
       }
     }
-  }, [user, loading]);
+  }, [user, isLoading]);
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSplashScreen />;
   }
 
@@ -72,9 +72,9 @@ const AppNavigator: React.FC = () => {
       initialRouteName={user ? "Main" : "Auth"}
       screenOptions={{
         headerStyle: {
-          backgroundColor: theme.colors.primary.dark,
+          backgroundColor: theme.colors.primary,
         },
-        headerTintColor: theme.colors.neutral.white,
+        headerTintColor: theme.colors.white,
         headerMode: 'screen',
         presentation: 'card',
       }}

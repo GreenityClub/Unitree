@@ -13,8 +13,8 @@ export const useScreenLoadingAnimation = () => {
   const contentTranslateY = useSharedValue(30);
   const contentScale = useSharedValue(0.95);
 
-  // Loading state
-  const isLoading = useSharedValue(true);
+  // Loading state (using 1 for true, 0 for false)
+  const isLoading = useSharedValue(1);
 
   const startLoadingAnimation = useCallback(() => {
     // Reset values
@@ -23,7 +23,7 @@ export const useScreenLoadingAnimation = () => {
     contentOpacity.value = 0;
     contentTranslateY.value = 30;
     contentScale.value = 0.95;
-    isLoading.value = true;
+    isLoading.value = 1;
 
     // Start header animation
     headerOpacity.value = withDelay(100, withTiming(1, {
@@ -56,7 +56,7 @@ export const useScreenLoadingAnimation = () => {
     }));
 
     // End loading state
-    isLoading.value = withDelay(800, withTiming(false, { duration: 1 }));
+    isLoading.value = withDelay(800, withTiming(0, { duration: 1 }));
   }, []);
 
   // Trigger animation when screen comes into focus

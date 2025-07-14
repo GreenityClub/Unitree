@@ -71,7 +71,7 @@ class LocationService {
         await locationStorageService.saveLocationToStorage({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy,
+          accuracy: location.coords.accuracy ?? undefined,
           timestamp: new Date().toISOString()
         });
         
@@ -89,7 +89,7 @@ class LocationService {
         result.location = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy,
+          accuracy: location.coords.accuracy ?? undefined,
           timestamp: new Date().toISOString()
         };
       }

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
-import wifiService from './wifiService';
+import { wifiService, WiFiSession } from './wifiService';
 import locationService, { WiFiValidationResult } from './locationService';
 import locationStorageService from './locationStorageService';
 import { logger } from '../utils/logger';
@@ -159,7 +159,7 @@ class WifiMonitor {
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
       const history = await wifiService.getSessionHistory();
-      this.sessionCount = history.filter(session => {
+      this.sessionCount = history.filter((session: WiFiSession) => {
         const sessionDate = new Date(session.sessionDate);
         return sessionDate >= todayStart;
       }).length;
@@ -277,10 +277,15 @@ class WifiMonitor {
     try {
       await wifiService.startSession({ 
         ipAddress: ipAddress ?? '',
-        location: validationResult?.location,
+        location: validationResult?.location ? {
+          ...validationResult.location,
+          accuracy: validationResult.location.accuracy || 0,
+          timestamp: typeof validationResult.location.timestamp === 'string' ? 
+            new Date(validationResult.location.timestamp).getTime() : validationResult.location.timestamp
+        } : undefined,
         validationMethods: validationResult?.validationMethods,
         campus: validationResult?.campus,
-        distance: validationResult?.distance
+        distance: validationResult?.distance ?? undefined
       });
     } catch (err: any) {
       // Don't log validation errors as errors - they're expected during testing

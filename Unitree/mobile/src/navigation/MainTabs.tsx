@@ -142,9 +142,9 @@ const AnimatedTabItem = ({
               bottom: 6,
               left: 6,
               right: 6,
-              backgroundColor: theme.colors.primary.main,
+              backgroundColor: theme.colors.primary,
               borderRadius: 28,
-              shadowColor: theme.colors.primary.main,
+              shadowColor: theme.colors.primary,
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 0.4,
               shadowRadius: 12,
@@ -167,7 +167,7 @@ const AnimatedTabItem = ({
                 backgroundColor: 'transparent',
                 borderRadius: 30,
                 borderWidth: 2,
-                borderColor: `${theme.colors.primary.main}40`,
+                borderColor: `${theme.colors.primary}40`,
               },
               backgroundStyle,
             ]}
@@ -179,7 +179,7 @@ const AnimatedTabItem = ({
           <Icon
             name={iconName}
             size={24}
-            color={isFocused ? '#FFFFFF' : theme.colors.text.secondary}
+            color={isFocused ? '#FFFFFF' : theme.colors.secondary}
           />
         </Animated.View>
 

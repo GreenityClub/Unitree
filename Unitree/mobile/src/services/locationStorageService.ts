@@ -83,7 +83,7 @@ export const getCurrentAndSaveLocation = async (): Promise<LocationData | null> 
       const locationData: LocationData = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
+        accuracy: location.coords.accuracy ?? undefined,
         timestamp: new Date().toISOString()
       };
 

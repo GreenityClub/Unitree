@@ -37,6 +37,7 @@ interface BackgroundSession {
   metadata?: {
     backgroundModeStartTime?: string;
     isInBackground?: boolean;
+    endReason?: string;
     location?: {
       latitude: number;
       longitude: number;
@@ -891,7 +892,15 @@ class BackgroundWifiService {
       // Nếu phiên không có location, thử lấy location đã lưu trước đó
       if (!location) {
         try {
-          location = await locationStorageService.getLocationFromStorage();
+          const storedLocation = await locationStorageService.getLocationFromStorage();
+          if (storedLocation) {
+            location = {
+              latitude: storedLocation.latitude,
+              longitude: storedLocation.longitude,
+              accuracy: storedLocation.accuracy ?? 0,
+              timestamp: storedLocation.timestamp
+            };
+          }
           if (location) {
             console.log('Using stored location for session sync');
           } else {
