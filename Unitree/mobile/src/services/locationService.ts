@@ -11,6 +11,12 @@ export interface WiFiValidationResult {
   };
   campus: string;
   distance: number | null;
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp: string;
+  };
 }
 
 class LocationService {
@@ -43,7 +49,8 @@ class LocationService {
         location: false
       },
       campus: 'unknown',
-      distance: null
+      distance: null,
+      location: undefined
     };
 
     // Validate IP address
@@ -79,6 +86,12 @@ class LocationService {
         result.distance = distance;
         result.validationMethods.location = distance <= ENV.UNIVERSITY_RADIUS;
         result.campus = result.validationMethods.location ? 'main_campus' : 'off_campus';
+        result.location = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy,
+          timestamp: new Date().toISOString()
+        };
       }
     } catch (error) {
       console.error('Location validation error:', error);

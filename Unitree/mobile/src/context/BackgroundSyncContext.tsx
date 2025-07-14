@@ -38,11 +38,11 @@ interface BackgroundSyncProviderProps {
 export const BackgroundSyncProvider: React.FC<BackgroundSyncProviderProps> = ({
   children,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
   const [isBackgroundMonitoringEnabled, setIsBackgroundMonitoringEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStats, setSyncStats] = useState<BackgroundSyncStats>({
+  const [syncStats, setSyncStats] = useState<BackgroundSyncContextType['syncStats']>({
     pendingCount: 0,
     lastSync: null,
     currentSession: null,
