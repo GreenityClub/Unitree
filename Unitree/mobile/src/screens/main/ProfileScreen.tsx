@@ -44,7 +44,7 @@ import { getAvatarUrl, handleAvatarError } from '../../utils/imageUtils';
 import { wifiService } from '../../services/wifiService';
 
 const ProfileScreen = () => {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, forceLogout } = useAuth();
   const { handleScroll, handleScrollBeginDrag, handleScrollEndDrag, handleTouchStart } = useTabBarContext();
   const { headerAnimatedStyle, contentAnimatedStyle, isLoading } = useScreenLoadingAnimation();
   const { panGesture } = useSwipeNavigation({ currentScreen: 'profile' });
@@ -128,18 +128,30 @@ const ProfileScreen = () => {
   const handleLogoutOnly = async () => {
     setShowLogoutModal(false);
     try {
+      console.log('🔄 Attempting regular logout...');
       await logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Regular logout failed, trying force logout:', error);
+      try {
+        await forceLogout();
+      } catch (forceError) {
+        console.error('Force logout also failed:', forceError);
+      }
     }
   };
 
   const handleClearAll = async () => {
     setShowLogoutModal(false);
     try {
+      console.log('🔄 Attempting regular logout...');
       await logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Regular logout failed, trying force logout:', error);
+      try {
+        await forceLogout();
+      } catch (forceError) {
+        console.error('Force logout also failed:', forceError);
+      }
     }
   };
 

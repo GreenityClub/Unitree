@@ -29,6 +29,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const loadingTextAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Small delay to ensure component is fully mounted
@@ -65,6 +66,25 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
 
     return () => clearTimeout(timer);
   }, [fadeAnim, scaleAnim, slideAnim, onAnimationComplete]);
+
+  // Animate loading text
+  useEffect(() => {
+    const loadingAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(loadingTextAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(loadingTextAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loadingAnimation.start();
+  }, [loadingTextAnim]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -113,11 +133,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
           },
         ]}
       >
-        <View style={styles.loadingDots}>
-          <LoadingDot delay={0} />
-          <LoadingDot delay={200} />
-          <LoadingDot delay={400} />
-        </View>
+        <Animated.View style={{ opacity: loadingTextAnim }}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </Animated.View>
       </Animated.View>
 
       {/* Bottom decoration */}
@@ -125,56 +143,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
         <Text style={styles.versionText}>v1.0.0</Text>
       </View>
     </SafeAreaView>
-  );
-};
-
-// Loading dot component with animation
-const LoadingDot: React.FC<{ delay: number }> = ({ delay }) => {
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Small delay to ensure component is fully mounted
-    const timer = setTimeout(() => {
-      const bounceAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(bounceAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      bounceAnimation.start();
-    }, 150);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [bounceAnim, delay]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.dot,
-        {
-          transform: [
-            {
-              translateY: bounceAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -10],
-              }),
-            },
-          ],
-        },
-      ]}
-    />
   );
 };
 
@@ -235,27 +203,21 @@ const styles = StyleSheet.create({
     bottom: 120,
     alignItems: 'center',
   },
-  loadingDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors?.primaryLight || fallbackColors.primaryLight,
-    marginHorizontal: 4,
+  loadingText: {
+    fontSize: 16,
+    color: theme.colors?.primaryLight || fallbackColors.primaryLight,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   bottomDecoration: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 40,
     alignItems: 'center',
   },
   versionText: {
     fontSize: 12,
     color: theme.colors?.gray400 || fallbackColors.gray400,
-    opacity: 0.7,
+    opacity: 0.6,
   },
 });
 

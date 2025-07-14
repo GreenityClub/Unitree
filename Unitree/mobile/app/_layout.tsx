@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 import { AuthProvider } from '../src/context/AuthContext';
 import { WiFiProvider } from '../src/context/WiFiContext';
@@ -12,10 +13,9 @@ import { TabBarProvider } from '../src/context/TabBarContext';
 import { BackgroundSyncProvider } from '../src/context/BackgroundSyncContext';
 import { NotificationProvider } from '../src/context/NotificationContext';
 import ENV, { validateEnvironment } from '../src/config/env';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import BackgroundWifiService from '../src/services/BackgroundWifiService';
-import SplashScreen from '../src/components/SplashScreen';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -24,7 +24,6 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     // Validate environment variables on app startup
@@ -60,13 +59,16 @@ export default function RootLayout() {
     };
   }, []);
 
-  if (!loaded || showSplash) {
+  // Show loading screen while fonts are loading
+  if (!loaded) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <SplashScreen 
-            onAnimationComplete={() => setShowSplash(false)}
-          />
+          <AuthProvider>
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading...</Text>
+            </View>
+          </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -83,6 +85,7 @@ export default function RootLayout() {
                   <TabBarProvider>
                     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                       <Stack>
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
                         <Stack.Screen name="auth" options={{ headerShown: false }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                         <Stack.Screen name="user-settings" options={{ headerShown: false }} />
@@ -101,3 +104,16 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#2E7D32',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
+  },
+});

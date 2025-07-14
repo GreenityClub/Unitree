@@ -1,62 +1,35 @@
 import { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
-import { theme } from '../src/theme';
-import Animated, { 
-  FadeIn,
-  FadeOut 
-} from 'react-native-reanimated';
+import SplashScreen from '../src/components/SplashScreen';
 
 const Index = () => {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    console.log('🔄 Auth state changed - User:', !!user, 'Loading:', isLoading);
+    console.log('🔄 Index: Auth state changed - User:', !!user, 'Loading:', isLoading);
     
     if (!isLoading) {
+      console.log('✅ Index: Loading finished, checking user state...');
       if (user) {
-        console.log('✅ User authenticated, navigating to tabs');
+        console.log('✅ Index: User authenticated, navigating to tabs');
         router.replace('/(tabs)');
       } else {
-        console.log('❌ No user, navigating to login');
+        console.log('❌ Index: No user, navigating to login');
         router.replace('/auth/login');
       }
+    } else {
+      console.log('⏳ Index: Still loading...');
     }
   }, [user, isLoading]);
 
-  // Show animated loading screen while checking auth
-  return (
-    <Animated.View 
-      entering={FadeIn}
-      exiting={FadeOut}
-      style={styles.container}
-    >
-      <Text variant="displayLarge" style={styles.loadingText}>
-        UniTree
-      </Text>
-      <Text variant="titleMedium" style={styles.subtitle}>
-        Loading...
-      </Text>
-    </Animated.View>
-  );
-}
+  // Show SplashScreen while loading, otherwise render nothing (will redirect)
+  if (isLoading) {
+    return <SplashScreen />;
+  }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: theme.colors.white,
-    marginBottom: 10,
-  },
-  subtitle: {
-    color: theme.colors.textWhite,
-  },
-});
+  // Don't render anything when not loading (will redirect immediately)
+  return null;
+};
 
 export default Index; 
