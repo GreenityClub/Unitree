@@ -72,10 +72,28 @@ class WifiMonitor {
 
     // Update session statistics every minute
     this.statsUpdateTimer = setInterval(async () => {
-      if (this.monitoring && this.sessionStartTime) {
+      if (this.monitoring) {
         try {
-          await wifiService.updateSession();
-          this.notifyStatsUpdate();
+          if (this.sessionStartTime) {
+            await wifiService.updateSession();
+            this.notifyStatsUpdate();
+          } else {
+            // Nếu không còn session active, kiểm tra điều kiện để tự động start session mới
+            const info = await NetInfo.fetch();
+            if (info.type === 'wifi' && info.isConnected && info.details) {
+              const details: any = info.details;
+              const ipAddress = details.ipAddress || null;
+              // Enhanced validation using both IP address and location
+              const validationResult = await locationService.validateWiFiSession(ipAddress || '');
+              const isValidIP = validationResult.validationMethods.ipAddress;
+              const isValidLocation = validationResult.validationMethods.location;
+              if (isValidIP && isValidLocation) {
+                // Tự động start session mới nếu đủ điều kiện
+                logger.wifi.info('No active session, auto-starting new session after timeout end');
+                await this.startSession(ipAddress, validationResult);
+              }
+            }
+          }
         } catch (error: any) {
           // If server says no active session, sync our local state
           if (error.response?.status === 404 || error.message?.includes('No active session found')) {

@@ -170,73 +170,85 @@ router.post('/background-sync', auth, async (req, res) => {
 
     // Use transactions if available
     const result = await executeWithOptionalTransaction(async (session) => {
-      // Create WiFi session record with location if available
-      const wifiSession = new WifiSession({
-        user: req.user._id,
-        ipAddress,
-        startTime: new Date(startTime),
-        endTime: endTime ? new Date(endTime) : new Date(),
-        duration: durationSeconds,
-        pointsEarned,
-        sessionDate: new Date(startTime),
-        isActive: false,
-        location: location ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          timestamp: new Date(location.timestamp || startTime)
-        } : undefined,
-        metadata: {
-          backgroundSessionId: sessionId,
-          syncedAt: new Date(),
-          source: 'background',
-          validationMethods: {
-            ipAddress: true,
-            location: locationValid
-          }
-        }
-      });
-
-      await wifiSession.save(session ? { session } : {});
-
-      // Update user points and time tracking
-      await User.findByIdAndUpdate(
-        req.user._id,
-        { 
-          $inc: { 
-            points: pointsEarned,
-            allTimePoints: pointsEarned,
-            dayTimeConnected: durationSeconds,
-            weekTimeConnected: durationSeconds,
-            monthTimeConnected: durationSeconds,
-            totalTimeConnected: durationSeconds
-          }
-        },
-        session ? { session } : {}
-      );
-
-      // Create point transaction record
-      const pointTransaction = new Point({
+      // Check for existing transaction to prevent double point
+      const existingTransaction = await Point.findOne({
         userId: req.user._id,
-        amount: pointsEarned,
         type: 'WIFI_SESSION',
-        metadata: {
-          backgroundSessionId: sessionId,
+        'metadata.startTime': new Date(startTime),
+        'metadata.endTime': endTime ? new Date(endTime) : new Date()
+      });
+      if (!existingTransaction) {
+        // Create WiFi session record with location if available
+        const wifiSession = new WifiSession({
+          user: req.user._id,
+          ipAddress,
           startTime: new Date(startTime),
           endTime: endTime ? new Date(endTime) : new Date(),
           duration: durationSeconds,
-          description: `Background WiFi session on ${ipAddress}`,
-          location: location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : undefined,
-          validationMethods: {
-            ipAddress: true,
-            location: locationValid
+          pointsEarned,
+          sessionDate: new Date(startTime),
+          isActive: false,
+          location: location ? {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            timestamp: new Date(location.timestamp || startTime)
+          } : undefined,
+          metadata: {
+            backgroundSessionId: sessionId,
+            syncedAt: new Date(),
+            source: 'background',
+            validationMethods: {
+              ipAddress: true,
+              location: locationValid
+            }
           }
-        }
-      });
+        });
 
-      await pointTransaction.save(session ? { session } : {});
+        await wifiSession.save(session ? { session } : {});
 
-      return wifiSession;
+        // Update user points and time tracking
+        await User.findByIdAndUpdate(
+          req.user._id,
+          { 
+            $inc: { 
+              points: pointsEarned,
+              allTimePoints: pointsEarned,
+              dayTimeConnected: durationSeconds,
+              weekTimeConnected: durationSeconds,
+              monthTimeConnected: durationSeconds,
+              totalTimeConnected: durationSeconds
+            }
+          },
+          session ? { session } : {}
+        );
+
+        // Create point transaction record
+        const pointTransaction = new Point({
+          userId: req.user._id,
+          amount: pointsEarned,
+          type: 'WIFI_SESSION',
+          metadata: {
+            backgroundSessionId: sessionId,
+            startTime: new Date(startTime),
+            endTime: endTime ? new Date(endTime) : new Date(),
+            duration: durationSeconds,
+            description: `Background WiFi session on ${ipAddress}`,
+            location: location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : undefined,
+            validationMethods: {
+              ipAddress: true,
+              location: locationValid
+            }
+          }
+        });
+
+        await pointTransaction.save(session ? { session } : {});
+
+        return wifiSession;
+      } else {
+        logger.info(`Background sync: Transaction already exists for user ${req.user._id}, sessionId ${sessionId}`);
+        return existingSession;
+      }
     });
 
     logger.info(`Background session synced: ${sessionId} for user ${req.user._id}, points: ${pointsEarned}`);
@@ -328,22 +340,61 @@ router.post('/start', auth, async (req, res) => {
         
         if (durationSeconds >= minSessionDuration) {
           const pointsEarned = Math.floor(durationSeconds / 60);
-          
-          // Try to use transactions if available, fallback to sequential operations
-          let transactionSession = null;
-          let useTransactions = false;
-          
-          try {
-            transactionSession = await mongoose.startSession();
-            useTransactions = true;
-          } catch (sessionError) {
-            useTransactions = false;
-          }
-          
-          try {
-            if (useTransactions && transactionSession) {
-              await transactionSession.withTransaction(async () => {
-                // Update user points and time tracking
+          // Check for existing transaction to prevent double point
+          const existingTransaction = await Point.findOne({
+            userId: req.user._id,
+            type: 'WIFI_SESSION',
+            'metadata.startTime': activeSession.startTime,
+            'metadata.endTime': endTime
+          });
+          if (!existingTransaction) {
+            // Try to use transactions if available, fallback to sequential operations
+            let transactionSession = null;
+            let useTransactions = false;
+            
+            try {
+              transactionSession = await mongoose.startSession();
+              useTransactions = true;
+            } catch (sessionError) {
+              useTransactions = false;
+            }
+            
+            try {
+              if (useTransactions && transactionSession) {
+                await transactionSession.withTransaction(async () => {
+                  // Update user points and time tracking
+                  await User.findByIdAndUpdate(
+                    req.user._id,
+                    { 
+                      $inc: { 
+                        points: pointsEarned,
+                        allTimePoints: pointsEarned,
+                        dayTimeConnected: durationSeconds,
+                        weekTimeConnected: durationSeconds,
+                        monthTimeConnected: durationSeconds,
+                        totalTimeConnected: durationSeconds
+                      }
+                    },
+                    { session: transactionSession }
+                  );
+                  
+                  // Create point transaction record
+                  const pointTransaction = new Point({
+                    userId: req.user._id,
+                    amount: pointsEarned,
+                    type: 'WIFI_SESSION',
+                    metadata: {
+                      startTime: activeSession.startTime,
+                      endTime: endTime,
+                      duration: durationSeconds,
+                      description: `WiFi session on ${activeSession.ipAddress}`,
+                    }
+                  });
+                  await pointTransaction.save({ session: transactionSession });
+                  activeSession.pointsEarned = pointsEarned;
+                });
+              } else {
+                // Sequential operations for local development
                 await User.findByIdAndUpdate(
                   req.user._id,
                   { 
@@ -355,11 +406,8 @@ router.post('/start', auth, async (req, res) => {
                       monthTimeConnected: durationSeconds,
                       totalTimeConnected: durationSeconds
                     }
-                  },
-                  { session: transactionSession }
+                  }
                 );
-                
-                // Create point transaction record
                 const pointTransaction = new Point({
                   userId: req.user._id,
                   amount: pointsEarned,
@@ -371,47 +419,16 @@ router.post('/start', auth, async (req, res) => {
                     description: `WiFi session on ${activeSession.ipAddress}`,
                   }
                 });
-                await pointTransaction.save({ session: transactionSession });
-                
+                await pointTransaction.save();
                 activeSession.pointsEarned = pointsEarned;
-              });
-            } else {
-              // Sequential operations for local development
-              // Update user points and time tracking
-              await User.findByIdAndUpdate(
-                req.user._id,
-                { 
-                  $inc: { 
-                    points: pointsEarned,
-                    allTimePoints: pointsEarned,
-                    dayTimeConnected: durationSeconds,
-                    weekTimeConnected: durationSeconds,
-                    monthTimeConnected: durationSeconds,
-                    totalTimeConnected: durationSeconds
-                  }
-                }
-              );
-              
-              // Create point transaction record
-              const pointTransaction = new Point({
-                userId: req.user._id,
-                amount: pointsEarned,
-                type: 'WIFI_SESSION',
-                metadata: {
-                  startTime: activeSession.startTime,
-                  endTime: endTime,
-                  duration: durationSeconds,
-                  description: `WiFi session on ${activeSession.ipAddress}`,
-                }
-              });
-              await pointTransaction.save();
-              
-              activeSession.pointsEarned = pointsEarned;
+              }
+            } finally {
+              if (transactionSession) {
+                await transactionSession.endSession();
+              }
             }
-          } finally {
-            if (transactionSession) {
-              await transactionSession.endSession();
-            }
+          } else {
+            logger.info(`WiFi session auto-end: Transaction already exists for user ${req.user._id}, session ${activeSession._id}`);
           }
         } else {
           // Track time even if no points earned
@@ -427,7 +444,6 @@ router.post('/start', auth, async (req, res) => {
             }
           );
         }
-        
         await activeSession.save();
       }
     }
@@ -491,28 +507,71 @@ router.post('/end', auth, async (req, res) => {
     session.duration = durationSeconds;
     
     // Calculate points: 1 minute = 1 point
-    const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10); // 5 minutes
+    const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
     
     if (durationSeconds >= minSessionDuration) {
       const pointsEarned = Math.floor(durationSeconds / 60); // 1 minute = 1 point
       
-      // Try to use transactions if available (production), fallback to sequential operations (local dev)
-      let transactionSession = null;
-      let useTransactions = false;
-      
-      try {
-        // Check if transactions are supported (replica set/mongos)
-        transactionSession = await mongoose.startSession();
-        useTransactions = true;
-      } catch (sessionError) {
-        logger.info('MongoDB transactions not supported, using sequential operations');
-        useTransactions = false;
-      }
-      
-      try {
-        if (useTransactions && transactionSession) {
-          // Production: Use transactions for atomic operations
-          await transactionSession.withTransaction(async () => {
+      // Check for existing transaction to prevent double point
+      const existingTransaction = await Point.findOne({
+        userId: req.user._id,
+        type: 'WIFI_SESSION',
+        'metadata.startTime': session.startTime,
+        'metadata.endTime': endTime
+      });
+      if (!existingTransaction) {
+        // Try to use transactions if available (production), fallback to sequential operations (local dev)
+        let transactionSession = null;
+        let useTransactions = false;
+        
+        try {
+          // Check if transactions are supported (replica set/mongos)
+          transactionSession = await mongoose.startSession();
+          useTransactions = true;
+        } catch (sessionError) {
+          logger.info('MongoDB transactions not supported, using sequential operations');
+          useTransactions = false;
+        }
+        
+        try {
+          if (useTransactions && transactionSession) {
+            // Production: Use transactions for atomic operations
+            await transactionSession.withTransaction(async () => {
+              // Update user points and all time tracking fields
+              await User.findByIdAndUpdate(
+                req.user._id,
+                { 
+                  $inc: { 
+                    points: pointsEarned,
+                    allTimePoints: pointsEarned,
+                    dayTimeConnected: durationSeconds,
+                    weekTimeConnected: durationSeconds,
+                    monthTimeConnected: durationSeconds,
+                    totalTimeConnected: durationSeconds
+                  }
+                },
+                { session: transactionSession }
+              );
+              
+              // Create point transaction record
+              const pointTransaction = new Point({
+                userId: req.user._id,
+                amount: pointsEarned,
+                type: 'WIFI_SESSION',
+                metadata: {
+                  startTime: session.startTime,
+                  endTime: endTime,
+                  duration: durationSeconds,
+                  description: `WiFi session on ${session.ipAddress}`,
+                }
+              });
+              await pointTransaction.save({ session: transactionSession });
+              // Update session
+              session.pointsEarned = pointsEarned;
+            });
+            logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (with transactions)`);
+          } else {
+            // Local development: Sequential operations with error handling
             // Update user points and all time tracking fields
             await User.findByIdAndUpdate(
               req.user._id,
@@ -525,8 +584,7 @@ router.post('/end', auth, async (req, res) => {
                   monthTimeConnected: durationSeconds,
                   totalTimeConnected: durationSeconds
                 }
-              },
-              { session: transactionSession }
+              }
             );
             
             // Create point transaction record
@@ -541,58 +599,23 @@ router.post('/end', auth, async (req, res) => {
                 description: `WiFi session on ${session.ipAddress}`,
               }
             });
-            await pointTransaction.save({ session: transactionSession });
-            
+            await pointTransaction.save();
             // Update session
             session.pointsEarned = pointsEarned;
-          });
-          
-          logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (with transactions)`);
-        } else {
-          // Local development: Sequential operations with error handling
-          // Update user points and all time tracking fields
-          await User.findByIdAndUpdate(
-            req.user._id,
-            { 
-              $inc: { 
-                points: pointsEarned,
-                allTimePoints: pointsEarned,
-                dayTimeConnected: durationSeconds,
-                weekTimeConnected: durationSeconds,
-                monthTimeConnected: durationSeconds,
-                totalTimeConnected: durationSeconds
-              }
-            }
-          );
-          
-          // Create point transaction record
-          const pointTransaction = new Point({
-            userId: req.user._id,
-            amount: pointsEarned,
-            type: 'WIFI_SESSION',
-            metadata: {
-              startTime: session.startTime,
-              endTime: endTime,
-              duration: durationSeconds,
-              description: `WiFi session on ${session.ipAddress}`,
-            }
-          });
-          await pointTransaction.save();
-          
-          // Update session
-          session.pointsEarned = pointsEarned;
-          
-          logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (sequential)`);
+            logger.info(`WiFi session ended for user ${req.user._id}. Duration: ${durationSeconds}s, Points: ${pointsEarned} (sequential)`);
+          }
+        } catch (updateError) {
+          logger.error('Failed to update user points or create point transaction:', updateError);
+          throw updateError;
+        } finally {
+          if (transactionSession) {
+            await transactionSession.endSession();
+          }
         }
-      } catch (updateError) {
-        logger.error('Failed to update user points or create point transaction:', updateError);
-        throw updateError;
-      } finally {
-        if (transactionSession) {
-          await transactionSession.endSession();
-        }
+      } else {
+        logger.info(`WiFi session end: Transaction already exists for user ${req.user._id}, session ${session._id}`);
       }
-    } else {
+    }
       // Even if no points earned, still track the time
       await User.findByIdAndUpdate(
         req.user._id,
@@ -605,8 +628,6 @@ router.post('/end', auth, async (req, res) => {
           }
         }
       );
-    }
-
     await session.save();
     res.json({
       ...session.toObject(),

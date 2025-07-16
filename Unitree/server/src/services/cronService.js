@@ -2,6 +2,9 @@ const cron = require('cron');
 const notificationService = require('./notificationService');
 const notificationServiceV1 = require('./notificationServiceV1');
 const logger = require('../utils/logger');
+const WifiSession = require('../models/WifiSession');
+const User = require('../models/User');
+const Point = require('../models/Point');
 
 class CronService {
   constructor() {
@@ -15,7 +18,8 @@ class CronService {
     try {
       // Schedule reminder notifications every 2 hours during business hours (7 AM - 6 PM)
       this.scheduleReminderNotifications();
-
+      // Schedule WiFi session timeout cleanup
+      this.scheduleWifiSessionTimeoutCleanup();
       logger.info('✅ Cron service initialized successfully');
     } catch (error) {
       logger.error('❌ Failed to initialize cron service:', error);
@@ -57,6 +61,91 @@ class CronService {
     this.jobs.set('reminderNotifications', reminderJob);
     
     logger.info('📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)');
+  }
+
+  /**
+   * Schedule WiFi session timeout cleanup (runs every 10 minutes)
+   */
+  scheduleWifiSessionTimeoutCleanup() {
+    const cleanupPattern = '*/10 * * * *'; // Every 10 minutes
+    const TIMEOUT_SECONDS = 2 * 60 * 60; // 2 hours
+
+    const cleanupJob = new cron.CronJob(
+      cleanupPattern,
+      async () => {
+        try {
+          logger.info('🕒 Running WiFi session timeout cleanup...');
+          const now = new Date();
+          const cutoff = new Date(now.getTime() - TIMEOUT_SECONDS * 1000);
+          // Find all sessions still active and started before cutoff
+          const orphanedSessions = await WifiSession.find({
+            isActive: true,
+            startTime: { $lt: cutoff }
+          });
+          let cleanedCount = 0;
+          for (const session of orphanedSessions) {
+            const endTime = now;
+            session.endTime = endTime;
+            session.isActive = false;
+            const durationSeconds = Math.floor((endTime - session.startTime) / 1000);
+            session.duration = durationSeconds;
+            // Calculate points for the session
+            const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
+            if (durationSeconds >= minSessionDuration) {
+              const pointsEarned = Math.floor(durationSeconds / 60);
+              // Check for existing transaction to prevent double point
+              const existingTransaction = await Point.findOne({
+                userId: session.user,
+                type: 'WIFI_SESSION',
+                'metadata.startTime': session.startTime,
+                'metadata.endTime': endTime
+              });
+              if (!existingTransaction) {
+                await User.findByIdAndUpdate(
+                  session.user,
+                  {
+                    $inc: {
+                      points: pointsEarned,
+                      allTimePoints: pointsEarned,
+                      dayTimeConnected: durationSeconds,
+                      weekTimeConnected: durationSeconds,
+                      monthTimeConnected: durationSeconds,
+                      totalTimeConnected: durationSeconds
+                    }
+                  }
+                );
+                const pointTransaction = new Point({
+                  userId: session.user,
+                  amount: pointsEarned,
+                  type: 'WIFI_SESSION',
+                  metadata: {
+                    startTime: session.startTime,
+                    endTime: endTime,
+                    duration: durationSeconds,
+                    description: `WiFi session on ${session.ipAddress} (timeout cleanup)`
+                  }
+                });
+                await pointTransaction.save();
+                session.pointsEarned = pointsEarned;
+              } else {
+                logger.info(`Timeout cleanup: Transaction already exists for user ${session.user}, session ${session._id}`);
+              }
+            }
+            await session.save();
+            cleanedCount++;
+          }
+          logger.info(`🕒 WiFi session timeout cleanup done. Cleaned: ${cleanedCount}`);
+        } catch (error) {
+          logger.error('❌ Error in WiFi session timeout cleanup:', error);
+        }
+      },
+      null,
+      false,
+      'Asia/Ho_Chi_Minh'
+    );
+    cleanupJob.start();
+    this.jobs.set('wifiSessionTimeoutCleanup', cleanupJob);
+    logger.info('🕒 WiFi session timeout cleanup cron job scheduled: Every 10 minutes (sessions >2h)');
   }
 
   /**

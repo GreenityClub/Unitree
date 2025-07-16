@@ -168,7 +168,6 @@ class BackgroundWifiService {
     try {
       const netInfo = await NetInfo.fetch();
       const currentSession = await this.getCurrentSession();
-      
       // First, check if current session is stale (app has been closed)
       if (currentSession?.isActive) {
         const isStale = await this.isSessionStale(currentSession);
@@ -178,16 +177,13 @@ class BackgroundWifiService {
           return;
         }
       }
-      
       if (netInfo.type === 'wifi' && netInfo.isConnected && netInfo.details) {
         const wifiDetails = netInfo.details as any;
         const ipAddress = wifiDetails.ipAddress;
-        
         // Kiểm tra cả IP và location
         const isValidIP = this.isUniversityIP(ipAddress);
         let isValidLocation = false;
         let locationData = null;
-        
         try {
           // Lấy vị trí đã lưu gần đây nhất
           const locationString = await AsyncStorage.getItem('last_known_location');
@@ -201,12 +197,11 @@ class BackgroundWifiService {
         } catch (error) {
           console.log('Failed to get location data:', error);
         }
-        
         // Chỉ bắt đầu hoặc tiếp tục phiên khi CẢ HAI điều kiện đều thỏa mãn
         if (isValidIP && isValidLocation) {
-          console.log('✅ Valid university WiFi and on campus, managing session...');
           if (!currentSession || !currentSession.isActive) {
-            // No active session, start a new one
+            // Không còn session active, tự động start session mới
+            console.log('No active session in background, auto-starting new session after timeout end');
             await this.startBackgroundSession(ipAddress, locationData);
           } else if (currentSession.ipAddress !== ipAddress) {
             // IP address changed, end current session and start new one
