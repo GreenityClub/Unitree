@@ -171,6 +171,21 @@ treeSchema.methods.updateStage = async function() {
         stageFrom: oldStage,
         stageTo: newStage
       });
+
+      // Gửi push notification cho user khi cây lên stage mới
+      try {
+        const notificationServiceV1 = require('../services/notificationServiceV1');
+        if (user.pushToken && user.notificationSettings?.pushNotificationsEnabled) {
+          await notificationServiceV1.sendPushNotification(
+            user.pushToken,
+            '🌱 Cây của bạn đã lớn hơn rồi!',
+            `Chúc mừng! Cây UniTree của bạn vừa phát triển sang giai đoạn mới: ${newStage}.`,
+            { type: 'tree_stage_up', stage: newStage }
+          );
+        }
+      } catch (notifyErr) {
+        console.error('Error sending stage up notification:', notifyErr);
+      }
     }
     
     return this.stage;

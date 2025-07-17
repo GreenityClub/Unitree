@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from './ApiService';
-import { formatTime } from '../utils/formatters';
+// Đã xóa import formatTime vì không còn dùng
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -11,6 +11,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -71,7 +73,7 @@ class NotificationService {
 
       this.isInitialized = true;
       console.log('✅ Notification service initialized');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to initialize notification service:', error);
     }
   }
@@ -116,15 +118,13 @@ class NotificationService {
       await this.savePushTokenToServer(this.expoPushToken);
 
       return this.expoPushToken;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to get push token:', error);
-      
       // If Firebase isn't configured, still allow the app to function
       if (error.message?.includes('FirebaseApp is not initialized')) {
         console.warn('⚠️ Firebase not configured - push notifications disabled for now');
         console.warn('⚠️ See: https://docs.expo.dev/push-notifications/fcm-credentials/');
       }
-      
       return null;
     }
   }
@@ -136,7 +136,7 @@ class NotificationService {
     try {
       await ApiService.post('/api/user/push-token', { pushToken: token });
       console.log('✅ Push token saved to server');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to save push token to server:', error);
     }
   }
@@ -189,7 +189,7 @@ class NotificationService {
       if (settings) {
         return JSON.parse(settings);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get notification settings:', error);
     }
 
@@ -223,7 +223,7 @@ class NotificationService {
       await this.updatePushNotificationPreference(settings.pushNotificationsEnabled);
       
       console.log('✅ Notification settings saved');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to save notification settings:', error);
     }
   }
@@ -236,141 +236,25 @@ class NotificationService {
       await ApiService.post('/api/user/notification-preference', { 
         pushNotificationsEnabled: enabled 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to update push notification preference:', error);
     }
   }
 
   /**
    * Schedule local stats notifications
+   * (Đã tắt hoàn toàn, giữ lại để gọi cancelAllStatsNotifications khi lưu settings)
    */
   async scheduleStatsNotifications(settings: NotificationSettings): Promise<void> {
-    if (!settings.statsNotifications) {
-      await this.cancelAllStatsNotifications();
-      return;
-    }
-
-    try {
-      // Cancel existing stats notifications
-      await this.cancelAllStatsNotifications();
-
-      // Schedule daily stats notification
-      await this.scheduleDailyStatsNotification(settings.dailyStatsTime);
-
-      // Schedule weekly stats notification
-      await this.scheduleWeeklyStatsNotification(settings.weeklyStatsDay, settings.dailyStatsTime);
-
-      // Schedule monthly stats notification
-      await this.scheduleMonthlyStatsNotification(settings.monthlyStatsDay, settings.dailyStatsTime);
-
-      console.log('✅ Stats notifications scheduled');
-    } catch (error) {
-      console.error('❌ Failed to schedule stats notifications:', error);
-    }
+    await this.cancelAllStatsNotifications();
+    return;
   }
 
   /**
-   * Schedule daily stats notification
-   */
-  private async scheduleDailyStatsNotification(time: string): Promise<void> {
-    const [hours, minutes] = time.split(':').map(Number);
-    
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'daily_stats',
-      content: {
-        title: '📊 Daily UniTree Stats',
-        body: 'Check out your WiFi time and points earned today!',
-        data: { type: 'stats_daily' },
-      },
-      trigger: {
-        hour: hours,
-        minute: minutes,
-        repeats: true,
-      },
-    });
-  }
-
-  /**
-   * Schedule weekly stats notification
-   */
-  private async scheduleWeeklyStatsNotification(weekday: number, time: string): Promise<void> {
-    const [hours, minutes] = time.split(':').map(Number);
-    
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'weekly_stats',
-      content: {
-        title: '🌟 Weekly UniTree Progress',
-        body: 'Your weekly WiFi stats are ready!',
-        data: { type: 'stats_weekly' },
-      },
-      trigger: {
-        weekday: weekday + 1, // Expo uses 1-7 (Sunday = 1)
-        hour: hours,
-        minute: minutes,
-        repeats: true,
-      },
-    });
-  }
-
-  /**
-   * Schedule monthly stats notification
-   */
-  private async scheduleMonthlyStatsNotification(day: number, time: string): Promise<void> {
-    const [hours, minutes] = time.split(':').map(Number);
-    
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'monthly_stats',
-      content: {
-        title: '🏆 Monthly UniTree Achievements',
-        body: 'See how much you\'ve grown this month!',
-        data: { type: 'stats_monthly' },
-      },
-      trigger: {
-        day: day,
-        hour: hours,
-        minute: minutes,
-        repeats: true,
-      },
-    });
-  }
-
-  /**
-   * Send immediate stats notification with current data
+   * Send immediate stats notification with current data (đã tắt)
    */
   async sendStatsNotification(type: 'daily' | 'weekly' | 'monthly', stats: StatsData): Promise<void> {
-    let title: string;
-    let body: string;
-    let timeConnected: number;
-    let points: number;
-
-    switch (type) {
-      case 'daily':
-        title = '📊 Today\'s UniTree Stats';
-        timeConnected = stats.dailyTime;
-        points = stats.dailyPoints;
-        break;
-      case 'weekly':
-        title = '🌟 This Week\'s Progress';
-        timeConnected = stats.weeklyTime;
-        points = stats.weeklyPoints;
-        break;
-      case 'monthly':
-        title = '🏆 Monthly Achievements';
-        timeConnected = stats.monthlyTime;
-        points = stats.monthlyPoints;
-        break;
-    }
-
-    body = `${formatTime(timeConnected)} connected • ${points} points earned`;
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: { type: `stats_${type}` },
-      },
-      trigger: null, // Send immediately
-    });
+    return;
   }
 
   /**

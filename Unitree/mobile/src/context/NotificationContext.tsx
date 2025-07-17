@@ -52,8 +52,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         const settings = await notificationService.getNotificationSettings();
         setNotificationSettings(settings);
 
-        // Schedule notifications based on settings
-        await notificationService.scheduleStatsNotifications(settings);
+        // Đã tắt scheduleStatsNotifications để không lên lịch local notification thống kê
+        // await notificationService.scheduleStatsNotifications(settings);
 
         setIsInitialized(true);
         console.log('✅ Notification context initialized');
@@ -110,15 +110,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Send test notification with current stats
   const sendTestNotification = async (type: 'daily' | 'weekly' | 'monthly'): Promise<void> => {
-    try {
-      // Get current stats from server
-      const stats = await getCurrentStats();
-      await notificationService.sendStatsNotification(type, stats);
-      console.log(`✅ Test ${type} notification sent`);
-    } catch (error) {
-      console.error(`❌ Failed to send test ${type} notification:`, error);
-      throw error;
-    }
+    // Đã tắt local stats notifications - không gửi test notification thống kê
+    return;
   };
 
   // Get current user stats for notifications

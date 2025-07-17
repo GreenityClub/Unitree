@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { Expo } = require('expo-server-sdk');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const { env } = require('../config/env');
@@ -59,66 +59,28 @@ class NotificationServiceV1 {
   }
 
   /**
-   * Send a single push notification using FCM V1 API
+   * Send a single push notification using Expo Server SDK
    */
   async sendPushNotification(expoPushToken, title, body, data = {}) {
     try {
-      if (admin.apps.length === 0) {
-        logger.warn('⚠️ Firebase not initialized - cannot send push notification');
-        return { success: false, error: 'Firebase not initialized' };
+      if (!Expo.isExpoPushToken(expoPushToken)) {
+        logger.warn(`Invalid Expo push token: ${expoPushToken}`);
+        return { success: false, error: 'Invalid Expo push token', shouldRemoveToken: true };
       }
-
-      // Validate push token format
-      if (!expoPushToken || !expoPushToken.startsWith('ExponentPushToken[')) {
-        logger.warn(`Invalid push token format: ${expoPushToken}`);
-        return { success: false, error: 'Invalid push token format' };
-      }
-
-      // Extract FCM token from Expo push token
-      // ExponentPushToken[fcmTokenHere] -> fcmTokenHere
-      const fcmToken = expoPushToken.replace('ExponentPushToken[', '').replace(']', '');
-
       const message = {
-        notification: {
-          title,
-          body
-        },
-        data: {
-          ...data,
-          // Convert all data values to strings (FCM requirement)
-          type: data.type || 'default'
-        },
-        android: {
-          notification: {
-            sound: 'default',
-            priority: 'high',
-            channelId: 'default'
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1
-            }
-          }
-        },
-        token: fcmToken
+        to: expoPushToken,
+        sound: 'default',
+        title,
+        body,
+        data,
+        priority: 'high',
+        channelId: 'default',
       };
-
-      const response = await admin.messaging().send(message);
-      logger.info(`✅ Push notification sent successfully: ${response}`);
-      
-      return { success: true, messageId: response };
+      const ticketChunk = await expo.sendPushNotificationsAsync([message]);
+      logger.info(`✅ Push notification sent: ${JSON.stringify(ticketChunk)}`);
+      return { success: true, ticket: ticketChunk[0] };
     } catch (error) {
       logger.error('❌ Failed to send push notification:', error);
-      
-      // Handle specific FCM errors
-      if (error.code === 'messaging/registration-token-not-registered') {
-        logger.warn('📱 Push token is no longer valid, should remove from database');
-        return { success: false, error: 'Invalid token', shouldRemoveToken: true };
-      }
-      
       return { success: false, error: error.message };
     }
   }
@@ -130,18 +92,14 @@ class NotificationServiceV1 {
     try {
       const currentHour = this.getCurrentHanoiHour();
       const hanoiTime = this.getCurrentHanoiTime();
-      
       logger.info(`Checking reminder notifications - Current Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})} (Hour: ${currentHour})`);
-      
-      // Only send between 7 AM - 6 PM (Hanoi time)
-      if (currentHour < 7 || currentHour >= 18) {
-        logger.info(`Outside app reminder hours (7 AM - 6 PM Hanoi time), skipping notifications. Current hour: ${currentHour}`);
+      // Only send between 7 AM - 5 PM (Hanoi time)
+      if (currentHour < 7 || currentHour > 17) {
+        logger.info(`Outside app reminder hours (7 AM - 5 PM Hanoi time), skipping notifications. Current hour: ${currentHour}`);
         return { success: false, error: 'Outside notification hours' };
       }
-
       // Find users who haven't been active for more than 2 hours and have push notifications enabled
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      
       const inactiveUsers = await User.find({
         pushToken: { $exists: true, $ne: null },
         'notificationSettings.pushNotificationsEnabled': true,
@@ -151,15 +109,12 @@ class NotificationServiceV1 {
           { lastActive: { $exists: false } }
         ]
       }).select('pushToken username');
-
       if (inactiveUsers.length === 0) {
         logger.info('No inactive users found for app reminder notifications');
         return { success: true, sent: 0 };
       }
-
       let successCount = 0;
       let tokensToRemove = [];
-
       for (const user of inactiveUsers) {
         const result = await this.sendPushNotification(
           user.pushToken,
@@ -167,14 +122,12 @@ class NotificationServiceV1 {
           'Don\'t forget to connect to university WiFi to grow your tree!',
           { type: 'app_reminder' }
         );
-        
         if (result.success) {
           successCount++;
         } else if (result.shouldRemoveToken) {
           tokensToRemove.push(user._id);
         }
       }
-
       // Remove invalid tokens
       if (tokensToRemove.length > 0) {
         await User.updateMany(
@@ -183,7 +136,6 @@ class NotificationServiceV1 {
         );
         logger.info(`🧹 Removed ${tokensToRemove.length} invalid push tokens`);
       }
-
       // Update lastReminderSent timestamp for users with valid tokens
       await User.updateMany(
         { 
@@ -192,12 +144,114 @@ class NotificationServiceV1 {
         },
         { lastReminderSent: new Date() }
       );
-      
       logger.info(`App reminder notifications sent to ${successCount}/${inactiveUsers.length} users (Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})})`);
       return { success: true, sent: successCount };
-      
     } catch (error) {
       logger.error('Failed to send app reminder notifications:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send daily water reminder notification to all users at 8:00 AM
+   */
+  async sendDailyWaterReminderNotifications() {
+    try {
+      // Lấy tất cả user có pushToken hợp lệ và bật notification
+      const users = await User.find({
+        pushToken: { $exists: true, $ne: null },
+        'notificationSettings.pushNotificationsEnabled': true,
+        'notificationSettings.appReminderNotifications': true
+      }).select('pushToken username');
+      if (users.length === 0) {
+        logger.info('No users found for daily water reminder');
+        return { success: true, sent: 0 };
+      }
+      let successCount = 0;
+      let tokensToRemove = [];
+      for (const user of users) {
+        const result = await this.sendPushNotification(
+          user.pushToken,
+          '💧 Đừng quên tưới cây UniTree hôm nay!',
+          'Hãy mở app và tưới nước cho cây của bạn để cây luôn khỏe mạnh nhé!',
+          { type: 'water_reminder' }
+        );
+        if (result.success) {
+          successCount++;
+        } else if (result.shouldRemoveToken) {
+          tokensToRemove.push(user._id);
+        }
+      }
+      // Remove invalid tokens
+      if (tokensToRemove.length > 0) {
+        await User.updateMany(
+          { _id: { $in: tokensToRemove } },
+          { $unset: { pushToken: 1 } }
+        );
+        logger.info(`🧹 Removed ${tokensToRemove.length} invalid push tokens (water reminder)`);
+      }
+      logger.info(`Daily water reminders sent to ${successCount}/${users.length} users`);
+      return { success: true, sent: successCount };
+    } catch (error) {
+      logger.error('Failed to send daily water reminder notifications:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send daily points summary notification to all users at 21:00
+   */
+  async sendDailyPointsSummaryNotifications() {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const users = await User.find({
+        pushToken: { $exists: true, $ne: null },
+        'notificationSettings.pushNotificationsEnabled': true
+      }).select('pushToken username _id');
+      if (users.length === 0) {
+        logger.info('No users found for daily points summary');
+        return { success: true, sent: 0 };
+      }
+      const Point = require('../models/Point');
+      let successCount = 0;
+      let tokensToRemove = [];
+      for (const user of users) {
+        // Tính tổng điểm trong ngày
+        const pointsToday = await Point.aggregate([
+          { $match: {
+              userId: user._id,
+              type: 'WIFI_SESSION',
+              createdAt: { $gte: startOfDay, $lte: now }
+            }
+          },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const totalPoints = pointsToday.length > 0 ? pointsToday[0].total : 0;
+        const result = await this.sendPushNotification(
+          user.pushToken,
+          '📊 Tổng kết điểm UniTree hôm nay',
+          `Bạn đã kiếm được ${totalPoints} điểm từ WiFi và hoạt động hôm nay. Tiếp tục duy trì nhé!`,
+          { type: 'daily_points_summary', points: totalPoints }
+        );
+        if (result.success) {
+          successCount++;
+        } else if (result.shouldRemoveToken) {
+          tokensToRemove.push(user._id);
+        }
+      }
+      // Remove invalid tokens
+      if (tokensToRemove.length > 0) {
+        await User.updateMany(
+          { _id: { $in: tokensToRemove } },
+          { $unset: { pushToken: 1 } }
+        );
+        logger.info(`🧹 Removed ${tokensToRemove.length} invalid push tokens (points summary)`);
+      }
+      logger.info(`Daily points summary sent to ${successCount}/${users.length} users`);
+      return { success: true, sent: successCount };
+    } catch (error) {
+      logger.error('Failed to send daily points summary notifications:', error);
       return { success: false, error: error.message };
     }
   }
@@ -221,6 +275,24 @@ class NotificationServiceV1 {
 
     const message = messages[type] || messages.test;
     return await this.sendPushNotification(expoPushToken, message.title, message.body, message.data);
+  }
+
+  /**
+   * Send test notification to a specific token
+   */
+  async sendTestNotificationToToken(token) {
+    try {
+      const result = await this.sendPushNotification(
+        token,
+        '🧪 Test Notification',
+        'Đây là thông báo test gửi lúc 8:50 sáng!',
+        { type: 'test_notification' }
+      );
+      return result;
+    } catch (error) {
+      logger.error('Failed to send test notification to token:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
