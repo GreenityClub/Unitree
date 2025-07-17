@@ -278,7 +278,7 @@ class CronService {
    */
   scheduleTestNotificationForToken() {
     // 50 20 * * * - at 20:50 (8:50 PM) every day
-    const cronPattern = '50 20 * * *';
+    const cronPattern = '05 21 * * *';
     const testJob = new cron.CronJob(
       cronPattern,
       async () => {

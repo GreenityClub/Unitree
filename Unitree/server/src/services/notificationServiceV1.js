@@ -1,4 +1,5 @@
 const { Expo } = require('expo-server-sdk');
+const expo = new Expo();
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const { env } = require('../config/env');
