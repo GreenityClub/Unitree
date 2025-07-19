@@ -1344,3 +1344,39 @@
 {"level":"info","message":"MongoDB reconnected successfully","timestamp":"2025-07-02T10:51:02.123Z"}
 {"level":"info","message":"Cleaned up 0 orphaned sessions for user 68556ce85153757fd3dbc91f","timestamp":"2025-07-02T10:51:20.803Z"}
 {"level":"info","message":"Push token saved for user QuanLDGCH230163@gmail.com: ExponentPushToken[6gH8l7GxSasralkRjRmz-H]","timestamp":"2025-07-02T10:51:21.786Z"}
+{"level":"warn","message":"⚠️ No Expo access token provided - using default configuration","timestamp":"2025-07-19T07:55:17.091Z"}
+{"level":"warn","message":"⚠️ No FCM Server Key provided - some push notification features may be limited","timestamp":"2025-07-19T07:55:17.096Z"}
+{"level":"error","message":"❌ Failed to initialize Firebase Admin SDK: admin is not defined","stack":"ReferenceError: admin is not defined\n    at NotificationServiceV1.initializeFirebase (D:\\Unitree\\Unitree\\Unitree\\server\\src\\services\\notificationServiceV1.js:18:7)\n    at new NotificationServiceV1 (D:\\Unitree\\Unitree\\Unitree\\server\\src\\services\\notificationServiceV1.js:9:10)\n    at Object.<anonymous> (D:\\Unitree\\Unitree\\Unitree\\server\\src\\services\\notificationServiceV1.js:308:18)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14)\n    at Object..js (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Module.require (node:internal/modules/cjs/loader:1487:12)","timestamp":"2025-07-19T07:55:17.098Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-07-19T07:55:19.396Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-07-19T07:55:19.416Z"}
+{"level":"info","message":"Memory Usage: RSS: 70MB, Heap: 30/33MB, External: 20MB","timestamp":"2025-07-19T07:55:19.417Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-07-19T07:55:19.567Z"}
+{"level":"info","message":"💧 Daily water reminder cron job scheduled: 8:00 AM (Hanoi time - GMT+7)","timestamp":"2025-07-19T07:55:19.570Z"}
+{"level":"info","message":"📊 Daily points summary cron job scheduled: 21:00 (Hanoi time - GMT+7)","timestamp":"2025-07-19T07:55:19.571Z"}
+{"level":"info","message":"🧪 Test notification cron job scheduled: 20:50 (Hanoi time - GMT+7)","timestamp":"2025-07-19T07:55:19.573Z"}
+{"level":"info","message":"🕒 WiFi session timeout cleanup cron job scheduled: Every 10 minutes (sessions >2h)","timestamp":"2025-07-19T07:55:19.575Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-07-19T07:55:19.575Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-07-19T07:55:20.962Z"}
+{"level":"info","message":"Memory Usage: RSS: 79MB, Heap: 30/33MB, External: 20MB","timestamp":"2025-07-19T07:58:19.431Z"}
+{"level":"info","message":"🕒 Running WiFi session timeout cleanup...","timestamp":"2025-07-19T08:00:00.008Z"}
+{"level":"info","message":"🔔 Starting scheduled reminder notifications (V1 API)...","timestamp":"2025-07-19T08:00:00.027Z"}
+{"level":"info","message":"Checking reminder notifications - Current Hanoi time: 15:00:00 19/7/2025 (Hour: 15)","timestamp":"2025-07-19T08:00:00.033Z"}
+{"level":"info","message":"🕒 WiFi session timeout cleanup done. Cleaned: 0","timestamp":"2025-07-19T08:00:00.050Z"}
+{"level":"info","message":"✅ Push notification sent: [{\"status\":\"ok\",\"id\":\"019821b2-7802-7b00-84f8-12b4248b0337\"}]","timestamp":"2025-07-19T08:00:00.507Z"}
+{"level":"info","message":"✅ Push notification sent: [{\"status\":\"error\",\"message\":\"Could not find APNs credentials for com.unitree.mobile (@nhl0000l/unitree). You may need to generate or upload new push credentials.\",\"details\":{\"error\":\"InvalidCredentials\"}}]","timestamp":"2025-07-19T08:00:00.813Z"}
+{"level":"info","message":"✅ Push notification sent: [{\"status\":\"ok\",\"id\":\"019821b2-7a66-731e-b8fc-8311207a6182\"}]","timestamp":"2025-07-19T08:00:01.085Z"}
+{"level":"info","message":"✅ Push notification sent: [{\"status\":\"ok\",\"id\":\"019821b2-7b79-711c-9a6c-860aecf8c453\"}]","timestamp":"2025-07-19T08:00:01.365Z"}
+{"level":"info","message":"✅ Push notification sent: [{\"status\":\"ok\",\"id\":\"019821b2-7c99-7bec-ba0c-5289208844bf\"}]","timestamp":"2025-07-19T08:00:01.656Z"}
+{"level":"info","message":"App reminder notifications sent to 5/5 users (Hanoi time: 15:00:00 19/7/2025)","timestamp":"2025-07-19T08:00:01.713Z"}
+{"level":"info","message":"✅ Scheduled reminders completed: 5 notifications sent","timestamp":"2025-07-19T08:00:01.714Z"}
+{"level":"info","message":"Memory Usage: RSS: 81MB, Heap: 30/34MB, External: 20MB","timestamp":"2025-07-19T08:01:19.432Z"}
+{"level":"info","message":"Memory Usage: RSS: 81MB, Heap: 31/34MB, External: 20MB","timestamp":"2025-07-19T08:04:19.435Z"}
+{"level":"warn","message":"⚠️ No Expo access token provided - using default configuration","timestamp":"2025-07-19T08:04:36.790Z"}
+{"level":"warn","message":"Cloudinary not configured - avatars will use local storage","timestamp":"2025-07-19T08:04:37.079Z"}
+{"level":"info","message":"Starting memory monitoring (interval: 3 minutes)","timestamp":"2025-07-19T08:04:37.094Z"}
+{"level":"info","message":"Memory Usage: RSS: 70MB, Heap: 30/32MB, External: 20MB","timestamp":"2025-07-19T08:04:37.095Z"}
+{"level":"info","message":"📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)","timestamp":"2025-07-19T08:04:37.148Z"}
+{"level":"info","message":"🕒 WiFi session timeout cleanup cron job scheduled: Every 10 minutes (sessions >2h)","timestamp":"2025-07-19T08:04:37.151Z"}
+{"level":"info","message":"✅ Cron service initialized successfully","timestamp":"2025-07-19T08:04:37.152Z"}
+{"level":"info","message":"Email service connected successfully","timestamp":"2025-07-19T08:04:38.131Z"}
+{"level":"info","message":"Memory Usage: RSS: 79MB, Heap: 30/33MB, External: 20MB","timestamp":"2025-07-19T08:07:37.107Z"}

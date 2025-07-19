@@ -1,10 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Layout from './components/Layout';
-import LoginPage from './pages/auth/LoginPage';
+import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
+import { Layout } from './components/Layout';
+import LoginPage from './pages/auth/AdminLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import AdminLoginPage from './pages/auth/AdminLoginPage';
 import DashboardPage from './pages/DashboardPage';
+import AdminDashboardPage from './pages/admin/DashboardPage';
+import AdminsPage from './pages/admin/AdminsPage';
 import './App.css';
 
 // Protected Route Component
@@ -45,6 +49,63 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+// Admin Protected Route Component
+const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { admin, isAuthenticated, isLoading } = useAdminAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Super Admin Protected Route Component
+const SuperAdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { admin, isAuthenticated, isLoading } = useAdminAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || admin?.role !== 'superadmin') {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Admin Public Route Component
+const AdminPublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAdminAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const AppContent: React.FC = () => {
   return (
     <Router>
@@ -64,6 +125,35 @@ const AppContent: React.FC = () => {
             <PublicRoute>
               <RegisterPage />
             </PublicRoute>
+          }
+        />
+
+        {/* Admin Auth Routes */}
+        <Route
+          path="/admin/login"
+          element={
+            <AdminPublicRoute>
+              <AdminLoginPage />
+            </AdminPublicRoute>
+          }
+        />
+
+        {/* Admin Protected Routes */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboardPage />
+            </AdminProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/admins"
+          element={
+            <SuperAdminProtectedRoute>
+              <AdminsPage />
+            </SuperAdminProtectedRoute>
           }
         />
 
@@ -146,7 +236,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <AdminAuthProvider>
+        <AppContent />
+      </AdminAuthProvider>
     </AuthProvider>
   );
 };

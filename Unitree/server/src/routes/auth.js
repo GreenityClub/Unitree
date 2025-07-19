@@ -7,7 +7,7 @@ const Admin = require('../models/Admin');
 const Student = require('../models/Student');
 const VerificationCode = require('../models/VerificationCode');
 const logger = require('../utils/logger');
-const { auth } = require('../middleware/auth');
+const { auth, authAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const emailService = require('../utils/emailService');
 
@@ -251,67 +251,130 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-// Admin Login
-router.post('/admin/login',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').exists()
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
+// Admin login route
+router.post('/admin/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-      const { email, password } = req.body;
-
-      // Check if admin exists
-      const admin = await Admin.findOne({ email });
-      if (!admin) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Check password
-      const isMatch = await admin.comparePassword(password);
-      if (!isMatch) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Generate JWT
-      const token = jwt.sign(
-        { id: admin._id },
-        process.env.JWT_SECRET,
-        { expiresIn: '1d' }
-      );
-
-      res.json({
-        success: true,
-        token,
-        admin: {
-          id: admin._id,
-          email: admin.email,
-          role: admin.role
-        }
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({
+    // Validate username & password
+    if (!username || !password) {
+      return res.status(400).json({
         success: false,
-        message: 'Server error'
+        message: 'Please provide username and password'
       });
     }
+
+    // Find admin by username
+    const admin = await Admin.findOne({ username }).select('+password');
+    
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if password matches
+    const isMatch = await admin.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Update last login time
+    admin.lastLogin = Date.now();
+    await admin.save();
+
+    // Generate token
+    const token = admin.getSignedJwtToken();
+
+    res.json({
+      success: true,
+      token,
+      admin: {
+        id: admin._id,
+        username: admin.username,
+        role: admin.role,
+        permissions: admin.permissions
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error logging in admin'
+    });
   }
-);
+});
+
+// Get current admin profile
+router.get('/admin/me', authAdmin, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      admin: {
+        id: admin._id,
+        username: admin.username,
+        role: admin.role,
+        permissions: admin.permissions,
+        createdAt: admin.createdAt,
+        lastLogin: admin.lastLogin
+      }
+    });
+  } catch (error) {
+    console.error('Get admin error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting admin data'
+    });
+  }
+});
+
+// Create super admin (should be called only once during setup)
+router.post('/admin/seed', async (req, res) => {
+  try {
+    // Check if any admin already exists
+    const adminCount = await Admin.countDocuments();
+    
+    if (adminCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin accounts already exist'
+      });
+    }
+    
+    // Create super admin
+    const superAdmin = new Admin({
+      username: 'GreenitySA',
+      password: 'Vcnghzkldzfgtd1.',
+      role: 'superadmin'
+    });
+    
+    await superAdmin.save();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Super admin account created successfully'
+    });
+  } catch (error) {
+    console.error('Super admin creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating super admin'
+    });
+  }
+});
 
 // Send verification code for email verification
 router.post('/send-verification-code', async (req, res) => {

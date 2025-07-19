@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://unitree.onrender.com';
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
@@ -15,7 +15,15 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    // Check if URL path starts with /api/admin
+    const isAdminRoute = config.url?.includes('/api/admins') || 
+                        config.url?.includes('/api/auth/admin');
+    
+    // Select the appropriate token based on the route
+    const token = isAdminRoute 
+      ? localStorage.getItem('adminAuthToken') 
+      : localStorage.getItem('authToken');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -32,11 +40,21 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Check if URL path starts with /api/admin
+    const isAdminRoute = error.config?.url?.includes('/api/admins') || 
+                        error.config?.url?.includes('/api/auth/admin');
+                        
     if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Handle unauthorized access based on route type
+      if (isAdminRoute) {
+        localStorage.removeItem('adminAuthToken');
+        localStorage.removeItem('admin');
+        window.location.href = '/admin/login';
+      } else {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -52,6 +70,9 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/api/auth/reset-password',
     VERIFY_EMAIL: '/api/auth/verify-email',
     REFRESH_TOKEN: '/api/auth/refresh-token',
+    ADMIN_LOGIN: '/api/auth/admin/login',
+    ADMIN_ME: '/api/auth/admin/me',
+    ADMIN_SEED: '/api/auth/admin/seed',
   },
   // User endpoints
   USER: {
@@ -88,6 +109,15 @@ export const API_ENDPOINTS = {
     MARK_READ: (id: string) => `/api/notification/${id}/read`,
     MARK_ALL_READ: '/api/notification/mark-all-read',
     SETTINGS: '/api/user/notification-settings',
+  },
+  // Admin endpoints
+  ADMIN: {
+    GET_ALL: '/api/admins',
+    GET_BY_ID: (id: string) => `/api/admins/${id}`,
+    CREATE: '/api/admins',
+    UPDATE: (id: string) => `/api/admins/${id}`,
+    DELETE: (id: string) => `/api/admins/${id}`,
+    RESET_PASSWORD: (id: string) => `/api/admins/${id}/reset-password`,
   },
 };
 

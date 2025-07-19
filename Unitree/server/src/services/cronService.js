@@ -1,6 +1,5 @@
 const cron = require('cron');
 const notificationService = require('./notificationService');
-const notificationServiceV1 = require('./notificationServiceV1');
 const logger = require('../utils/logger');
 const WifiSession = require('../models/WifiSession');
 const User = require('../models/User');
@@ -18,12 +17,6 @@ class CronService {
     try {
       // Schedule reminder notifications every 2 hours during business hours (7 AM - 6 PM)
       this.scheduleReminderNotifications();
-      // Schedule daily water reminder at 8:00 AM
-      this.scheduleDailyWaterReminder();
-      // Schedule daily points summary at 21:00
-      this.scheduleDailyPointsSummary();
-      // Schedule test notification for specific token at 8:50 AM
-      this.scheduleTestNotificationForToken();
       // Schedule WiFi session timeout cleanup
       this.scheduleWifiSessionTimeoutCleanup();
       logger.info('✅ Cron service initialized successfully');
@@ -45,8 +38,8 @@ class CronService {
       cronPattern,
       async () => {
         try {
-          logger.info('🔔 Starting scheduled reminder notifications (V1 API)...');
-          const result = await notificationServiceV1.sendAppReminderNotifications();
+          logger.info('🔔 Starting scheduled reminder notifications...');
+          const result = await notificationService.sendAppReminderNotifications();
           
           if (result.success) {
             logger.info(`✅ Scheduled reminders completed: ${result.sent} notifications sent`);
@@ -214,107 +207,16 @@ class CronService {
   }
 
   /**
-   * Schedule daily water reminder notification at 8:00 AM Hanoi time
-   */
-  scheduleDailyWaterReminder() {
-    // 0 8 * * * - at 8:00 AM every day
-    const cronPattern = '0 8 * * *';
-    const waterJob = new cron.CronJob(
-      cronPattern,
-      async () => {
-        try {
-          logger.info('💧 Starting daily water reminder notifications...');
-          const result = await notificationServiceV1.sendDailyWaterReminderNotifications();
-          if (result.success) {
-            logger.info(`✅ Water reminders sent: ${result.sent} users`);
-          } else {
-            logger.warn(`⚠️ Water reminders completed with issues: ${result.error}`);
-          }
-        } catch (error) {
-          logger.error('❌ Error in daily water reminder notifications:', error);
-        }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh'
-    );
-    waterJob.start();
-    this.jobs.set('dailyWaterReminder', waterJob);
-    logger.info('💧 Daily water reminder cron job scheduled: 8:00 AM (Hanoi time - GMT+7)');
-  }
-
-  /**
-   * Schedule daily points summary notification at 21:00 Hanoi time
-   */
-  scheduleDailyPointsSummary() {
-    // 0 21 * * * - at 21:00 (9 PM) every day
-    const cronPattern = '0 21 * * *';
-    const pointsJob = new cron.CronJob(
-      cronPattern,
-      async () => {
-        try {
-          logger.info('📊 Starting daily points summary notifications...');
-          const result = await notificationServiceV1.sendDailyPointsSummaryNotifications();
-          if (result.success) {
-            logger.info(`✅ Daily points summary sent: ${result.sent} users`);
-          } else {
-            logger.warn(`⚠️ Daily points summary completed with issues: ${result.error}`);
-          }
-        } catch (error) {
-          logger.error('❌ Error in daily points summary notifications:', error);
-        }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh'
-    );
-    pointsJob.start();
-    this.jobs.set('dailyPointsSummary', pointsJob);
-    logger.info('📊 Daily points summary cron job scheduled: 21:00 (Hanoi time - GMT+7)');
-  }
-
-  /**
-   * Schedule test notification at 20:50 (8:50 PM) Hanoi time for a specific token
-   */
-  scheduleTestNotificationForToken() {
-    // 50 20 * * * - at 20:50 (8:50 PM) every day
-    const cronPattern = '05 21 * * *';
-    const testJob = new cron.CronJob(
-      cronPattern,
-      async () => {
-        try {
-          logger.info('🧪 Sending test notification to specific token...');
-          const result = await notificationServiceV1.sendTestNotificationToToken('ExponentPushToken[7xc-2JORajto57ccB6w_eS]');
-          if (result.success) {
-            logger.info('✅ Test notification sent successfully');
-          } else {
-            logger.warn(`⚠️ Test notification failed: ${result.error}`);
-          }
-        } catch (error) {
-          logger.error('❌ Error in test notification cron job:', error);
-        }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh'
-    );
-    testJob.start();
-    this.jobs.set('testNotificationForToken', testJob);
-    logger.info('🧪 Test notification cron job scheduled: 20:50 (Hanoi time - GMT+7)');
-  }
-
-  /**
    * Stop a specific cron job
    */
   stopJob(jobName) {
     const job = this.jobs.get(jobName);
     if (job) {
       job.stop();
-      this.jobs.delete(jobName);
-      logger.info(`⏹️ Stopped cron job: ${jobName}`);
+      logger.info(`Cron job '${jobName}' stopped`);
       return true;
     }
-    logger.warn(`⚠️ Cron job not found: ${jobName}`);
+    logger.warn(`Cron job '${jobName}' not found`);
     return false;
   }
 
@@ -322,42 +224,33 @@ class CronService {
    * Stop all cron jobs
    */
   stopAllJobs() {
-    for (const [jobName, job] of this.jobs) {
+    this.jobs.forEach((job, name) => {
       job.stop();
-      logger.info(`⏹️ Stopped cron job: ${jobName}`);
-    }
-    this.jobs.clear();
-    logger.info('⏹️ All cron jobs stopped');
+      logger.info(`Cron job '${name}' stopped`);
+    });
+    logger.info('All cron jobs stopped');
   }
 
   /**
-   * Get status of all jobs
+   * Get status of all cron jobs
    */
   getJobsStatus() {
     const status = {};
-    for (const [jobName, job] of this.jobs) {
-      status[jobName] = {
+    this.jobs.forEach((job, name) => {
+      status[name] = {
         running: job.running,
-        lastDate: job.lastDate(),
-        nextDate: job.nextDate()
+        nextDate: job.nextDate()?.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}) || null
       };
-    }
+    });
     return status;
   }
 
   /**
-   * Manually trigger reminder notifications (for testing)
+   * Trigger reminder notifications manually (for testing)
    */
   async triggerReminderNotifications() {
-    try {
-      logger.info('🔔 Manually triggering reminder notifications (V1 API)...');
-      const result = await notificationServiceV1.sendAppReminderNotifications();
-      logger.info('✅ Manual reminder trigger completed:', result);
-      return result;
-    } catch (error) {
-      logger.error('❌ Error in manual reminder trigger:', error);
-      throw error;
-    }
+    logger.info('🔔 Manually triggering reminder notifications...');
+    return await notificationService.sendAppReminderNotifications();
   }
 }
 

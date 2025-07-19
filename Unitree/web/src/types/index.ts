@@ -182,4 +182,69 @@ export interface ModalProps {
   title?: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+}
+
+// Admin related types
+export interface AdminUser {
+  _id: string;
+  id: string; // For compatibility
+  username: string;
+  role: 'admin' | 'superadmin';
+  permissions: {
+    manageAdmins: boolean;
+    manageStudents: boolean;
+    manageTrees: boolean;
+    managePoints: boolean;
+    manageWifiSessions: boolean;
+    manageTreeTypes: boolean;
+    manageRealTrees: boolean;
+    viewStatistics: boolean;
+  };
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export interface AdminAuthResponse {
+  success: boolean;
+  token: string;
+  admin: AdminUser;
+  message?: string;
+}
+
+export interface AdminLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AdminCreateRequest {
+  username: string;
+  password: string;
+  permissions: {
+    manageAdmins?: boolean;
+    manageStudents?: boolean;
+    manageTrees?: boolean;
+    managePoints?: boolean;
+    manageWifiSessions?: boolean;
+    manageTreeTypes?: boolean;
+    manageRealTrees?: boolean;
+    viewStatistics?: boolean;
+  };
+}
+
+export interface AdminUpdateRequest {
+  username?: string;
+  permissions?: {
+    manageAdmins?: boolean;
+    manageStudents?: boolean;
+    manageTrees?: boolean;
+    managePoints?: boolean;
+    manageWifiSessions?: boolean;
+    manageTreeTypes?: boolean;
+    manageRealTrees?: boolean;
+    viewStatistics?: boolean;
+  };
+}
+
+export interface AdminPasswordResetRequest {
+  newPassword: string;
 } 

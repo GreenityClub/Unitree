@@ -35,14 +35,6 @@ const requiredEnvVars = {
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   
-  // Push Notifications Configuration (V1 API)
-  FIREBASE_SERVICE_ACCOUNT_KEY: process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
-  FIREBASE_SERVICE_ACCOUNT_PATH: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
-  
-  // Legacy Push Notifications (deprecated)
-  EXPO_ACCESS_TOKEN: process.env.EXPO_ACCESS_TOKEN,
-  FCM_SERVER_KEY: process.env.FCM_SERVER_KEY,
-  
   // CORS Origins
   CLIENT_URL: process.env.CLIENT_URL,
   CLIENT_DEV_URL: process.env.CLIENT_DEV_URL,

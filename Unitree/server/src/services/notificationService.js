@@ -15,13 +15,6 @@ class NotificationService {
     }
     
     this.expo = new Expo(options);
-    
-    // Log FCM configuration status
-    if (env.FCM_SERVER_KEY) {
-      logger.info('🔥 FCM Server Key configured for push notifications');
-    } else {
-      logger.warn('⚠️ No FCM Server Key provided - some push notification features may be limited');
-    }
   }
 
   /**

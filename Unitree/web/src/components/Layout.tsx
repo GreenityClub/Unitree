@@ -1,100 +1,95 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import Button from './ui/Button';
+import React, { ReactNode } from 'react';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout } = useAuth();
-  const location = useLocation();
+interface LayoutProps {
+  children: ReactNode;
+}
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: '🏠' },
-    { name: 'Trees', href: '/trees', icon: '🌳' },
-    { name: 'Points', href: '/points', icon: '⭐' },
-    { name: 'WiFi', href: '/wifi', icon: '📶' },
-    { name: 'Profile', href: '/profile', icon: '👤' },
-  ];
-
-  const handleLogout = () => {
-    logout();
-  };
-
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center">
-                <span className="text-2xl mr-2">🌱</span>
-                <span className="text-xl font-bold text-green-600">Unitree</span>
-              </Link>
-            </div>
-            
-            {user && (
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  {user.avatar && (
-                    <img
-                      src={user.avatar}
-                      alt={user.fullName}
-                      className="w-8 h-8 rounded-full"
-                    />
-                  )}
-                  <span className="text-sm font-medium text-gray-700">
-                    {user.fullName}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {user.points} pts
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      {user && (
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-8">
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`flex items-center px-3 py-4 text-sm font-medium border-b-2 transition-colors ${
-                      isActive
-                        ? 'border-green-500 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="mr-2">{item.icon}</span>
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </nav>
-      )}
-
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-4 py-8">
         {children}
-      </main>
+      </div>
     </div>
   );
 };
 
-export default Layout; 
+interface AdminLayoutProps {
+  children: ReactNode;
+}
+
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
+  return (
+    <div className="min-h-screen flex bg-gray-100">
+      <div className="w-64 bg-white shadow">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
+        </div>
+        <nav className="p-4">
+          <ul className="space-y-2">
+            <li>
+              <a href="/admin/dashboard" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Dashboard
+              </a>
+            </li>
+            <li>
+              <a href="/admin/admins" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Admins
+              </a>
+            </li>
+            <li>
+              <a href="/admin/students" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Students
+              </a>
+            </li>
+            <li>
+              <a href="/admin/trees" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Trees
+              </a>
+            </li>
+            <li>
+              <a href="/admin/tree-types" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Tree Types
+              </a>
+            </li>
+            <li>
+              <a href="/admin/real-trees" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Real Trees
+              </a>
+            </li>
+            <li>
+              <a href="/admin/points" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Points
+              </a>
+            </li>
+            <li>
+              <a href="/admin/wifi-sessions" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                WiFi Sessions
+              </a>
+            </li>
+            <li>
+              <a href="/admin/statistics" className="block px-4 py-2 rounded hover:bg-gray-200 transition-colors">
+                Statistics
+              </a>
+            </li>
+            <li>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('adminAuthToken');
+                  localStorage.removeItem('admin');
+                  window.location.href = '/admin/login';
+                }}
+                className="block w-full text-left px-4 py-2 rounded hover:bg-gray-200 transition-colors text-red-600"
+              >
+                Logout
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      <div className="flex-1 p-8">
+        {children}
+      </div>
+    </div>
+  );
+}; 

@@ -120,11 +120,6 @@ class NotificationService {
       return this.expoPushToken;
     } catch (error: any) {
       console.error('❌ Failed to get push token:', error);
-      // If Firebase isn't configured, still allow the app to function
-      if (error.message?.includes('FirebaseApp is not initialized')) {
-        console.warn('⚠️ Firebase not configured - push notifications disabled for now');
-        console.warn('⚠️ See: https://docs.expo.dev/push-notifications/fcm-credentials/');
-      }
       return null;
     }
   }
