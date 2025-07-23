@@ -161,8 +161,8 @@ export interface FormField {
 export interface ButtonProps {
     children: React.ReactNode;
     onClick?: () => void;
-    type?: 'button' | 'submit' | 'reset'; // <-- add this
-    variant?: 'primary' | 'secondary' | 'outline' | 'danger';
+    type?: 'button' | 'submit' | 'reset';
+    variant?: 'primary' | 'secondary' | 'tertiary' | 'accent' | 'outline' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     disabled?: boolean;
     loading?: boolean;
@@ -174,6 +174,8 @@ export interface CardProps {
   title?: string;
   className?: string;
   onClick?: () => void;
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
+  variant?: 'default' | 'primary' | 'secondary' | 'tertiary' | 'accent';
 }
 
 export interface ModalProps {

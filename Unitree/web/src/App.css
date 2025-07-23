@@ -1,1 +1,79 @@
-/* App-specific styles can be added here if needed */
+/* App-specific styles */
+:root {
+  /* Base color palette */
+  --color-primary: #A3DC9A;
+  --color-secondary: #DEE791;
+  --color-tertiary: #FFF9BD;
+  --color-accent: #FFD6BA;
+  
+  /* Darker variants */
+  --color-primary-dark: #8ac382;
+  --color-secondary-dark: #c5cd7d;
+  --color-tertiary-dark: #e6e0aa;
+  --color-accent-dark: #e6c1a7;
+  
+  /* Lighter variants */
+  --color-primary-light: #dbf1d7;
+  --color-secondary-light: #f0f3d8;
+  --color-tertiary-light: #fffdf0;
+  --color-accent-light: #fff0e8;
+  
+  /* Text colors */
+  --color-text: #333333;
+  --color-text-light: #4b5563;
+  --color-text-inverse: #ffffff;
+}
+
+.app-container {
+  background-color: var(--color-tertiary-light);
+  min-height: 100vh;
+}
+
+/* Custom button styles */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-secondary-dark);
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.btn-accent:hover {
+  background-color: var(--color-accent-dark);
+}
+
+/* Card styles */
+.card-primary {
+  background-color: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+}
+
+.card-secondary {
+  background-color: var(--color-secondary-light);
+  border: 1px solid var(--color-secondary);
+}
+
+.card-tertiary {
+  background-color: var(--color-tertiary-light);
+  border: 1px solid var(--color-tertiary);
+}
+
+.card-accent {
+  background-color: var(--color-accent-light);
+  border: 1px solid var(--color-accent);
+}

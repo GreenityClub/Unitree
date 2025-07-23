@@ -6,17 +6,44 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Template colors
+        'primary': '#A3DC9A',
+        'secondary': '#DEE791',
+        'tertiary': '#FFF9BD',
+        'accent': '#FFD6BA',
+        
+        // Darker variants
+        'primary-dark': '#8ac382',
+        'secondary-dark': '#c5cd7d',
+        'tertiary-dark': '#e6e0aa',
+        'accent-dark': '#e6c1a7',
+        
+        // Lighter variants
+        'primary-light': '#dbf1d7',
+        'secondary-light': '#f0f3d8',
+        'tertiary-light': '#fffdf0',
+        'accent-light': '#fff0e8',
+        
+        // Custom themed colors
         green: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
+          DEFAULT: '#A3DC9A',
+          dark: '#8ac382',
+          light: '#dbf1d7',
+        },
+        yellow: {
+          DEFAULT: '#DEE791',
+          dark: '#c5cd7d',
+          light: '#f0f3d8',
+        },
+        cream: {
+          DEFAULT: '#FFF9BD',
+          dark: '#e6e0aa',
+          light: '#fffdf0',
+        },
+        peach: {
+          DEFAULT: '#FFD6BA',
+          dark: '#e6c1a7',
+          light: '#fff0e8',
         },
       },
       fontFamily: {

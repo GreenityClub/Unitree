@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import Icon from '../../components/ui/Icon';
+import Modal from '../../components/ui/Modal';
+import { eyeIcon, eyeSlashIcon, treeIcon } from '../../utils/icons';
 
 const AdminLoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { login } = useAdminAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const validateForm = () => {
@@ -39,9 +47,16 @@ const AdminLoginPage: React.FC = () => {
 
     try {
       await login({ username, password });
+      showToast('Login successful! Redirecting to dashboard...', 'success');
       navigate('/admin/dashboard');
     } catch (err: any) {
-      setErrors({ general: err.message || 'Login failed' });
+      // Show error via modal and toast
+      const errorMsg = err.message || 'Login failed';
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+      
+      // Also show as a toast
+      showToast(errorMsg, 'error', 5000);
     } finally {
       setIsLoading(false);
     }
@@ -58,32 +73,45 @@ const AdminLoginPage: React.FC = () => {
     }
   };
 
+  const closeErrorModal = () => {
+    setShowErrorModal(false);
+  };
+
   return (
-    <div className="flex min-h-screen bg-gray-100 items-center justify-center">
-      <div className="w-full max-w-md p-4">
-        <Card>
-          <div className="p-6">
-            <div className="text-center mb-6">
-              <div className="flex justify-center">
-                <span className="text-4xl">🌱</span>
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+      {/* Background with forest scene */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url('/assets/5bb58eb6-0c32-4eb3-ae76-83e0dcd29eab.png')`,
+          filter: 'brightness(0.85)'
+        }}
+      />
+
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 via-transparent to-amber-800/20" />
+
+      {/* Login Card */}
+      <div className="relative z-10 w-full max-w-md mx-4 ">
+        <Card 
+          className="backdrop-blur-sm bg-white/95 border-green-800/20 shadow-2xl" 
+          rounded="4xl"
+        >
+          <div className="p-0">
+            <div className="text-center space-y-0">
+              {/* Sprout to Forest Logo */}
+              <div className="relative z-10 flex justify-center mb-0">
+                <img
+                  src="/assets/b61064bb-226b-4edc-937c-612625337883.png"
+                  alt="Sprout to Forest"
+                  className="h-36 object-contain opacity-90"
+                />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mt-3">
-                Admin Dashboard
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Sign in to access the Unitree admin panel
-              </p>
             </div>
-            
-            {errors.general && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {errors.general}
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+
+            <form onSubmit={handleSubmit} className="space-y-6 mt-0 p-6">
+              <div className="space-y-2">
+                <label className="block text-gray-700 text-sm font-bold">
                   Username
                 </label>
                 <Input
@@ -92,42 +120,72 @@ const AdminLoginPage: React.FC = () => {
                   value={username}
                   onChange={handleChange}
                   placeholder="Enter your username"
+                  className="bg-white/80 border-green-700/30 focus:border-green-700 focus:ring-green-700/20 rounded-lg"
                   required
                 />
                 {errors.username && (
                   <p className="text-red-500 text-xs mt-1">{errors.username}</p>
                 )}
               </div>
-              
-              <div className="mb-6">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+
+              <div className="space-y-2">
+                <label className="block text-gray-700 text-sm font-bold">
                   Password
                 </label>
-                <Input
-                  type="password"
-                  name="password"
-                  value={password}
-                  onChange={handleChange}
-                  placeholder="Enter your password"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    className="bg-white/80 border-green-700/30 focus:border-green-700 focus:ring-green-700/20 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-gray-700"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <Icon icon={showPassword ? eyeSlashIcon : eyeIcon} />
+                  </button>
+                </div>
                 {errors.password && (
                   <p className="text-red-500 text-xs mt-1">{errors.password}</p>
                 )}
               </div>
-              
+
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full"
+                className="w-full bg-green-700 hover:bg-green-800 text-white"
                 disabled={isLoading}
               >
-                {isLoading ? 'Logging in...' : 'Sign In'}
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
           </div>
         </Card>
       </div>
+
+      {/* Error Modal */}
+      <Modal 
+        isOpen={showErrorModal} 
+        onClose={closeErrorModal}
+        title="Login Failed"
+        variant="error"
+      >
+        <div className="text-center">
+          <p className="mb-4">{errorMessage}</p>
+          <Button 
+            variant="primary" 
+            onClick={closeErrorModal} 
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Try Again
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
