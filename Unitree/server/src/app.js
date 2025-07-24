@@ -24,13 +24,13 @@ const statisticsRoutes = require('./routes/statistics');
 const app = express();
 
 // Start memory monitoring
-memoryMonitor.startMonitoring(3); // Monitor every 3 minutes
+memoryMonitor.start(3); // Monitor every 3 minutes
 
 // Add process event handlers for graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  const memStats = memoryMonitor.getMemoryStats();
-  logger.info(`Shutdown memory stats: Current: ${memStats.current}MB, Avg: ${memStats.average}MB, Max: ${memStats.maximum}MB, Trend: ${memStats.trend}`);
+  const memStats = memoryMonitor.getStats();
+  logger.info(`Shutdown memory stats: Current: ${memStats.current}MB, Avg: ${memStats.average}MB, Max: ${memStats.max}MB, Trend: ${memStats.trend}`);
   gracefulShutdown();
 });
 
@@ -42,14 +42,14 @@ process.on('SIGINT', () => {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
   // Log memory state during errors
-  const memStats = memoryMonitor.getMemoryStats();
+  const memStats = memoryMonitor.getStats();
   logger.error(`Memory state during rejection: ${memStats.current}MB (${memStats.status})`);
   // Don't exit the process, just log the error
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  const memStats = memoryMonitor.getMemoryStats();
+  const memStats = memoryMonitor.getStats();
   logger.error(`Memory state during exception: ${memStats.current}MB (${memStats.status})`);
   process.exit(1);
 });
@@ -58,7 +58,7 @@ process.on('uncaughtException', (error) => {
 process.on('warning', (warning) => {
   if (warning.name === 'MaxListenersExceededWarning') {
     logger.warn('MaxListenersExceededWarning - potential memory leak detected');
-    memoryMonitor.cleanup();
+    memoryMonitor.triggerGC();
   }
 });
 
@@ -108,7 +108,7 @@ app.get('/health', async (req, res) => {
     const dbStatus = dbState === 1 ? 'connected' : 'disconnected';
     
     // Get detailed memory stats from monitor
-    const memStats = memoryMonitor.getMemoryStats();
+    const memStats = memoryMonitor.getStats();
     
     if (dbState !== 1) {
       return res.status(503).json({
@@ -135,7 +135,7 @@ app.get('/health', async (req, res) => {
       memoryStatus: memStats.status,
       memoryTrend: memStats.trend,
       averageMemory: `${memStats.average}MB`,
-      maxMemory: `${memStats.maximum}MB`,
+      maxMemory: `${memStats.max}MB`,
       timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}),
       uptime: Math.floor(process.uptime()),
       version: process.env.npm_package_version || '1.0.0',
@@ -221,9 +221,9 @@ const server = app.listen(PORT, () => {
   setInterval(() => {
     try {
       logger.info('Running periodic maintenance...');
-      memoryMonitor.cleanup();
+      memoryMonitor.triggerGC(); // Directly trigger GC
       
-      // Force garbage collection if available
+      // Force garbage collection if available (redundant but safe)
       if (global.gc) {
         global.gc();
       }
