@@ -3,12 +3,20 @@ const User = require('../models/User');
 const Admin = require('../models/Admin');
 const logger = require('../utils/logger');
 
-// Middleware to authenticate user tokens
+// =================================================================
+// ==                  USER AUTHENTICATION                      ==
+// =================================================================
+
+/**
+ * Middleware to authenticate user tokens.
+ * Verifies the JWT from the Authorization header, checks if the user exists,
+ * and validates the session against the active session stored in the user's document.
+ * This is primarily used for mobile client APIs.
+ */
 const auth = async (req, res, next) => {
   try {
     let token;
 
-    // Check if auth header exists and has Bearer format
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith('Bearer')
@@ -18,52 +26,52 @@ const auth = async (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({
-        message: 'Not authorized to access this route'
+        message: 'Not authorized, no token'
       });
     }
 
     try {
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // Get user from token with session data
-      req.user = await User.findById(decoded.id).select('+activeSession.token +activeSession.refreshToken +activeSession.deviceInfo +activeSession.loginTime +activeSession.lastActivity +activeSession.refreshTokenExpiresAt');
+      req.user = await User.findById(decoded.id).select('+activeSession.token');
       
       if (!req.user) {
         return res.status(401).json({
-          message: 'User no longer exists'
+          message: 'User not found'
         });
       }
 
-      // Check if the session is still valid (token matches stored session)
-      // Skip session validation if user doesn't have activeSession set (for backward compatibility)
-      if (req.user.activeSession && req.user.activeSession.token) {
-        if (req.user.activeSession.token !== token) {
-          return res.status(401).json({
-            message: 'Session invalid - please login again',
-            code: 'SESSION_INVALID'
-          });
-        }
-        
-        // Update last activity for users with active sessions
-        await req.user.updateLastActivity();
+      // Session validation: Ensure the provided token matches the one in the DB
+      if (req.user.activeSession && req.user.activeSession.token !== token) {
+        return res.status(401).json({
+          message: 'Session is invalid. Please log in again.',
+          code: 'SESSION_INVALID'
+        });
       }
-
+      
       next();
     } catch (err) {
       return res.status(401).json({
-        message: 'Token is invalid or expired'
+        message: 'Token is not valid'
       });
     }
   } catch (err) {
-    console.error('Auth middleware error:', err);
+    logger.error('Auth middleware error:', err);
     res.status(500).json({
-      message: 'Server error in auth middleware'
+      message: 'Server error during authentication'
     });
   }
 };
 
-// Middleware to authenticate admin tokens
+// =================================================================
+// ==                  ADMIN AUTHENTICATION                     ==
+// =================================================================
+
+/**
+ * Middleware to authenticate admin tokens.
+ * Verifies the JWT from the Authorization header and attaches the admin document to the request.
+ * This is used for web admin dashboard APIs.
+ */
 const authAdmin = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -71,7 +79,7 @@ const authAdmin = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'No authentication token provided'
+        message: 'No token, authorization denied'
       });
     }
 
@@ -79,10 +87,10 @@ const authAdmin = async (req, res, next) => {
     const admin = await Admin.findById(decoded.id);
 
     if (!admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Admin not found'
-      });
+        return res.status(401).json({
+            success: false,
+            message: 'Admin not found, token is invalid'
+        });
     }
 
     req.admin = admin;
@@ -90,18 +98,22 @@ const authAdmin = async (req, res, next) => {
   } catch (error) {
     res.status(401).json({
       success: false,
-      message: 'Invalid authentication token'
+      message: 'Token is not valid'
     });
   }
 };
 
-// Middleware to check if admin has required role
+/**
+ * Middleware factory to require a specific admin role.
+ * This should be used after `authAdmin`.
+ * @param {string} role The required role (e.g., 'superadmin').
+ */
 const requireRole = (role) => {
   return (req, res, next) => {
     if (!req.admin || req.admin.role !== role) {
       return res.status(403).json({
         success: false,
-        message: 'Insufficient permissions'
+        message: 'Forbidden: Insufficient permissions for this action'
       });
     }
     next();

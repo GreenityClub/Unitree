@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 
+// =================================================================
+// ==                 VERIFICATION CODE SCHEMA                  ==
+// =================================================================
+
 const verificationCodeSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -14,24 +18,33 @@ const verificationCodeSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['verification', 'reset']
+    enum: ['verification', 'reset'],
+    comment: "'verification' for new accounts, 'reset' for password resets."
   },
   attempts: {
     type: Number,
-    default: 0,
-    max: 3
+    default: 0
   },
   expiresAt: {
     type: Date,
     required: true,
-    default: () => new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
-    index: { expireAfterSeconds: 0 } // MongoDB TTL index for automatic cleanup
+    default: () => new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    index: { expiresAt: 1 }, // Index for querying
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: true });
 
-// Static method to create or update verification code
+// MongoDB TTL index for automatic cleanup of expired documents
+verificationCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+
+// =================================================================
+// ==                       STATIC METHODS                      ==
+// =================================================================
+
+/**
+ * Creates or updates a verification code for a given email and type.
+ * Resets attempts and expiration on creation/update.
+ */
 verificationCodeSchema.statics.createCode = async function(email, code, type) {
   return await this.findOneAndUpdate(
     { email: email.toLowerCase(), type },
@@ -40,14 +53,15 @@ verificationCodeSchema.statics.createCode = async function(email, code, type) {
       attempts: 0, 
       expiresAt: new Date(Date.now() + 10 * 60 * 1000) 
     },
-    { 
-      upsert: true, 
-      new: true 
-    }
+    { upsert: true, new: true }
   );
 };
 
-// Static method to verify code
+/**
+ * Verifies a code, handling expiration and attempt limits.
+ * Deletes the code upon successful verification or too many attempts.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
 verificationCodeSchema.statics.verifyCode = async function(email, code, type) {
   const record = await this.findOne({ 
     email: email.toLowerCase(), 
@@ -56,7 +70,7 @@ verificationCodeSchema.statics.verifyCode = async function(email, code, type) {
   });
 
   if (!record) {
-    return { success: false, error: 'No verification code found or code expired' };
+    return { success: false, error: 'Invalid or expired code. Please request a new one.' };
   }
 
   if (record.attempts >= 3) {
@@ -67,17 +81,12 @@ verificationCodeSchema.statics.verifyCode = async function(email, code, type) {
   if (record.code !== code) {
     record.attempts += 1;
     await record.save();
-    return { success: false, error: 'Invalid verification code' };
+    return { success: false, error: 'The code you entered is incorrect.' };
   }
 
-  // Success - remove the code
   await record.deleteOne();
   return { success: true };
 };
 
-// Static method to cleanup expired codes (optional, since TTL handles it)
-verificationCodeSchema.statics.cleanupExpired = async function() {
-  return await this.deleteMany({ expiresAt: { $lt: new Date() } });
-};
 
 module.exports = mongoose.model('VerificationCode', verificationCodeSchema); 

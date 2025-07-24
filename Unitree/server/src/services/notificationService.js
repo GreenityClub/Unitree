@@ -3,162 +3,119 @@ const User = require('../models/User');
 const logger = require('../utils/logger');
 const { env } = require('../config/env');
 
+// =================================================================
+// ==                  NOTIFICATION SERVICE                     ==
+// =================================================================
+
 class NotificationService {
   constructor() {
-    // Initialize Expo client with access token if available
-    const options = {};
+    this.expo = new Expo({ accessToken: env.EXPO_ACCESS_TOKEN });
     if (env.EXPO_ACCESS_TOKEN) {
-      options.accessToken = env.EXPO_ACCESS_TOKEN;
-      logger.info('🔑 Expo client initialized with access token for production');
+      logger.info('Expo client initialized with Access Token.');
     } else {
-      logger.warn('⚠️ No Expo access token provided - using default configuration');
+      logger.warn('EXPO_ACCESS_TOKEN not set. Push notifications will likely fail.');
+    }
+    this.timeZone = env.TIMEZONE || 'Asia/Ho_Chi_Minh';
+  }
+
+  /**
+   * Sends one or more push notifications using Expo.
+   * @param {Array<Object>} messages - An array of Expo message objects.
+   * @returns {Promise<{success: boolean, tickets?: Array, error?: string}>}
+   */
+  async sendNotifications(messages) {
+    if (!messages || messages.length === 0) {
+      return { success: true, tickets: [] };
     }
     
-    this.expo = new Expo(options);
-  }
+    // Filter out invalid tokens before sending
+    const validMessages = messages.filter(msg => Expo.isExpoPushToken(msg.to));
+    const invalidTokens = messages.filter(msg => !Expo.isExpoPushToken(msg.to)).map(msg => msg.to);
+    
+    if (invalidTokens.length > 0) {
+      logger.warn(`Attempted to send notifications to invalid tokens: ${invalidTokens.join(', ')}`);
+    }
 
-  /**
-   * Get current time in Hanoi timezone (GMT+7)
-   */
-  getCurrentHanoiTime() {
-    const now = new Date();
-    // Convert to Hanoi time (GMT+7)
-    const hanoiTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
-    return hanoiTime;
-  }
+    if (validMessages.length === 0) {
+        return { success: true, tickets: [] };
+    }
 
-  /**
-   * Get current hour in Hanoi timezone
-   */
-  getCurrentHanoiHour() {
-    return this.getCurrentHanoiTime().getHours();
-  }
-
-  /**
-   * Send a single push notification
-   */
-  async sendPushNotification(expoPushToken, title, body, data = {}) {
     try {
-      // Check if the push token is valid
-      if (!Expo.isExpoPushToken(expoPushToken)) {
-        logger.warn(`Invalid push token: ${expoPushToken}`);
-        return { success: false, error: 'Invalid push token' };
+      const chunks = this.expo.chunkPushNotifications(validMessages);
+      const tickets = [];
+      for (const chunk of chunks) {
+        const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
+        tickets.push(...ticketChunk);
+        logger.info('Push notification chunk sent.', { tickets: ticketChunk });
       }
-
-      const message = {
-        to: expoPushToken,
-        sound: 'default',
-        title,
-        body,
-        data,
-        priority: 'high',
-        channelId: 'default',
-      };
-
-      const ticket = await this.expo.sendPushNotificationsAsync([message]);
-      logger.info(`Push notification sent: ${JSON.stringify(ticket)}`);
-      
-      return { success: true, ticket: ticket[0] };
+      return { success: true, tickets };
     } catch (error) {
-      logger.error('Failed to send push notification:', error);
+      logger.error('Failed to send push notification chunk:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Send app reminder notification to inactive users
+   * Sends a single push notification. A convenience wrapper for sendNotifications.
+   * @param {string} expoPushToken - The recipient's Expo push token.
+   * @param {string} title - The title of the notification.
+   * @param {string} body - The body of the notification.
+   * @param {Object} [data={}] - Additional data to send with the notification.
    */
-  async sendAppReminderNotifications() {
+  async sendSingleNotification(expoPushToken, title, body, data = {}) {
+    const message = {
+      to: expoPushToken,
+      sound: 'default',
+      title,
+      body,
+      data,
+    };
+    return this.sendNotifications([message]);
+  }
+  
+  /**
+   * Sends reminder notifications to users who have been inactive.
+   * This is intended to be called by a cron job.
+   */
+  async sendInactiveUserReminders() {
     try {
-      const currentHour = this.getCurrentHanoiHour();
-      const hanoiTime = this.getCurrentHanoiTime();
-      
-      logger.info(`Checking reminder notifications - Current Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})} (Hour: ${currentHour})`);
-      
-      // Only send between 7 AM - 6 PM (Hanoi time)
-      if (currentHour < 7 || currentHour >= 18) {
-        logger.info(`Outside app reminder hours (7 AM - 6 PM Hanoi time), skipping notifications. Current hour: ${currentHour}`);
-        return { success: false, error: 'Outside notification hours' };
+      const now = new Date();
+      const hanoiHour = new Date(now.toLocaleString("en-US", { timeZone: this.timeZone })).getHours();
+
+      // Only send reminders during reasonable hours (e.g., 8 AM - 10 PM)
+      if (hanoiHour < 8 || hanoiHour >= 22) {
+        logger.info(`Skipping inactive user reminders outside of active hours (current hour: ${hanoiHour} in ${this.timeZone}).`);
+        return;
       }
 
-      // Find users who haven't been active for more than 2 hours and have push notifications enabled
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       
       const inactiveUsers = await User.find({
-        pushToken: { $exists: true, $ne: null },
+        pushToken: { $ne: null },
         'notificationSettings.pushNotificationsEnabled': true,
         'notificationSettings.appReminderNotifications': true,
-        $or: [
-          { lastActive: { $lt: twoHoursAgo } },
-          { lastActive: { $exists: false } }
-        ]
-      }).select('pushToken username');
+        lastActive: { $lt: twoHoursAgo }
+      }).select('pushToken');
 
       if (inactiveUsers.length === 0) {
-        logger.info('No inactive users found for app reminder notifications');
-        return { success: true, sent: 0 };
+        logger.info('No inactive users to remind at this time.');
+        return;
       }
 
-      const notifications = inactiveUsers.map(user => ({
-        expoPushToken: user.pushToken,
-        title: '🌱 UniTree Reminder',
-        body: 'Don\'t forget to connect to university WiFi to grow your tree!',
+      const messages = inactiveUsers.map(user => ({
+        to: user.pushToken,
+        sound: 'default',
+        title: 'Your UniTree is waiting!',
+        body: 'Don\'t forget to connect to university WiFi to help your tree grow.',
         data: { type: 'app_reminder' }
       }));
 
-      let successCount = 0;
-      for (const notif of notifications) {
-        const result = await this.sendPushNotification(
-          notif.expoPushToken, 
-          notif.title, 
-          notif.body, 
-          notif.data
-        );
-        if (result.success) successCount++;
-      }
+      await this.sendNotifications(messages);
+      logger.info(`Sent ${messages.length} inactivity reminder notifications.`);
 
-      // Update lastReminderSent timestamp for these users
-      await User.updateMany(
-        { _id: { $in: inactiveUsers.map(u => u._id) } },
-        { lastReminderSent: new Date() }
-      );
-      
-      logger.info(`App reminder notifications sent to ${successCount}/${inactiveUsers.length} users (Hanoi time: ${hanoiTime.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})})`);
-      return { success: true, sent: successCount };
-      
     } catch (error) {
-      logger.error('Failed to send app reminder notifications:', error);
-      return { success: false, error: error.message };
+      logger.error('Failed to send inactive user reminder notifications:', error);
     }
-  }
-
-  /**
-   * Test push notification
-   */
-  async sendTestNotification(expoPushToken, type = 'test') {
-    const messages = {
-      test: {
-        title: '🧪 Test Notification',
-        body: 'This is a test notification from UniTree!',
-        data: { type: 'test' }
-      },
-      reminder: {
-        title: '🌱 UniTree Reminder',
-        body: 'Don\'t forget to connect to university WiFi!',
-        data: { type: 'app_reminder' }
-      }
-    };
-
-    const message = messages[type] || messages.test;
-    return await this.sendPushNotification(expoPushToken, message.title, message.body, message.data);
-  }
-
-  /**
-   * Schedule daily reminder notifications (called by cron job)
-   */
-  async scheduleDailyReminders() {
-    logger.info('Running scheduled daily reminder notifications');
-    return await this.sendAppReminderNotifications();
   }
 }
 

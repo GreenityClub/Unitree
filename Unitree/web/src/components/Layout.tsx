@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './ui/Icon';
 import {
   dashboardIcon,
@@ -16,6 +16,8 @@ import {
   listUlIcon,
   userIcon
 } from '../utils/icons';
+
+
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,25 +44,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return savedState ? JSON.parse(savedState) : false;
   });
   const [isHovered, setIsHovered] = useState(false);
-  const [currentPath, setCurrentPath] = useState('');
+  const location = useLocation();
   const navigate = useNavigate();
   
-  // Update current path when component mounts or URL changes
-  useEffect(() => {
-    setCurrentPath(window.location.pathname);
-    
-    const handleUrlChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    
-    // Listen for URL changes
-    window.addEventListener('popstate', handleUrlChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleUrlChange);
-    };
-  }, []);
-
   // Lưu trạng thái collapsed vào localStorage khi nó thay đổi
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
@@ -68,7 +54,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   // Check if menu item is active
   const isActive = (path: string) => {
-    return currentPath === path;
+    return location.pathname === path;
   };
 
   const expanded = !collapsed || isHovered;
@@ -77,7 +63,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
   };
-
+  
   // Hàm logout
   const handleLogout = () => {
     localStorage.removeItem('adminAuthToken');
@@ -85,19 +71,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     navigate('/admin/login');
   };
 
-  // Khoảng cách cố định giữa sidebar và nội dung
-  const fixedGap = 'pl-16 pr-16 pt-8 pb-16'; // padding-left: 4rem (64px), padding-right: 4rem (64px)
-
   return (
     <div className="min-h-screen flex bg-tertiary-light">
-      {/* Sidebar */}
-      <div 
-        className={`bg-white shadow h-screen sticky top-0 left-0 transition-all duration-300 ease-in-out ${expanded ? 'w-64' : 'w-16'} overflow-hidden`}
+      {/* Fixed-width sidebar with overflow hidden */}
+              <div 
+        className={`bg-white shadow transition-all duration-300 ease-in-out ${expanded ? 'w-64' : 'w-16'} overflow-x-hidden fixed left-0 top-0 z-10`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        style={{ height: '100vh' }}
       >
         {/* Logo section */}
-        <div className="h-16 border-b border-primary relative">
+        <div className="h-16 relative">
           {/* Logo always centered in collapsed mode */}
           <div className="absolute top-0 left-0 w-16 h-16 flex items-center justify-center">
             <div className="bg-primary rounded-full w-8 h-8 flex items-center justify-center">
@@ -107,13 +91,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           
           {/* Title - separate from logo */}
           <div className={`absolute top-0 left-16 h-16 flex items-center transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
-            <h2 className="text-xl font-semibold text-primary-dark whitespace-nowrap">
+            <h2 className="text-xl font-bold text-primary-dark whitespace-nowrap">
               Unitree Admin
             </h2>
           </div>
         </div>
 
-        <div className="h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden">
           {/* Main navigation */}
           <nav className="py-4">
             <ul className="space-y-1">
@@ -122,32 +106,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/dashboard" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {/* Active indicator */}
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      
-                      {/* Icon column - always visible and fixed width */}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={dashboardIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      
-                      {/* Text column - can expand/collapse */}
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Dashboard
-                        </span>
-                      </div>
-                    </>
+                  {/* Active indicator */}
+                  {isActive('/admin/dashboard') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  
+                  {/* Icon column - always visible and fixed width */}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                                          <Icon 
+                      icon={dashboardIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/dashboard') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  
+                  {/* Text column - can expand/collapse */}
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                                          <span className={`transition-all duration-300 ${isActive('/admin/dashboard') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
+                      Dashboard
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -156,27 +136,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/admins" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={userIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Admins
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/admins') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                                          <Icon 
+                      icon={userIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/admins') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-300 ${isActive('/admin/admins') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
+                      Admins
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -185,27 +161,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/students" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={usersIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Students
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/students') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                                          <Icon 
+                      icon={usersIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/students') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-300 ${isActive('/admin/students') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
+                      Students
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -214,27 +186,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/trees" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={treeIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Trees
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/trees') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={treeIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      Trees
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -243,27 +211,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/tree-types" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={leafIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Tree Types
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/tree-types') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={leafIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/tree-types') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/tree-types') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      Tree Types
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -272,27 +236,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/real-trees" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={treeIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Real Trees
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/real-trees') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={treeIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/real-trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/real-trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      Real Trees
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -301,27 +261,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/points" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={medalIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Points
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/points') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={medalIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/points') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/points') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      Points
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -330,27 +286,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/wifi" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={wifiIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          WiFi Sessions
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/wifi') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={wifiIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/wifi') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/wifi') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      WiFi Sessions
+                    </span>
+                  </div>
                 </NavLink>
               </li>
               
@@ -359,27 +311,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <NavLink 
                   to="/admin/statistics" 
                   className={({ isActive }) => 
-                    `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                      )}
-                      <div className="w-16 flex items-center justify-center flex-shrink-0">
-                        <Icon 
-                          icon={chartIcon} 
-                          className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                        />
-                      </div>
-                      <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                        <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                          Statistics
-                        </span>
-                      </div>
-                    </>
+                  {isActive('/admin/statistics') && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                   )}
+                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+                    <Icon 
+                      icon={chartIcon} 
+                      className={`transition-all duration-300 ${isActive('/admin/statistics') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                    />
+                  </div>
+                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                    <span className={`transition-all duration-200 ${isActive('/admin/statistics') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                      Statistics
+                    </span>
+                  </div>
                 </NavLink>
               </li>
             </ul>
@@ -398,27 +346,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <NavLink 
                     to="/admin/settings" 
                     className={({ isActive }) => 
-                      `h-12 flex items-center relative hover: transition-colors group ${isActive ? 'text-primary' : ''}`
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
                     }
                   >
-                    {({ isActive }) => (
-                      <>
-                        {isActive && (
-                          <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></span>
-                        )}
-                        <div className="w-16 flex items-center justify-center flex-shrink-0">
-                          <Icon 
-                            icon={settingsIcon} 
-                            className={`transition-colors ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-primary'}`}
-                          />
-                        </div>
-                        <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                          <span className={`transition-colors ${isActive ? 'font-medium text-primary' : 'text-text group-hover:text-primary'}`}>
-                            Settings
-                          </span>
-                        </div>
-                      </>
+                    {isActive('/admin/settings') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
                     )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={settingsIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/settings') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/settings') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Settings
+                      </span>
+                    </div>
                   </NavLink>
                 </li>
                 
@@ -426,16 +370,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <li>
                   <button 
                     onClick={handleLogout}
-                    className="h-12 flex items-center w-full relative hover: transition-colors group"
+                    className="h-12 flex items-center w-full relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group"
                   >
                     <div className="w-16 flex items-center justify-center flex-shrink-0">
                       <Icon 
                         icon={logoutIcon} 
-                        className="text-red-600 group-hover:text-red-700 transition-colors"
+                        className="text-red-600 group-hover:text-red-700 group-hover:scale-130 transition-all duration-300"
                       />
                     </div>
                     <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                      <span className="text-red-600 group-hover:text-red-700 transition-colors">
+                      <span className="text-red-600 group-hover:text-red-700 group-hover:scale-105 transition-all duration-200">
                         Logout
                       </span>
                     </div>
@@ -453,13 +397,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             className="bg-white h-8 w-8 transition-all"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <Icon icon={listUlIcon} className="text text" />
+                          <Icon 
+              icon={listUlIcon} 
+              className="text-gray-500 hover:text-primary hover:scale-130 transition-all duration-300" 
+            />
           </button>
         </div>
       </div>
       
-      {/* Main content với khoảng cách cố định từ sidebar */}
-      <div className={`flex-1 transition-all duration-300 ${fixedGap}`}>
+      {/* Main content with margin to account for sidebar */}
+      <div className={`flex-1 p-8 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-16'} `}>
         {children}
       </div>
     </div>

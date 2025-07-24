@@ -36,7 +36,17 @@ import {
   faClock,
   faMapMarkerAlt,
   faStop,
-  faListUl
+  faListUl,
+  faPlusCircle,
+  faMinusCircle,
+  faBell,
+  faCloudUpload,
+  faDatabase,
+  faArrowDown,
+  faArrowUp,
+  faDownload,
+  faCheckCircle,
+  faLock as faLockSolid
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -50,6 +60,7 @@ import {
 import {
   faStar as faStarRegular,
   faBookmark as faBookmarkRegular,
+  faCheckCircle as faCheckCircleRegular
 } from '@fortawesome/free-regular-svg-icons';
 
 // Solid icons
@@ -96,9 +107,21 @@ export const clockIcon = faClock;
 export const locationIcon = faMapMarkerAlt;
 export const stopIcon = faStop;
 
+// Add missing icons
+export const plusCircleIcon = faPlusCircle;
+export const minusCircleIcon = faMinusCircle;
+export const bellIcon = faBell;
+export const cloudUploadIcon = faCloudUpload;
+export const databaseIcon = faDatabase;
+export const arrowDownIcon = faArrowDown;
+export const arrowUpIcon = faArrowUp;
+export const downloadIcon = faDownload;
+export const checkCircleIcon = faCheckCircle;
+
 // Regular icons
 export const starIcon = faStarRegular;
 export const bookmarkIcon = faBookmarkRegular;
+export const checkCircleRegularIcon = faCheckCircleRegular;
 
 // Brand icons
 export const facebookIcon = faFacebook;

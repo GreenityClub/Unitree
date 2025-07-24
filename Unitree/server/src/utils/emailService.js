@@ -1,80 +1,17 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
+const { env } = require('../config/env');
 
-class EmailService {
-  constructor() {
-    // Create transporter using Gmail
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+// =================================================================
+// ==                      EMAIL TEMPLATES                      ==
+// =================================================================
 
-    // Verify connection configuration
-    this.verifyConnection();
-  }
-
-  async verifyConnection() {
-    try {
-      await this.transporter.verify();
-      logger.info('Email service connected successfully');
-      console.log('✅ Email service connected successfully');
-    } catch (error) {
-      logger.error('Email service connection failed:', error);
-      console.error('❌ Email service connection failed:', error.message);
-    }
-  }
-
-  async sendVerificationCode(email, code, type = 'registration') {
-    try {
-      const subject = type === 'registration' 
-        ? 'UniTree - Email Verification Code'
-        : 'UniTree - Password Reset Code';
-
-      const htmlContent = type === 'registration'
-        ? this.getRegistrationEmailTemplate(code)
-        : this.getPasswordResetEmailTemplate(code);
-
-      const textContent = type === 'registration'
-        ? `Your UniTree verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, please ignore this email.`
-        : `Your UniTree password reset code is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, please ignore this email.`;
-
-      const mailOptions = {
-        from: {
-          name: 'UniTree',
-          address: process.env.EMAIL_USER
-        },
-        to: email,
-        subject: subject,
-        text: textContent,
-        html: htmlContent
-      };
-
-      const result = await this.transporter.sendMail(mailOptions);
-      
-      logger.info(`Email sent successfully to ${email}. Message ID: ${result.messageId}`);
-      console.log(`✅ Email sent successfully to ${email}`);
-      
-      return {
-        success: true,
-        messageId: result.messageId
-      };
-
-    } catch (error) {
-      logger.error(`Failed to send email to ${email}:`, error);
-      console.error(`❌ Failed to send email to ${email}:`, error.message);
-      
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  getRegistrationEmailTemplate(code) {
-    return `
+/**
+ * Generates the HTML content for a registration verification email.
+ * @param {string} code - The 6-digit verification code.
+ * @returns {string} - The HTML email template.
+ */
+const getRegistrationEmailTemplate = (code) => `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -190,10 +127,13 @@ class EmailService {
       </body>
       </html>
     `;
-  }
 
-  getPasswordResetEmailTemplate(code) {
-    return `
+/**
+ * Generates the HTML content for a password reset email.
+ * @param {string} code - The 6-digit password reset code.
+ * @returns {string} - The HTML email template.
+ */
+const getPasswordResetEmailTemplate = (code) => `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -321,45 +261,81 @@ class EmailService {
       </body>
       </html>
     `;
+
+
+// =================================================================
+// ==                       EMAIL SERVICE                       ==
+// =================================================================
+
+class EmailService {
+  constructor() {
+    if (!env.EMAIL_USER || !env.EMAIL_PASSWORD) {
+      logger.error('Email service is not configured. Please set EMAIL_USER and EMAIL_PASSWORD environment variables.');
+      this.transporter = null;
+    } else {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: env.EMAIL_USER,
+          pass: env.EMAIL_PASSWORD,
+        },
+      });
+      this.verifyConnection();
+    }
   }
 
-  // Test email function for development
-  async sendTestEmail(email) {
+  /**
+   * Verifies the SMTP connection to the email server.
+   */
+  async verifyConnection() {
+    if (!this.transporter) return;
     try {
-      const mailOptions = {
-        from: {
-          name: 'UniTree',
-          address: process.env.EMAIL_USER
-        },
-        to: email,
-        subject: 'UniTree - Email Service Test',
-        text: 'This is a test email from UniTree email service. If you received this, the email configuration is working correctly!',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto;">
-            <h2 style="color: #4CAF50;">🌳 UniTree Email Service Test</h2>
-            <p>This is a test email from UniTree email service.</p>
-            <p style="color: #4CAF50; font-weight: bold;">✅ If you received this, the email configuration is working correctly!</p>
-            <hr style="margin: 20px 0; border: 1px solid #eee;">
-            <p style="font-size: 14px; color: #666;">
-              Email sent at: ${new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}<br>
-              Service: Gmail SMTP<br>
-              Status: Active
-            </p>
-          </div>
-        `
-      };
+      await this.transporter.verify();
+      logger.info('Email service connected and ready to send emails.');
+    } catch (error) {
+      logger.error('Email service connection failed:', error);
+    }
+  }
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Test email sent successfully to ${email}. Message ID: ${result.messageId}`);
+  /**
+   * A generic method to send an email.
+   * @param {Object} mailOptions - Nodemailer mail options object.
+   * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+   */
+  async sendEmail(mailOptions) {
+    if (!this.transporter) {
+      const errorMsg = 'Email service is not configured.';
+      logger.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+    try {
+      const result = await this.transporter.sendMail({
+        from: { name: 'UniTree', address: env.EMAIL_USER },
+        ...mailOptions,
+      });
+      logger.info(`Email sent to ${mailOptions.to}. Message ID: ${result.messageId}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error(`❌ Test email failed:`, error.message);
+      logger.error(`Failed to send email to ${mailOptions.to}:`, error);
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Sends a verification or password reset code to a user.
+   * @param {string} email - The recipient's email address.
+   * @param {string} code - The 6-digit code.
+   * @param {'registration' | 'password_reset'} type - The type of email to send.
+   */
+  async sendVerificationCode(email, code, type = 'registration') {
+    const isRegistration = type === 'registration';
+    return this.sendEmail({
+      to: email,
+      subject: isRegistration ? 'UniTree - Email Verification Code' : 'UniTree - Password Reset Code',
+      html: isRegistration ? getRegistrationEmailTemplate(code) : getPasswordResetEmailTemplate(code),
+      text: `Your code is: ${code}. It will expire in 10 minutes.`,
+    });
+  }
 }
 
-// Create singleton instance
-const emailService = new EmailService();
-
-module.exports = emailService; 
+module.exports = new EmailService(); 

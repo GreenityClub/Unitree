@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AdminLayout } from '../../components/Layout';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -207,7 +208,7 @@ const TreesPage: React.FC = () => {
   });
 
   return (
-    <>
+    <AdminLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Tree Management</h1>
         <p className="text-gray-600">Manage and monitor all virtual trees</p>
@@ -428,7 +429,7 @@ const TreesPage: React.FC = () => {
           )}
         </div>
       </Card>
-    </>
+    </AdminLayout>
   );
 };
 

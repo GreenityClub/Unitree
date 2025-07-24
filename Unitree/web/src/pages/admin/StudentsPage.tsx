@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AdminLayout } from '../../components/Layout';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -255,7 +256,7 @@ const StudentsPage: React.FC = () => {
   };
 
   return (
-    <>
+    <AdminLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Student Management</h1>
         <p className="text-gray-600">Manage and monitor all student accounts</p>
@@ -473,7 +474,7 @@ const StudentsPage: React.FC = () => {
           </Button>
         </div>
       </Modal>
-    </>
+    </AdminLayout>
   );
 };
 

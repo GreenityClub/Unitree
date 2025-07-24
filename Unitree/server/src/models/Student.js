@@ -1,10 +1,16 @@
 const mongoose = require('mongoose');
 
+// =================================================================
+// ==                       STUDENT SCHEMA                      ==
+// =================================================================
+// This collection stores pre-loaded student data for verification purposes.
+
 const studentSchema = new mongoose.Schema({
   student_id: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    index: true
   },
   full_name: {
     type: String,
@@ -14,14 +20,13 @@ const studentSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    lowercase: true
+    lowercase: true,
+    trim: true,
+    index: true
   }
 }, {
   timestamps: true,
-  collection: 'students' // Explicitly specify the collection name
+  collection: 'students'
 });
-
-// Create case-insensitive index for email
-studentSchema.index({ email: 1 }, { unique: true });
 
 module.exports = mongoose.model('Student', studentSchema); 

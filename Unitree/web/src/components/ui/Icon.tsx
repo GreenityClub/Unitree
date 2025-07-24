@@ -23,6 +23,8 @@ export interface IconProps {
   flip?: 'horizontal' | 'vertical' | 'both';
   rotation?: 90 | 180 | 270;
   onClick?: () => void;
+  onMouseEnter?: (e: React.MouseEvent<SVGSVGElement>) => void;
+  onMouseLeave?: (e: React.MouseEvent<SVGSVGElement>) => void;
 }
 
 const Icon: React.FC<IconProps> = ({ 

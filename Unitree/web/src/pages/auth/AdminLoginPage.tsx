@@ -46,9 +46,16 @@ const AdminLoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Try to login with API
       await login({ username, password });
+      
       showToast('Login successful! Redirecting to dashboard...', 'success');
-      navigate('/admin/dashboard');
+      
+      // Add a slight delay to allow toast to show before navigation
+      setTimeout(() => {
+        navigate('/admin/dashboard');
+      }, 500);
+      
     } catch (err: any) {
       // Show error via modal and toast
       const errorMsg = err.message || 'Login failed';

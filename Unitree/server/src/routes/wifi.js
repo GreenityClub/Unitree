@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { auth } = require('../middleware/auth');
+const { auth, authAdmin } = require('../middleware/auth');
 const WifiSession = require('../models/WifiSession');
 const User = require('../models/User');
 const Point = require('../models/Point');
 const logger = require('../utils/logger');
+
+// =================================================================
+// ==                     HELPER FUNCTIONS                      ==
+// =================================================================
 
 // Utility function to execute operations with transactions when available
 const executeWithOptionalTransaction = async (operations) => {
@@ -42,6 +46,30 @@ const executeWithOptionalTransaction = async (operations) => {
 const isValidUniversityIP = (ipAddress) => {
   const allowedPrefix = process.env.UNIVERSITY_IP_PREFIX || '192.168';
   return ipAddress && ipAddress.toLowerCase().startsWith(allowedPrefix.toLowerCase());
+};
+
+// Helper function to validate location within university campus
+const isValidUniversityLocation = (location) => {
+  if (!location || !location.latitude || !location.longitude) return false;
+  
+  // University campus coordinates (configurable via environment)
+  const universityLat = parseFloat(process.env.UNIVERSITY_LAT || '10.8231'); // Default: HCMC
+  const universityLng = parseFloat(process.env.UNIVERSITY_LNG || '106.6297');
+  const universityRadius = parseFloat(process.env.UNIVERSITY_RADIUS || '100'); // 100m default
+  
+  // Calculate distance using Haversine formula
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (location.latitude * Math.PI) / 180;
+  const φ2 = (universityLat * Math.PI) / 180;
+  const Δφ = ((universityLat - location.latitude) * Math.PI) / 180;
+  const Δλ = ((universityLng - location.longitude) * Math.PI) / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+
+  return distance <= universityRadius;
 };
 
 // Helper function to check and reset time periods if needed
@@ -86,209 +114,14 @@ const checkAndResetTimePeriods = async (userId) => {
   }
 };
 
-// Background sync endpoint for minimal bandwidth usage
-router.post('/background-sync', auth, async (req, res) => {
-  try {
-    const { sessionId, startTime, endTime, duration, ipAddress, location } = req.body;
 
-    logger.info(`Background sync request: sessionId=${sessionId}, duration=${duration}s, IP=${ipAddress}, hasLocation=${!!location}`);
+// =================================================================
+// ==                      MOBILE-ONLY APIS                     ==
+// =================================================================
 
-    // Validate required fields
-    if (!sessionId || !startTime || !duration || !ipAddress) {
-      return res.status(400).json({ 
-        message: 'Missing required fields: sessionId, startTime, duration, ipAddress' 
-      });
-    }
-
-    // Validate session data - Kiểm tra IP đã lưu trong phiên (không kiểm tra IP hiện tại của người dùng)
-    if (!isValidUniversityIP(ipAddress)) {
-      logger.warn(`Background sync rejected: Invalid IP ${ipAddress}`);
-      return res.status(400).json({ 
-        message: 'Invalid university WiFi IP address in session data' 
-      });
-    }
-
-    // Validate session location if provided (không kiểm tra location hiện tại của người dùng)
-    let locationValid = true;
-    if (location) {
-      locationValid = isValidUniversityLocation(location);
-      if (!locationValid) {
-        // Ghi log nhưng không từ chối đồng bộ nếu IP hợp lệ
-        logger.info(`Background session ${sessionId} has invalid location data, but continuing with valid IP`);
-      }
-    } else {
-      // Phiên cũ không có location, ghi log nhưng không từ chối đồng bộ
-      logger.info(`Background session ${sessionId} has no location data (likely created before update)`);
-    }
-
-    // Enhanced duplicate session check
-    const existingSession = await WifiSession.findOne({
-      $or: [
-        // Kiểm tra theo ID phiên
-        {'metadata.backgroundSessionId': sessionId},
-        // Kiểm tra theo thời gian + user + độ dài phiên (trong trường hợp sessionId không khớp)
-        {
-          user: req.user._id,
-          startTime: {
-            $gte: new Date(new Date(startTime).getTime() - 60000), // -1 phút
-            $lte: new Date(new Date(startTime).getTime() + 60000)  // +1 phút
-          },
-          duration: { 
-            $gte: parseInt(duration, 10) * 0.9, 
-            $lte: parseInt(duration, 10) * 1.1 
-          },
-          'metadata.source': 'background'
-        }
-      ]
-    });
-
-    if (existingSession) {
-      logger.info(`Background session ${sessionId} already synced for user ${req.user._id} (or similar session exists)`);
-      return res.json({ 
-        message: 'Session already synced', 
-        session: existingSession,
-        alreadySynced: true
-      });
-    }
-
-    // Calculate points: 1 minute = 1 point
-    const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
-    const durationSeconds = parseInt(duration, 10);
-    
-    if (durationSeconds < minSessionDuration) {
-      logger.info(`Background session ${sessionId} too short (${durationSeconds}s), not awarding points`);
-      return res.json({ message: 'Session too short, no points awarded' });
-    }
-
-    const pointsEarned = Math.floor(durationSeconds / 60);
-
-    // Reset time periods if needed
-    await checkAndResetTimePeriods(req.user._id);
-
-    // Ghi log thông tin chi tiết trước khi tạo phiên
-    logger.info(`Creating new WiFi session for user ${req.user._id}: ${pointsEarned} points for ${durationSeconds}s duration`);
-
-    // Use transactions if available
-    const result = await executeWithOptionalTransaction(async (session) => {
-      // Check for existing transaction to prevent double point
-      const existingTransaction = await Point.findOne({
-        userId: req.user._id,
-        type: 'WIFI_SESSION',
-        'metadata.startTime': new Date(startTime),
-        'metadata.endTime': endTime ? new Date(endTime) : new Date()
-      });
-      if (!existingTransaction) {
-        // Create WiFi session record with location if available
-        const wifiSession = new WifiSession({
-          user: req.user._id,
-          ipAddress,
-          startTime: new Date(startTime),
-          endTime: endTime ? new Date(endTime) : new Date(),
-          duration: durationSeconds,
-          pointsEarned,
-          sessionDate: new Date(startTime),
-          isActive: false,
-          location: location ? {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            accuracy: location.accuracy,
-            timestamp: new Date(location.timestamp || startTime)
-          } : undefined,
-          metadata: {
-            backgroundSessionId: sessionId,
-            syncedAt: new Date(),
-            source: 'background',
-            validationMethods: {
-              ipAddress: true,
-              location: locationValid
-            }
-          }
-        });
-
-        await wifiSession.save(session ? { session } : {});
-
-        // Update user points and time tracking
-        await User.findByIdAndUpdate(
-          req.user._id,
-          { 
-            $inc: { 
-              points: pointsEarned,
-              allTimePoints: pointsEarned,
-              dayTimeConnected: durationSeconds,
-              weekTimeConnected: durationSeconds,
-              monthTimeConnected: durationSeconds,
-              totalTimeConnected: durationSeconds
-            }
-          },
-          session ? { session } : {}
-        );
-
-        // Create point transaction record
-        const pointTransaction = new Point({
-          userId: req.user._id,
-          amount: pointsEarned,
-          type: 'WIFI_SESSION',
-          metadata: {
-            backgroundSessionId: sessionId,
-            startTime: new Date(startTime),
-            endTime: endTime ? new Date(endTime) : new Date(),
-            duration: durationSeconds,
-            description: `Background WiFi session on ${ipAddress}`,
-            location: location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : undefined,
-            validationMethods: {
-              ipAddress: true,
-              location: locationValid
-            }
-          }
-        });
-
-        await pointTransaction.save(session ? { session } : {});
-
-        return wifiSession;
-      } else {
-        logger.info(`Background sync: Transaction already exists for user ${req.user._id}, sessionId ${sessionId}`);
-        return existingSession;
-      }
-    });
-
-    logger.info(`Background session synced: ${sessionId} for user ${req.user._id}, points: ${pointsEarned}`);
-    res.json({ 
-      message: 'Background session synced successfully', 
-      session: result,
-      pointsEarned 
-    });
-
-  } catch (error) {
-    logger.error('Background sync error:', error);
-    res.status(500).json({ message: 'Failed to sync background session', error: error.message });
-  }
-});
-
-// Helper function to validate location within university campus
-const isValidUniversityLocation = (location) => {
-  if (!location || !location.latitude || !location.longitude) return false;
-  
-  // University campus coordinates (configurable via environment)
-  const universityLat = parseFloat(process.env.UNIVERSITY_LAT || '10.8231'); // Default: HCMC
-  const universityLng = parseFloat(process.env.UNIVERSITY_LNG || '106.6297');
-  const universityRadius = parseFloat(process.env.UNIVERSITY_RADIUS || '100'); // 100m default
-  
-  // Calculate distance using Haversine formula
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = (location.latitude * Math.PI) / 180;
-  const φ2 = (universityLat * Math.PI) / 180;
-  const Δφ = ((universityLat - location.latitude) * Math.PI) / 180;
-  const Δλ = ((universityLng - location.longitude) * Math.PI) / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return distance <= universityRadius;
-};
-
-// Start WiFi session
+// @route   POST /api/wifi/start
+// @desc    Start a new WiFi session for a user
+// @access  Private (Mobile)
 router.post('/start', auth, async (req, res) => {
   try {
     const { ipAddress, location, validationMethods, campus, distance } = req.body;
@@ -482,7 +315,9 @@ router.post('/start', auth, async (req, res) => {
   }
 });
 
-// End WiFi session
+// @route   POST /api/wifi/end
+// @desc    End the current active WiFi session for a user
+// @access  Private (Mobile)
 router.post('/end', auth, async (req, res) => {
   try {
     const session = await WifiSession.findOne({
@@ -643,36 +478,189 @@ router.post('/end', auth, async (req, res) => {
   }
 });
 
-// Update active session (for real-time tracking)
-router.post('/update', auth, async (req, res) => {
+// @route   POST /api/wifi/background-sync
+// @desc    Sync offline/background session data from mobile
+// @access  Private (Mobile)
+router.post('/background-sync', auth, async (req, res) => {
   try {
-    const session = await WifiSession.findOne({
-      user: req.user._id,
-      isActive: true,
-      endTime: null,
-    });
+    const { sessionId, startTime, endTime, duration, ipAddress, location } = req.body;
 
-    if (!session) {
-      return res.status(404).json({ message: 'No active session found' });
+    logger.info(`Background sync request: sessionId=${sessionId}, duration=${duration}s, IP=${ipAddress}, hasLocation=${!!location}`);
+
+    // Validate required fields
+    if (!sessionId || !startTime || !duration || !ipAddress) {
+      return res.status(400).json({ 
+        message: 'Missing required fields: sessionId, startTime, duration, ipAddress' 
+      });
     }
 
-    // Calculate current duration and potential points
-    const currentTime = new Date();
-    const durationSeconds = Math.floor((currentTime - session.startTime) / 1000);
-    const potentialPoints = Math.floor(durationSeconds / 60); // 1 minute = 1 point
+    // Validate session data - Kiểm tra IP đã lưu trong phiên (không kiểm tra IP hiện tại của người dùng)
+    if (!isValidUniversityIP(ipAddress)) {
+      logger.warn(`Background sync rejected: Invalid IP ${ipAddress}`);
+      return res.status(400).json({ 
+        message: 'Invalid university WiFi IP address in session data' 
+      });
+    }
 
-    res.json({
-      ...session.toObject(),
-      currentDuration: durationSeconds,
-      potentialPoints: potentialPoints
+    // Validate session location if provided (không kiểm tra location hiện tại của người dùng)
+    let locationValid = true;
+    if (location) {
+      locationValid = isValidUniversityLocation(location);
+      if (!locationValid) {
+        // Ghi log nhưng không từ chối đồng bộ nếu IP hợp lệ
+        logger.info(`Background session ${sessionId} has invalid location data, but continuing with valid IP`);
+      }
+    } else {
+      // Phiên cũ không có location, ghi log nhưng không từ chối đồng bộ
+      logger.info(`Background session ${sessionId} has no location data (likely created before update)`);
+    }
+
+    // Enhanced duplicate session check
+    const existingSession = await WifiSession.findOne({
+      $or: [
+        // Kiểm tra theo ID phiên
+        {'metadata.backgroundSessionId': sessionId},
+        // Kiểm tra theo thời gian + user + độ dài phiên (trong trường hợp sessionId không khớp)
+        {
+      user: req.user._id,
+          startTime: {
+            $gte: new Date(new Date(startTime).getTime() - 60000), // -1 phút
+            $lte: new Date(new Date(startTime).getTime() + 60000)  // +1 phút
+          },
+          duration: { 
+            $gte: parseInt(duration, 10) * 0.9, 
+            $lte: parseInt(duration, 10) * 1.1 
+          },
+          'metadata.source': 'background'
+        }
+      ]
     });
+
+    if (existingSession) {
+      logger.info(`Background session ${sessionId} already synced for user ${req.user._id} (or similar session exists)`);
+      return res.json({ 
+        message: 'Session already synced', 
+        session: existingSession,
+        alreadySynced: true
+      });
+    }
+
+    // Calculate points: 1 minute = 1 point
+    const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
+    const durationSeconds = parseInt(duration, 10);
+    
+    if (durationSeconds < minSessionDuration) {
+      logger.info(`Background session ${sessionId} too short (${durationSeconds}s), not awarding points`);
+      return res.json({ message: 'Session too short, no points awarded' });
+    }
+
+    const pointsEarned = Math.floor(durationSeconds / 60);
+
+    // Reset time periods if needed
+    await checkAndResetTimePeriods(req.user._id);
+
+    // Ghi log thông tin chi tiết trước khi tạo phiên
+    logger.info(`Creating new WiFi session for user ${req.user._id}: ${pointsEarned} points for ${durationSeconds}s duration`);
+
+    // Use transactions if available
+    const result = await executeWithOptionalTransaction(async (session) => {
+      // Check for existing transaction to prevent double point
+      const existingTransaction = await Point.findOne({
+        userId: req.user._id,
+        type: 'WIFI_SESSION',
+        'metadata.startTime': new Date(startTime),
+        'metadata.endTime': endTime ? new Date(endTime) : new Date()
+      });
+      if (!existingTransaction) {
+        // Create WiFi session record with location if available
+        const wifiSession = new WifiSession({
+          user: req.user._id,
+          ipAddress,
+          startTime: new Date(startTime),
+          endTime: endTime ? new Date(endTime) : new Date(),
+          duration: durationSeconds,
+          pointsEarned,
+          sessionDate: new Date(startTime),
+          isActive: false,
+          location: location ? {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            timestamp: new Date(location.timestamp || startTime)
+          } : undefined,
+          metadata: {
+            backgroundSessionId: sessionId,
+            syncedAt: new Date(),
+            source: 'background',
+            validationMethods: {
+              ipAddress: true,
+              location: locationValid
+            }
+          }
+        });
+
+        await wifiSession.save(session ? { session } : {});
+
+        // Update user points and time tracking
+        await User.findByIdAndUpdate(
+          req.user._id,
+          { 
+            $inc: { 
+              points: pointsEarned,
+              allTimePoints: pointsEarned,
+              dayTimeConnected: durationSeconds,
+              weekTimeConnected: durationSeconds,
+              monthTimeConnected: durationSeconds,
+              totalTimeConnected: durationSeconds
+            }
+          },
+          session ? { session } : {}
+        );
+        
+        // Create point transaction record
+        const pointTransaction = new Point({
+          userId: req.user._id,
+          amount: pointsEarned,
+          type: 'WIFI_SESSION',
+          metadata: {
+            backgroundSessionId: sessionId,
+            startTime: new Date(startTime),
+            endTime: endTime ? new Date(endTime) : new Date(),
+            duration: durationSeconds,
+            description: `Background WiFi session on ${ipAddress}`,
+            location: location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : undefined,
+            validationMethods: {
+              ipAddress: true,
+              location: locationValid
+            }
+          }
+        });
+
+        await pointTransaction.save(session ? { session } : {});
+
+        return wifiSession;
+      } else {
+        logger.info(`Background sync: Transaction already exists for user ${req.user._id}, sessionId ${sessionId}`);
+        return existingSession;
+      }
+    });
+
+    logger.info(`Background session synced: ${sessionId} for user ${req.user._id}, points: ${pointsEarned}`);
+    res.json({ 
+      message: 'Background session synced successfully', 
+      session: result,
+      pointsEarned 
+    });
+
   } catch (error) {
-    logger.error('Update session error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Background sync error:', error);
+    res.status(500).json({ message: 'Failed to sync background session', error: error.message });
   }
 });
 
-// Get active session
+// @route   GET /api/wifi/active
+// @desc    Get the current active session for a user
+// @access  Private (Mobile)
 router.get('/active', auth, async (req, res) => {
   try {
     const session = await WifiSession.findOne({
@@ -695,7 +683,9 @@ router.get('/active', auth, async (req, res) => {
   }
 });
 
-// Get session history
+// @route   GET /api/wifi/history
+// @desc    Get the session history for a user
+// @access  Private (Mobile)
 router.get('/history', auth, async (req, res) => {
   try {
     const sessions = await WifiSession.find({
@@ -710,98 +700,9 @@ router.get('/history', auth, async (req, res) => {
   }
 });
 
-// Get current session count
-router.get('/session-count', auth, async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const sessionCount = await WifiSession.countDocuments({
-      user: req.user._id,
-      sessionDate: { $gte: today, $lt: tomorrow }
-    });
-
-    res.json({ sessionCount });
-  } catch (error) {
-    logger.error('Get session count error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Cleanup orphaned sessions (sessions that are still active but very old)
-router.post('/cleanup', auth, async (req, res) => {
-  try {
-    const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-    
-    // Find old active sessions
-    const orphanedSessions = await WifiSession.find({
-      user: req.user._id,
-      isActive: true,
-      startTime: { $lt: cutoffTime }
-    });
-
-    let cleanedCount = 0;
-    
-    for (const session of orphanedSessions) {
-      const endTime = new Date();
-      session.endTime = endTime;
-      session.isActive = false;
-      
-      const durationSeconds = Math.floor((endTime - session.startTime) / 1000);
-      session.duration = durationSeconds;
-      
-      // Calculate points for the session
-      const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
-      
-      if (durationSeconds >= minSessionDuration) {
-        const pointsEarned = Math.floor(durationSeconds / 60);
-        
-        await User.findByIdAndUpdate(
-          req.user._id,
-          { 
-            $inc: { 
-              points: pointsEarned,
-              allTimePoints: pointsEarned,
-              dayTimeConnected: durationSeconds,
-              weekTimeConnected: durationSeconds,
-              monthTimeConnected: durationSeconds,
-              totalTimeConnected: durationSeconds
-            }
-          }
-        );
-        
-        // Create point transaction record for cleanup session
-        const pointTransaction = new Point({
-          userId: req.user._id,
-          amount: pointsEarned,
-          type: 'WIFI_SESSION',
-          metadata: {
-            startTime: session.startTime,
-            endTime: endTime,
-            duration: durationSeconds,
-            description: `WiFi session on ${session.ipAddress} (cleanup)`,
-          }
-        });
-        await pointTransaction.save();
-        
-        session.pointsEarned = pointsEarned;
-      }
-      
-      await session.save();
-      cleanedCount++;
-    }
-
-    logger.info(`Cleaned up ${cleanedCount} orphaned sessions for user ${req.user._id}`);
-    res.json({ message: `Cleaned up ${cleanedCount} orphaned sessions` });
-  } catch (error) {
-    logger.error('Cleanup sessions error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Get WiFi stats
+// @route   GET /api/wifi/stats
+// @desc    Get WiFi connection statistics for a user
+// @access  Private (Mobile)
 router.get('/stats', auth, async (req, res) => {
   try {
     // Check and reset time periods if needed
@@ -877,7 +778,9 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
-// Manual sync route to ensure database consistency
+// @route   POST /api/wifi/sync
+// @desc    Manual sync route to ensure user's data consistency
+// @access  Private (Mobile)
 router.post('/sync', auth, async (req, res) => {
   try {
     const userId = req.user._id;
@@ -975,4 +878,198 @@ router.post('/sync', auth, async (req, res) => {
   }
 });
 
+// =================================================================
+// ==                     ADMIN-ONLY APIS                       ==
+// =================================================================
+
+// @route   GET /api/wifi/sessions
+// @desc    Get all WiFi sessions (for admin dashboard)
+// @access  Private (Admin)
+router.get('/sessions', authAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, sortBy = 'startTime', order = 'desc', status, userId } = req.query;
+
+    const query = {};
+    if (status) query.isActive = status === 'active';
+    if (userId) query.user = userId;
+
+    const sessions = await WifiSession.find(query)
+      .populate('user', 'fullname nickname studentId')
+      .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
+      .limit(parseInt(limit))
+      .skip((page - 1) * limit);
+
+    const total = await WifiSession.countDocuments(query);
+
+    res.json({
+      sessions,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    logger.error('Admin get WiFi sessions error:', error);
+    res.status(500).json({ message: 'Server error fetching WiFi sessions' });
+  }
+});
+
+// @route   GET /api/wifi/sessions/:id
+// @desc    Get a single WiFi session by ID (for admin)
+// @access  Private (Admin)
+router.get('/sessions/:id', authAdmin, async (req, res) => {
+  try {
+    const session = await WifiSession.findById(req.params.id).populate('user', 'fullname nickname studentId');
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+    res.json(session);
+  } catch (error) {
+    logger.error('Admin get WiFi session by ID error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// =================================================================
+// ==                  DEPRECATED/UNUSED APIS                   ==
+// =================================================================
+
+// Note: The following routes were identified as potentially unused by the latest clients.
+// Please verify they are no longer needed before deleting them manually.
+
+// @route   POST /api/wifi/update
+// @desc    (DEPRECATED?) Update active session (for real-time tracking)
+// @access  Private
+router.post('/update', auth, async (req, res) => {
+  try {
+    const session = await WifiSession.findOne({
+      user: req.user._id,
+      isActive: true,
+      endTime: null,
+    });
+
+    if (!session) {
+      return res.status(404).json({ message: 'No active session found' });
+    }
+
+    // Calculate current duration and potential points
+    const currentTime = new Date();
+    const durationSeconds = Math.floor((currentTime - session.startTime) / 1000);
+    const potentialPoints = Math.floor(durationSeconds / 60); // 1 minute = 1 point
+
+    res.json({
+      ...session.toObject(),
+      currentDuration: durationSeconds,
+      potentialPoints: potentialPoints
+    });
+  } catch (error) {
+    logger.error('Update session error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/wifi/session-count
+// @desc    (DEPRECATED?) Get current session count for the day
+// @access  Private
+router.get('/session-count', auth, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const sessionCount = await WifiSession.countDocuments({
+      user: req.user._id,
+      sessionDate: { $gte: today, $lt: tomorrow }
+    });
+
+    res.json({ sessionCount });
+  } catch (error) {
+    logger.error('Get session count error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/wifi/cleanup
+// @desc    (DEPRECATED?) Cleanup orphaned sessions for a user
+// @access  Private
+router.post('/cleanup', auth, async (req, res) => {
+  try {
+    const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+    
+    // Find old active sessions
+    const orphanedSessions = await WifiSession.find({
+      user: req.user._id,
+      isActive: true,
+      startTime: { $lt: cutoffTime }
+    });
+
+    let cleanedCount = 0;
+    
+    for (const session of orphanedSessions) {
+      const endTime = new Date();
+      session.endTime = endTime;
+      session.isActive = false;
+      
+      const durationSeconds = Math.floor((endTime - session.startTime) / 1000);
+      session.duration = durationSeconds;
+      
+      // Calculate points for the session
+      const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
+      
+      if (durationSeconds >= minSessionDuration) {
+        const pointsEarned = Math.floor(durationSeconds / 60);
+        
+        await User.findByIdAndUpdate(
+          req.user._id,
+          { 
+            $inc: { 
+              points: pointsEarned,
+              allTimePoints: pointsEarned,
+              dayTimeConnected: durationSeconds,
+              weekTimeConnected: durationSeconds,
+              monthTimeConnected: durationSeconds,
+              totalTimeConnected: durationSeconds
+            }
+          }
+        );
+        
+        // Create point transaction record for cleanup session
+        const pointTransaction = new Point({
+          userId: req.user._id,
+          amount: pointsEarned,
+          type: 'WIFI_SESSION',
+          metadata: {
+            startTime: session.startTime,
+            endTime: endTime,
+            duration: durationSeconds,
+            description: `WiFi session on ${session.ipAddress} (cleanup)`,
+          }
+        });
+        await pointTransaction.save();
+        
+        session.pointsEarned = pointsEarned;
+      }
+      
+      await session.save();
+      cleanedCount++;
+    }
+
+    logger.info(`Cleaned up ${cleanedCount} orphaned sessions for user ${req.user._id}`);
+    res.json({ message: `Cleaned up ${cleanedCount} orphaned sessions` });
+  } catch (error) {
+    logger.error('Cleanup sessions error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router; 
+
+// =================================================================
+// ==                MANUAL DELETION CHECKLIST                ==
+// =================================================================
+// The following routes were identified as potentially deprecated or unused.
+// Please verify they are no longer needed before deleting them manually.
+// 1. POST /api/wifi/update
+// 2. GET /api/wifi/session-count
+// 3. POST /api/wifi/cleanup
+// =================================================================

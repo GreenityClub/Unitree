@@ -1,94 +1,81 @@
 const mongoose = require('mongoose');
 
+// =================================================================
+// ==                      REAL TREE SCHEMA                     ==
+// =================================================================
+// This collection tracks real-world trees planted by users.
+
 const realTreeSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  studentId: {
-    type: String,
-    required: true,
-    ref: 'Student',
-    comment: 'Student ID from the students collection (e.g., GCH230179)'
-  },
-  treeSpecie: {
-    type: String,
-    required: true,
-    comment: 'Tree species name'
-  },
-  plantedDate: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
-  location: {
-    type: String,
-    required: true,
-    comment: 'Physical location where the tree is planted'
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  studentId: { type: String, required: true, index: true },
+  treeSpecie: { type: String, required: true },
+  plantedDate: { type: Date, default: Date.now, index: true },
+  location: { type: String, required: true },
   stage: {
     type: String,
-    enum: ['planted', 'thrive', 'dead'],
+    enum: ['planted', 'thriving', 'dead'], // 'thrive' -> 'thriving' for clarity
     default: 'planted',
-    comment: 'Stage will be updated manually by admin in database or admin dashboard'
+    index: true
   },
-  // Additional metadata for tracking
-  redeemedAt: {
-    type: Date,
-    default: Date.now,
-    comment: 'When the tree was redeemed for points'
-  },
-  pointsCost: {
-    type: Number,
-    required: true,
-    comment: 'Points spent to redeem this real tree'
-  },
-  notes: {
-    type: String,
-    comment: 'Admin notes about the tree status or location'
-  }
+  pointsCost: { type: Number, required: true },
+  notes: { type: String }
 }, {
   timestamps: true,
   collection: 'realtrees'
 });
 
-// Create indexes for efficient queries
-realTreeSchema.index({ userId: 1 });
-realTreeSchema.index({ studentId: 1 });
-realTreeSchema.index({ stage: 1 });
-realTreeSchema.index({ plantedDate: -1 });
 
-// Static method to get trees by user
+// =================================================================
+// ==                       STATIC METHODS                      ==
+// =================================================================
+
+/**
+ * Finds all real trees planted by a specific user.
+ * @param {string} userId - The ObjectId of the user.
+ * @returns {Promise<Array>} A promise that resolves to an array of real tree documents.
+ */
 realTreeSchema.statics.findByUser = function(userId) {
   return this.find({ userId }).sort({ plantedDate: -1 });
 };
 
-// Static method to get trees by student ID
+/**
+ * Finds all real trees associated with a specific student ID.
+ * @param {string} studentId - The student's ID string.
+ * @returns {Promise<Array>} A promise that resolves to an array of real tree documents.
+ */
 realTreeSchema.statics.findByStudentId = function(studentId) {
   return this.find({ studentId }).sort({ plantedDate: -1 });
 };
 
-// Static method to get trees by stage
-realTreeSchema.statics.findByStage = function(stage) {
-  return this.find({ stage }).sort({ plantedDate: -1 });
-};
 
-// Instance method to update stage (admin only)
+// =================================================================
+// ==                      INSTANCE METHODS                     ==
+// =================================================================
+
+/**
+ * Updates the stage of the real tree. Intended for admin use.
+ * @param {'planted'|'thriving'|'dead'} newStage - The new stage of the tree.
+ * @param {string} [adminNotes] - Optional notes from the admin regarding the update.
+ * @returns {Promise<Object>} A promise that resolves to the updated document.
+ */
 realTreeSchema.methods.updateStage = function(newStage, adminNotes) {
-  if (!['planted', 'thrive', 'dead'].includes(newStage)) {
-    throw new Error('Invalid stage. Must be: planted, thrive, or dead');
+  const validStages = ['planted', 'thriving', 'dead'];
+  if (!validStages.includes(newStage)) {
+    throw new Error(`Invalid stage. Must be one of: ${validStages.join(', ')}`);
   }
   
   this.stage = newStage;
   if (adminNotes) {
-    this.notes = this.notes ? `${this.notes}\n${adminNotes}` : adminNotes;
+    this.notes = this.notes ? `${this.notes}\n---UPDATE---\n${adminNotes}` : adminNotes;
   }
   
   return this.save();
 };
 
-// Instance method to get display info
+/**
+ * Returns a simplified object for display purposes.
+ * @returns {Object} The display information for the real tree.
+ */
 realTreeSchema.methods.getDisplayInfo = function() {
   return {
     id: this._id,
@@ -97,12 +84,11 @@ realTreeSchema.methods.getDisplayInfo = function() {
     plantedDate: this.plantedDate,
     location: this.location,
     stage: this.stage,
-    redeemedAt: this.redeemedAt,
     pointsCost: this.pointsCost,
-    notes: this.notes
+    notes: this.notes,
+    updatedAt: this.updatedAt
   };
 };
 
 const RealTree = mongoose.model('RealTree', realTreeSchema);
-
 module.exports = RealTree; 

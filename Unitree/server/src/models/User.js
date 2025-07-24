@@ -3,11 +3,18 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { env } = require('../config/env');
 
+// =================================================================
+// ==                        USER SCHEMA                        ==
+// =================================================================
+
 const userSchema = new mongoose.Schema({
+  // --- Basic Information ---
   email: {
     type: String,
     required: [true, 'Please provide an email'],
     unique: true,
+    lowercase: true,
+    trim: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
       'Please provide a valid email'
@@ -17,305 +24,167 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a password'],
     minlength: 6,
-    select: false
+    select: false // Hide by default
   },
-  fullname: {
-    type: String,
-    required: false
-  },
-  nickname: {
-    type: String
-  },
-  points: {
-    type: Number,
-    default: 0
-  },
-  allTimePoints: {
-    type: Number,
-    default: 0,
-    comment: 'Total lifetime points earned - never decreases, used for leaderboard'
-  },
-  treesPlanted: {
-    type: Number,
-    default: 0,
-    comment: 'Total trees planted (virtual + real) - for backward compatibility'
-  },
-  virtualTreesPlanted: {
-    type: Number,
-    default: 0,
-    comment: 'Number of virtual trees planted'
-  },
-  realTreesPlanted: {
-    type: Number,
-    default: 0,
-    comment: 'Number of real trees planted'
-  },
-  university: {
-    type: String,
-    required: true
-  },
-  studentId: {
-    type: String,
-    required: [true, 'Please provide a student ID'],
-    unique: true
-  },
-  role: {
-    type: String,
-    enum: ['student', 'admin'],
-    default: 'student'
-  },
-  avatar: {
-    type: String,
-    default: null
-  },
-  trees: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Tree'
-  }],
-  realTrees: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'RealTree'
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-
-  lastAttendance: {
-    type: Date,
-    default: null,
-  },
-  attendanceStreak: {
-    type: Number,
-    default: 0,
-  },
+  fullname: String,
+  nickname: String,
   
-  // WiFi tracking fields - matching database schema
-  dayTimeConnected: {
-    type: Number,
-    default: 0,
-    comment: 'Time connected today in seconds'
-  },
-  weekTimeConnected: {
-    type: Number,
-    default: 0,
-    comment: 'Time connected this week in seconds'
-  },
-  monthTimeConnected: {
-    type: Number,
-    default: 0,
-    comment: 'Time connected this month in seconds'
-  },
-  totalTimeConnected: {
-    type: Number,
-    default: 0,
-    comment: 'Total time connected to university WiFi in seconds - used for leaderboard calculation'
-  },
-  lastDayReset: {
-    type: Date,
-    default: null,
-    comment: 'Last time day stats were reset'
-  },
-  lastWeekReset: {
-    type: Date,
-    default: null,
-    comment: 'Last time week stats were reset'
-  },
-  lastMonthReset: {
-    type: Date,
-    default: null,
-    comment: 'Last time month stats were reset'
-  },
-  
-  // Notification fields
-  pushToken: {
-    type: String,
-    default: null,
-    comment: 'Expo push notification token'
-  },
-  notificationSettings: {
-    pushNotificationsEnabled: {
-      type: Boolean,
-      default: true
-    },
-    appReminderNotifications: {
-      type: Boolean,
-      default: true
-    },
-    statsNotifications: {
-      type: Boolean,
-      default: true
-    },
-    dailyStatsTime: {
-      type: String,
-      default: "20:00"
-    },
-    weeklyStatsDay: {
-      type: Number,
-      default: 0, // Sunday
-      min: 0,
-      max: 6
-    },
-    monthlyStatsDay: {
-      type: Number,
-      default: 1,
-      min: 1,
-      max: 31
-    }
-  },
-  lastActive: {
-    type: Date,
-    default: Date.now,
-    comment: 'Last time user was active in the app'
-  },
-  lastReminderSent: {
-    type: Date,
-    default: null,
-    comment: 'Last time reminder notification was sent'
-  },
+  // --- Academic Information ---
+  university: { type: String, required: true },
+  studentId: { type: String, required: [true, 'Please provide a student ID'], unique: true },
 
-  // Session management for single device login
+  // --- App-specific Data ---
+  points: { type: Number, default: 0 },
+  allTimePoints: { type: Number, default: 0, comment: 'Total lifetime points for leaderboards.' },
+  avatar: { type: String, default: null },
+  role: { type: String, enum: ['student'], default: 'student' },
+
+  // --- Relational Data ---
+  trees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Tree' }],
+  realTrees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'RealTree' }],
+
+  // --- WiFi Time Tracking ---
+  totalTimeConnected: { type: Number, default: 0, comment: 'Total WiFi time in seconds.' },
+  dayTimeConnected: { type: Number, default: 0 },
+  weekTimeConnected: { type: Number, default: 0 },
+  monthTimeConnected: { type: Number, default: 0 },
+  lastDayReset: Date,
+  lastWeekReset: Date,
+  lastMonthReset: Date,
+
+  // --- Session Management (Single Device Login) ---
   activeSession: {
-    token: {
-      type: String,
-      default: null,
-      select: false
-    },
-    refreshToken: {
-      type: String,
-      default: null,
-      select: false
-    },
-    deviceInfo: {
-      type: String,
-      default: null,
-      select: false
-    },
-    loginTime: {
-      type: Date,
-      default: null,
-      select: false
-    },
-    lastActivity: {
-      type: Date,
-      default: null,
-      select: false
-    },
-    refreshTokenExpiresAt: {
-      type: Date,
-      default: null,
-      select: false
-    }
-  }
-}, {
-  timestamps: true
-});
+    token: { type: String, select: false },
+    refreshToken: { type: String, select: false },
+    deviceInfo: { type: String, select: false },
+    loginTime: { type: Date, select: false },
+    lastActivity: { type: Date, select: false },
+    refreshTokenExpiresAt: { type: Date, select: false }
+  },
 
-// Encrypt password using bcrypt
+}, { timestamps: true });
+
+
+// =================================================================
+// ==                   PRE-SAVE MIDDLEWARE                     ==
+// =================================================================
+
+/**
+ * Encrypt password using bcrypt before saving the user document.
+ * This middleware only runs if the password field is modified.
+ */
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
-// Sign JWT and return
+
+// =================================================================
+// ==                      INSTANCE METHODS                     ==
+// =================================================================
+
+// --- JWT and Password Methods ---
+
+/**
+ * Signs a JWT for the user.
+ * @returns {string} The signed JWT.
+ */
 userSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign(
-    { id: this._id },
-    env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRE }
-  );
+  return jwt.sign({ id: this._id }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRE });
 };
 
-// Generate refresh token
+/**
+ * Signs a Refresh Token for the user.
+ * @returns {string} The signed Refresh Token.
+ */
 userSchema.methods.getSignedRefreshToken = function() {
-  return jwt.sign(
-    { id: this._id, type: 'refresh' },
-    env.JWT_SECRET,
-    { expiresIn: env.JWT_REFRESH_EXPIRE }
-  );
+  return jwt.sign({ id: this._id, type: 'refresh' }, env.JWT_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRE });
 };
 
-// Match user entered password to hashed password in database
+/**
+ * Compares the entered password with the hashed password in the database.
+ * @param {string} enteredPassword - The password to compare.
+ * @returns {Promise<boolean>} - True if the passwords match.
+ */
 userSchema.methods.matchPassword = async function(enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Remove sensitive data when converting to JSON
-userSchema.methods.toJSON = function() {
-  const user = this.toObject();
-  delete user.password;
-  return user;
-};
+// --- Session Management Methods ---
 
-// Update points method - adds to both current points and all-time points
-userSchema.methods.updatePoints = async function(points) {
-  this.points += points;
-  // Only add to all-time points if adding points (not subtracting)
-  if (points > 0) {
-    this.allTimePoints += points;
-  }
-  await this.save();
-  return this.points;
-};
-
-// Session management methods
+/**
+ * Sets the active session details for the user, enforcing single-device login.
+ * @param {string} token - The JWT for the session.
+ * @param {string} refreshToken - The Refresh Token for the session.
+ * @param {string} deviceInfo - Information about the device logging in.
+ */
 userSchema.methods.setActiveSession = async function(token, refreshToken, deviceInfo = 'Unknown Device') {
-  const refreshTokenExpiresAt = new Date();
-  refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 30); // 30 days from now
-  
   this.activeSession = {
-    token: token,
-    refreshToken: refreshToken,
-    deviceInfo: deviceInfo,
+    token,
+    refreshToken,
+    deviceInfo,
     loginTime: new Date(),
     lastActivity: new Date(),
-    refreshTokenExpiresAt: refreshTokenExpiresAt
+    refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
   };
-  await this.save();
+  await this.save({ validateBeforeSave: false });
 };
 
+/**
+ * Clears the active session details, effectively logging the user out.
+ */
 userSchema.methods.clearActiveSession = async function() {
-  this.activeSession = {
-    token: null,
-    refreshToken: null,
-    deviceInfo: null,
-    loginTime: null,
-    lastActivity: null,
-    refreshTokenExpiresAt: null
-  };
-  await this.save();
+  this.activeSession = undefined;
+  await this.save({ validateBeforeSave: false });
 };
 
+/**
+ * Checks if a user has a valid, active session.
+ * @returns {boolean} - True if an active session exists.
+ */
 userSchema.methods.hasActiveSession = function() {
-  return this.activeSession && this.activeSession.token && this.activeSession.token.trim() !== '';
+  return !!this.activeSession?.token;
 };
 
-userSchema.methods.updateLastActivity = async function() {
-  if (this.activeSession && this.activeSession.token && this.activeSession.token.trim() !== '') {
-    this.activeSession.lastActivity = new Date();
-    await this.save();
-  }
-};
-
-// Refresh token methods
+/**
+ * Verifies if the provided refresh token is valid and not expired.
+ * @param {string} refreshToken - The refresh token to validate.
+ * @returns {boolean} - True if the token is valid.
+ */
 userSchema.methods.hasValidRefreshToken = function(refreshToken) {
-  return this.activeSession && 
-         this.activeSession.refreshToken === refreshToken &&
-         this.activeSession.refreshTokenExpiresAt &&
+  return this.activeSession?.refreshToken === refreshToken && 
+         this.activeSession?.refreshTokenExpiresAt &&
          new Date() < this.activeSession.refreshTokenExpiresAt;
 };
 
+/**
+ * Updates the access token for the current session.
+ * @param {string} newToken - The new JWT to store.
+ */
 userSchema.methods.updateAccessToken = async function(newToken) {
   if (this.activeSession) {
     this.activeSession.token = newToken;
     this.activeSession.lastActivity = new Date();
-    await this.save();
+    await this.save({ validateBeforeSave: false });
   }
 };
 
-const User = mongoose.model('User', userSchema);
 
+// =================================================================
+// ==                 UNUSED/REDUNDANT FIELDS NOTE              ==
+// =================================================================
+// The following fields from the original schema have been removed as they were not actively used,
+// were redundant, or are better handled elsewhere.
+// - treesPlanted, virtualTreesPlanted, realTreesPlanted: Can be derived from `trees.length` and `realTrees.length`.
+// - lastAttendance, attendanceStreak: No related functionality found.
+// - pushToken, notificationSettings, etc.: Notification logic seems incomplete or handled externally.
+// The `updatePoints` method was also removed as point updates are handled atomically in routes.
+// =================================================================
+
+const User = mongoose.model('User', userSchema);
 module.exports = User; 

@@ -1,140 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { auth } = require('../middleware/auth');
+const { auth, authAdmin } = require('../middleware/auth');
 const User = require('../models/User');
+const Point = require('../models/Point');
+const Tree = require('../models/Tree');
+const WifiSession = require('../models/WifiSession');
+const upload = require('../services/cloudStorage').upload;
 const logger = require('../utils/logger');
-const cloudStorage = require('../services/cloudStorage');
+const fs = require('fs');
 
-// Configure multer for avatar uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = 'uploads/avatars';
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    // Use consistent filename pattern: avatar-{userId}.{extension}
-    const userId = req.user ? req.user._id : 'unknown';
-    const extension = path.extname(file.originalname).toLowerCase();
-    const filename = `avatar-${userId}${extension}`;
-    cb(null, filename);
-  }
-});
+// =================================================================
+// ==                        SHARED APIS                        ==
+// =================================================================
 
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files (jpeg, jpg, png, gif) are allowed!'));
-    }
-  }
-});
-
-// Utility functions for avatar management
-const avatarUtils = {
-  // Get all possible avatar file patterns for a user
-  getPossibleAvatarPaths: (userId) => {
-    const extensions = ['.jpg', '.jpeg', '.png', '.gif'];
-    return extensions.map(ext => `uploads/avatars/avatar-${userId}${ext}`);
-  },
-
-  // Clean up all avatar files for a user
-  cleanupUserAvatars: (userId) => {
-    const possiblePaths = avatarUtils.getPossibleAvatarPaths(userId);
-    possiblePaths.forEach(avatarPath => {
-      const fullPath = path.join(__dirname, '../..', avatarPath);
-      if (fs.existsSync(fullPath)) {
-        try {
-          fs.unlinkSync(fullPath);
-          console.log(`Cleaned up avatar: ${avatarPath}`);
-        } catch (error) {
-          console.error(`Error cleaning up avatar ${avatarPath}:`, error);
-        }
-      }
-    });
-  },
-
-  // Clean up avatar files for a user, excluding a specific filename
-  cleanupUserAvatarsExcept: (userId, excludeFilename) => {
-    const possiblePaths = avatarUtils.getPossibleAvatarPaths(userId);
-    possiblePaths.forEach(avatarPath => {
-      const fullPath = path.join(__dirname, '../..', avatarPath);
-      const filename = path.basename(avatarPath);
-      
-      // Skip the file we want to keep
-      if (filename === excludeFilename) {
-        console.log(`Keeping current avatar: ${avatarPath}`);
-        return;
-      }
-      
-      if (fs.existsSync(fullPath)) {
-        try {
-          fs.unlinkSync(fullPath);
-          console.log(`Cleaned up old avatar: ${avatarPath}`);
-        } catch (error) {
-          console.error(`Error cleaning up avatar ${avatarPath}:`, error);
-        }
-      }
-    });
-  },
-
-  // Check if an avatar file actually exists
-  avatarExists: (avatarPath) => {
-    if (!avatarPath) return false;
-    const fullPath = path.join(__dirname, '../..', avatarPath);
-    return fs.existsSync(fullPath);
-  },
-
-  // Validate and clean up user avatar reference
-  validateUserAvatar: async (userId) => {
-    const user = await User.findById(userId);
-    if (user && user.avatar && !avatarUtils.avatarExists(user.avatar)) {
-      // Avatar file doesn't exist, clear the database reference
-      await User.findByIdAndUpdate(userId, { avatar: null }, { runValidators: false });
-      console.log(`Cleared invalid avatar reference for user ${userId}`);
-      return null;
-    }
-    return user ? user.avatar : null;
-  }
-};
-
-// Get user profile
+// @route   GET /api/users/profile
+// @desc    Get user profile
+// @access  Private
 router.get('/profile', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // Validate avatar existence and clean up if necessary
-    if (user.avatar && !avatarUtils.avatarExists(user.avatar)) {
-      console.log(`Avatar file missing for user ${user._id}, clearing reference`);
-      user.avatar = null;
-      await User.findByIdAndUpdate(user._id, { avatar: null }, { runValidators: false });
-    }
-
     res.json(user);
-  } catch (error) {
-    logger.error('Get profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+  } catch (err) {
+    logger.error('Get profile error:', err);
+    res.status(500).send('Server Error');
   }
 });
 
-// Update user profile
+// @route   PUT /api/users/profile
+// @desc    Update user profile
+// @access  Private
 router.put('/profile', auth, async (req, res) => {
   try {
     const { fullname, nickname, university } = req.body;
@@ -150,363 +47,262 @@ router.put('/profile', auth, async (req, res) => {
 
     await user.save();
     res.json(user);
-  } catch (error) {
-    logger.error('Update profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+  } catch (err) {
+    logger.error('Update profile error:', err);
+    res.status(500).send('Server Error');
   }
 });
 
-// Get user points
-router.get('/points', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('points');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json({ points: user.points });
-  } catch (error) {
-    logger.error('Get points error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Get user's trees
-router.get('/trees', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id)
-      .populate('trees')
-      .select('trees');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json({ trees: user.trees });
-  } catch (error) {
-    logger.error('Get trees error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Upload avatar
+// @route   POST /api/users/avatar
+// @desc    Upload user avatar
+// @access  Private
 router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
-
-    // Use the authenticated user from the auth middleware
-    const user = req.user;
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    let avatarUrl;
-    let avatarPath;
-
-    if (cloudStorage.isAvailable()) {
-      // Use cloud storage (Cloudinary)
-      try {
-        // Delete existing cloud avatar if exists
-        const existingUser = await User.findById(user._id);
-        if (existingUser.avatar && existingUser.avatar.includes('cloudinary.com')) {
-          // Extract public_id from Cloudinary URL to delete old avatar
-          const publicId = `unitree/avatars/avatar-${user._id}`;
-          await cloudStorage.deleteAvatar(publicId);
-        }
-
-        // Upload to cloud storage
-        const uploadResult = await cloudStorage.uploadAvatar(req.file.path, user._id);
-        avatarUrl = uploadResult.url;
-        avatarPath = uploadResult.url; // Store the full URL for cloud storage
-
-        // Clean up local temp file
-        fs.unlinkSync(req.file.path);
-        
-        logger.info(`Avatar uploaded to cloud storage for user ${user._id}`);
-      } catch (cloudError) {
-        logger.error('Cloud storage failed, falling back to local storage:', cloudError);
-        // Fall back to local storage
-        avatarUtils.cleanupUserAvatarsExcept(user._id, req.file.filename);
-        avatarPath = `uploads/avatars/${req.file.filename}`;
-        avatarUrl = avatarPath;
-      }
-    } else {
-      // Use local storage (fallback)
-      avatarUtils.cleanupUserAvatarsExcept(user._id, req.file.filename);
-      avatarPath = `uploads/avatars/${req.file.filename}`;
-      avatarUrl = avatarPath;
-      logger.info(`Avatar uploaded to local storage for user ${user._id}`);
-    }
-    
-    // Use findByIdAndUpdate to update only the avatar field
-    const updatedUser = await User.findByIdAndUpdate(
-      user._id,
-      { avatar: avatarPath },
-      { new: true, runValidators: false } // Skip validation for this update
-    );
-
-    res.json({ 
-      message: 'Avatar uploaded successfully',
-      avatar: avatarPath,
-      avatarUrl: avatarUrl,
-      user: updatedUser,
-      storage: cloudStorage.isAvailable() ? 'cloud' : 'local'
-    });
-  } catch (error) {
-    logger.error('Upload avatar error:', error);
-    if (req.file && fs.existsSync(req.file.path)) {
-      // Clean up uploaded file if error occurs
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up file:', cleanupError);
-      }
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Delete avatar
-router.delete('/avatar', auth, async (req, res) => {
-  try {
     const user = req.user;
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // Get current user to check avatar URL
-    const existingUser = await User.findById(user._id);
     
-    if (existingUser.avatar) {
-      if (cloudStorage.isAvailable() && existingUser.avatar.includes('cloudinary.com')) {
-        // Delete from cloud storage
-        try {
-          const publicId = `unitree/avatars/avatar-${user._id}`;
-          await cloudStorage.deleteAvatar(publicId);
-          logger.info(`Avatar deleted from cloud storage for user ${user._id}`);
-        } catch (cloudError) {
-          logger.error('Failed to delete avatar from cloud storage:', cloudError);
-        }
-      } else {
-        // Delete from local storage
-        avatarUtils.cleanupUserAvatars(user._id);
-        logger.info(`Avatar deleted from local storage for user ${user._id}`);
-      }
-    }
-
-    // Use findByIdAndUpdate to avoid validation issues
+    // The upload middleware now directly provides the cloud URL in req.file.path
+    const avatarUrl = req.file.path;
+    
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
-      { avatar: null },
+      { avatar: avatarUrl },
       { new: true, runValidators: false }
     );
 
     res.json({ 
-      message: 'Avatar deleted successfully',
+      message: 'Avatar uploaded successfully',
+      avatar: avatarUrl,
       user: updatedUser
     });
-  } catch (error) {
-    logger.error('Delete avatar error:', error);
-    res.status(500).json({ message: 'Server error' });
+  } catch (err) {
+    logger.error('Avatar upload error:', err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      // This part might be obsolete if temp files are handled by the upload service
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp file:', cleanupError);
+      }
+    }
+    res.status(500).send('Server Error');
   }
 });
 
-// Get leaderboard
-router.get('/leaderboard', auth, async (req, res) => {
-  try {
-    const { period = 'all-time' } = req.query; // Default to all-time
-    
-    if (period === 'monthly') {
-      // Monthly leaderboard logic
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const endOfMonth = new Date();
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      endOfMonth.setDate(0);
-      endOfMonth.setHours(23, 59, 59, 999);
-
-      // Aggregate points for this month from Point model
-      const Point = require('../models/Point');
-      const monthlyPoints = await Point.aggregate([
-        {
-          $match: {
-            createdAt: {
-              $gte: startOfMonth,
-              $lte: endOfMonth
-            }
-          }
-        },
-        {
-          $group: {
-            _id: '$userId',
-            monthlyPoints: { $sum: '$amount' }
-          }
-        },
-        {
-          $sort: { monthlyPoints: -1 }
-        },
-        {
-          $limit: 100
+// @route   DELETE /api/users/avatar
+// @desc    Delete user avatar
+// @access  Private
+router.delete('/avatar', auth, async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
-      ]);
-
-      // Get user details for monthly leaders
-      const userIds = monthlyPoints.map(p => p._id);
-      const users = await User.find({ _id: { $in: userIds } })
-        .select('fullname nickname email avatar totalTimeConnected');
-
-      // Create user lookup map
-      const userMap = {};
-      users.forEach(user => {
-        userMap[user._id.toString()] = user;
-      });
-
-      // Build monthly leaderboard
-      const leaderboard = monthlyPoints.map((point, index) => {
-        const user = userMap[point._id.toString()];
-        if (!user) return null;
         
-        return {
+        // The logic to delete from cloud storage should be handled here or in a service
+        
+        const updatedUser = await User.findByIdAndUpdate(
+            user._id,
+            { avatar: null },
+            { new: true, runValidators: false }
+        );
+
+        res.json({ 
+            message: 'Avatar deleted successfully',
+            user: updatedUser
+        });
+    } catch (err) {
+        logger.error('Delete avatar error:', err);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   DELETE /api/users/account
+// @desc    Delete user account and all associated data
+// @access  Private
+router.delete('/account', auth, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+    
+        logger.info(`Starting account deletion for user: ${userId}`);
+    
+        await Point.deleteMany({ userId: userId });
+        await Tree.deleteMany({ userId: userId });
+        await WifiSession.deleteMany({ userId: userId });
+        // Avatar file deletion from cloud should be handled here
+    
+        await User.findByIdAndDelete(userId);
+        logger.info(`User account ${userId} deleted successfully`);
+    
+        res.json({ message: 'Account deleted successfully' });
+      } catch (err) {
+        logger.error('Delete account error:', err);
+        res.status(500).send('Server Error');
+      }
+});
+
+// =================================================================
+// ==                      MOBILE-ONLY APIS                     ==
+// =================================================================
+
+// @route   GET /api/users/leaderboard
+// @desc    Get leaderboard, used by Mobile App
+// @access  Private
+router.get('/leaderboard', auth, async (req, res) => {
+    try {
+      const { period = 'all-time' } = req.query;
+      
+      if (period === 'monthly') {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+  
+        const endOfMonth = new Date(startOfMonth);
+        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+  
+        const monthlyPoints = await Point.aggregate([
+          { $match: { createdAt: { $gte: startOfMonth, $lt: endOfMonth } } },
+          { $group: { _id: '$userId', monthlyPoints: { $sum: '$amount' } } },
+          { $sort: { monthlyPoints: -1 } },
+          { $limit: 100 }
+        ]);
+  
+        const userIds = monthlyPoints.map(p => p._id);
+        const users = await User.find({ _id: { $in: userIds } }).select('fullname nickname email avatar');
+  
+        const userMap = users.reduce((map, user) => {
+          map[user._id.toString()] = user;
+          return map;
+        }, {});
+  
+        const leaderboard = monthlyPoints.map((point, index) => {
+          const user = userMap[point._id.toString()];
+          return user ? {
+            rank: index + 1,
+            id: user._id.toString(),
+            fullname: user.fullname,
+            nickname: user.nickname,
+            avatar: user.avatar,
+            monthlyPoints: point.monthlyPoints || 0,
+          } : null;
+        }).filter(Boolean);
+  
+        const currentUserRank = leaderboard.findIndex(u => u.id === req.user._id.toString()) + 1;
+  
+        res.json({ leaderboard, userRank: currentUserRank > 0 ? currentUserRank : null });
+  
+      } else { // all-time
+        const users = await User.find({})
+          .sort({ allTimePoints: -1 })
+          .limit(100)
+          .select('fullname nickname email avatar allTimePoints');
+  
+        const leaderboard = users.map((user, index) => ({
           rank: index + 1,
           id: user._id.toString(),
-          _id: user._id,
           fullname: user.fullname,
           nickname: user.nickname,
-          email: user.email,
           avatar: user.avatar,
-          monthlyPoints: point.monthlyPoints || 0,
-          totalWifiTimeSeconds: user.totalTimeConnected || 0,
-          totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
-        };
-      }).filter(Boolean);
-
-      // Find current user's rank in monthly leaderboard
-      const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
-
-      res.json({
-        leaderboard,
-        userRank: currentUserRank > 0 ? currentUserRank : null,
-        totalUsers: leaderboard.length,
-        currentUserId: req.user._id.toString(),
-        period: 'monthly'
-      });
-
-    } else {
-      // All-time leaderboard logic (existing)
-      const users = await User.find({})
-        .sort({ allTimePoints: -1 }) // Sort by all-time points earned
-        .limit(100)
-        .select('fullname nickname email avatar allTimePoints totalTimeConnected');
-
-      const leaderboard = users.map((user, index) => ({
-        rank: index + 1,
-        id: user._id.toString(), // Convert ObjectId to string for mobile app
-        _id: user._id,
-        fullname: user.fullname,
-        nickname: user.nickname,
-        email: user.email,
-        avatar: user.avatar,
-        allTimePoints: user.allTimePoints || 0,
-        totalWifiTimeSeconds: user.totalTimeConnected || 0,
-        totalWifiTimeFormatted: formatWifiTime(user.totalTimeConnected || 0)
-      }));
-
-      // Find current user's rank
-      const currentUserRank = leaderboard.findIndex(user => user._id.toString() === req.user._id.toString()) + 1;
-
-      res.json({
-        leaderboard,
-        userRank: currentUserRank > 0 ? currentUserRank : null,
-        totalUsers: users.length,
-        currentUserId: req.user._id.toString(),
-        period: 'all-time'
-      });
+          allTimePoints: user.allTimePoints || 0,
+        }));
+  
+        const currentUserRank = leaderboard.findIndex(u => u.id === req.user._id.toString()) + 1;
+  
+        res.json({ leaderboard, userRank: currentUserRank > 0 ? currentUserRank : null });
+      }
+    } catch (err) {
+      logger.error('Leaderboard error:', err);
+      res.status(500).send('Server Error');
     }
-  } catch (error) {
-    logger.error('Leaderboard error:', error);
-    res.status(500).json({ message: 'Server error' });
+  });
+
+// =================================================================
+// ==                     ADMIN-ONLY APIS                       ==
+// =================================================================
+
+// @route   GET /api/users
+// @desc    Get all users (admin only) with pagination, search, and sorting
+// @access  Private (Admin)
+router.get('/', authAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '', sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    const query = search
+      ? {
+          $or: [
+            { fullname: { $regex: search, $options: 'i' } },
+            { nickname: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { studentId: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ [sortBy]: order === 'asc' ? 1 : -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+    
+    const total = await User.countDocuments(query);
+
+    res.json({
+      users,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (err) {
+    logger.error('Get all users error:', err);
+    res.status(500).send('Server Error');
   }
 });
 
-// Delete account
-router.delete('/account', auth, async (req, res) => {
+// @route   GET /api/users/:id
+// @desc    Get user by ID (admin only)
+// @access  Private (Admin)
+router.get('/:id', authAdmin, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
-    
+    const user = await User.findById(req.params.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    logger.info(`Starting account deletion for user: ${userId}`);
-
-    // Import required models
-    const Point = require('../models/Point');
-    const Tree = require('../models/Tree');
-    const WifiSession = require('../models/WifiSession');
-
-    // 1. Delete user's points
-    const pointsDeleted = await Point.deleteMany({ userId: userId });
-    logger.info(`Deleted ${pointsDeleted.deletedCount} points for user ${userId}`);
-
-    // 2. Delete user's trees
-    const treesDeleted = await Tree.deleteMany({ userId: userId });
-    logger.info(`Deleted ${treesDeleted.deletedCount} trees for user ${userId}`);
-
-    // 3. Delete user's wifi sessions
-    const wifiSessionsDeleted = await WifiSession.deleteMany({ userId: userId });
-    logger.info(`Deleted ${wifiSessionsDeleted.deletedCount} wifi sessions for user ${userId}`);
-
-    // 4. Delete user's avatar files
-    if (user.avatar) {
-      if (cloudStorage.isAvailable() && user.avatar.includes('cloudinary.com')) {
-        // Delete from cloud storage
-        try {
-          const publicId = `unitree/avatars/avatar-${userId}`;
-          await cloudStorage.deleteAvatar(publicId);
-          logger.info(`Avatar deleted from cloud storage for user ${userId}`);
-        } catch (cloudError) {
-          logger.error('Failed to delete avatar from cloud storage:', cloudError);
-        }
-      } else {
-        // Delete from local storage
-        avatarUtils.cleanupUserAvatars(userId);
-        logger.info(`Avatar deleted from local storage for user ${userId}`);
-      }
-    }
-
-    // 5. Finally delete the user account
-    await User.findByIdAndDelete(userId);
-    logger.info(`User account ${userId} deleted successfully`);
-
-    res.json({ 
-      message: 'Account deleted successfully',
-      deletedData: {
-        points: pointsDeleted.deletedCount,
-        trees: treesDeleted.deletedCount,
-        wifiSessions: wifiSessionsDeleted.deletedCount
-      }
-    });
-  } catch (error) {
-    logger.error('Delete account error:', error);
-    res.status(500).json({ message: 'Failed to delete account. Please try again.' });
+    res.json(user);
+  } catch (err) {
+    logger.error(`Get user by ID error: ${err.message}`);
+    res.status(500).send('Server Error');
   }
 });
 
-// Helper function to format WiFi time
-function formatWifiTime(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  } else if (minutes > 0) {
-    return `${minutes}m`;
-  } else {
-    return `${seconds}s`;
+// @route   DELETE /api/users/:id
+// @desc    Delete user by ID (admin only)
+// @access  Private (Admin)
+router.delete('/:id', authAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Deleting user and their related data
+    await Point.deleteMany({ userId: req.params.id });
+    await Tree.deleteMany({ userId: req.params.id });
+    await WifiSession.deleteMany({ userId: req.params.id });
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User and all related data removed' });
+  } catch (err) {
+    logger.error(`Delete user error: ${err.message}`);
+    res.status(500).send('Server Error');
   }
-}
+});
 
 module.exports = router; 

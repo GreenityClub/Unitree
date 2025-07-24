@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// =================================================================
+// ==                        ADMIN SCHEMA                       ==
+// =================================================================
+
 const adminSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -12,7 +16,8 @@ const adminSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 6
+    minlength: 6,
+    select: false
   },
   role: {
     type: String,
@@ -29,54 +34,63 @@ const adminSchema = new mongoose.Schema({
     manageRealTrees: { type: Boolean, default: true },
     viewStatistics: { type: Boolean, default: true }
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  lastLogin: {
-    type: Date,
-    default: null
-  }
-});
+  lastLogin: { type: Date, default: null }
+}, { timestamps: true });
 
-// Hash password before saving
+
+// =================================================================
+// ==                   PRE-SAVE MIDDLEWARE                     ==
+// =================================================================
+
+/**
+ * Middleware to hash the password before saving if it has been modified.
+ * Also ensures a 'superadmin' role has all permissions set to true.
+ */
 adminSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 10);
   }
   
-  // Set all permissions to true for superadmin
   if (this.role === 'superadmin') {
-    this.permissions = {
-      manageAdmins: true,
-      manageStudents: true,
-      manageTrees: true,
-      managePoints: true,
-      manageWifiSessions: true,
-      manageTreeTypes: true,
-      manageRealTrees: true,
-      viewStatistics: true
-    };
+    Object.keys(this.permissions.toObject()).forEach(key => {
+        this.permissions[key] = true;
+    });
   }
   
   next();
 });
 
-// Compare password method
+
+// =================================================================
+// ==                      INSTANCE METHODS                     ==
+// =================================================================
+
+/**
+ * Compares a candidate password with the admin's hashed password.
+ * @param {string} candidatePassword - The password to compare.
+ * @returns {Promise<boolean>} - True if the passwords match.
+ */
 adminSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate JWT token
+/**
+ * Generates a signed JWT for the admin.
+ * @returns {string} - The signed JWT.
+ */
 adminSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
     { id: this._id, role: this.role },
     process.env.JWT_SECRET,
-    { expiresIn: '1d' }
+    { expiresIn: '1d' } // Admins have a longer session
   );
 };
 
-// Check if admin has specific permission
+/**
+ * Checks if the admin has a specific permission.
+ * @param {string} permission - The permission key to check.
+ * @returns {boolean} - True if the admin has the permission.
+ */
 adminSchema.methods.hasPermission = function(permission) {
   return this.role === 'superadmin' || this.permissions[permission];
 };

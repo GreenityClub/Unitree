@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AdminLayout } from '../../components/Layout';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Icon from '../../components/ui/Icon';
@@ -9,7 +10,7 @@ const AdminsPage: React.FC = () => {
   const { admin } = useAdminAuth();
 
   return (
-    <>
+    <AdminLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Admins Management</h1>
         <p className="text-gray-600">Manage administrator accounts</p>
@@ -52,7 +53,7 @@ const AdminsPage: React.FC = () => {
           </div>
         </div>
       </Card>
-    </>
+    </AdminLayout>
   );
 };
 

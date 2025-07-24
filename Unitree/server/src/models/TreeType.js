@@ -1,74 +1,58 @@
 const mongoose = require('mongoose');
 
+// =================================================================
+// ==                      TREE TYPE SCHEMA                     ==
+// =================================================================
+// This collection stores the different types of trees users can redeem.
+
 const treeTypeSchema = new mongoose.Schema({
-  id: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  scientificName: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String,
-    required: true
-  },
-  careLevel: {
-    type: String,
-    enum: ['Easy', 'Moderate', 'Hard'],
-    required: true
-  },
-  maxHeight: {
-    type: String,
-    required: true
-  },
-  lifespan: {
-    type: String,
-    required: true
-  },
-  nativeTo: {
-    type: String,
-    required: true
-  },
-  cost: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  stages: [{
-    type: String,
-    required: true
-  }],
-  isActive: {
-    type: Boolean,
-    default: true
-  }
-}, {
-  timestamps: true
+  id: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true },
+  scientificName: { type: String, required: true },
+  description: { type: String, required: true },
+  careLevel: { type: String, enum: ['Easy', 'Moderate', 'Hard'], required: true },
+  maxHeight: { type: String, required: true },
+  lifespan: { type: String, required: true },
+  nativeTo: { type: String, required: true },
+  cost: { type: Number, required: true, min: 0 },
+  stages: [{ type: String, required: true }],
+  isActive: { type: Boolean, default: true, index: true }
+}, { 
+  timestamps: true,
+  collection: 'treetypes'
 });
 
-// Create index on id field for faster queries
-treeTypeSchema.index({ id: 1 });
 
-// Create index on isActive field for filtering active tree types
-treeTypeSchema.index({ isActive: 1 });
+// =================================================================
+// ==                       STATIC METHODS                      ==
+// =================================================================
 
-// Static method to get all active tree types
+/**
+ * Finds all active tree types, sorted by cost and name.
+ * @returns {Promise<Array>} A promise that resolves to an array of active tree types.
+ */
 treeTypeSchema.statics.getActiveTreeTypes = function() {
   return this.find({ isActive: true }).sort({ cost: 1, name: 1 });
 };
 
-// Static method to get tree type by id
+/**
+ * Finds a single active tree type by its custom 'id' field.
+ * @param {string} treeId - The custom ID of the tree type.
+ * @returns {Promise<Object|null>} A promise that resolves to the tree type document or null.
+ */
 treeTypeSchema.statics.findByTreeId = function(treeId) {
   return this.findOne({ id: treeId, isActive: true });
 };
 
-// Instance method to get display info
+
+// =================================================================
+// ==                      INSTANCE METHODS                     ==
+// =================================================================
+
+/**
+ * Returns a simplified object with only the necessary display information.
+ * @returns {Object} The display information for the tree type.
+ */
 treeTypeSchema.methods.getDisplayInfo = function() {
   return {
     id: this.id,
@@ -84,6 +68,5 @@ treeTypeSchema.methods.getDisplayInfo = function() {
   };
 };
 
-const TreeType = mongoose.model('TreeType', treeTypeSchema, 'treetypes');
-
+const TreeType = mongoose.model('TreeType', treeTypeSchema);
 module.exports = TreeType; 

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, authAdmin } = require('../middleware/auth');
 const Tree = require('../models/Tree');
 const RealTree = require('../models/RealTree');
 const TreeType = require('../models/TreeType');
@@ -9,18 +9,13 @@ const Student = require('../models/Student');
 const Point = require('../models/Point');
 const logger = require('../utils/logger');
 
-// Get all available tree types (legacy endpoint for backward compatibility)
-router.get('/types', auth, async (req, res) => {
-  try {
-    const types = await Tree.distinct('species');
-    res.json(types);
-  } catch (error) {
-    logger.error('Get tree types error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+// =================================================================
+// ==                      MOBILE-ONLY APIS                     ==
+// =================================================================
 
-// Get all available tree species with full details
+// @route   GET /api/trees/species
+// @desc    Get all available tree species for users to choose from
+// @access  Private (Mobile)
 router.get('/species', auth, async (req, res) => {
   try {
     // console.log('Fetching tree species...');
@@ -37,7 +32,9 @@ router.get('/species', auth, async (req, res) => {
   }
 });
 
-// Get tree species by ID
+// @route   GET /api/trees/species/:id
+// @desc    Get details of a single tree species
+// @access  Private (Mobile)
 router.get('/species/:id', auth, async (req, res) => {
   try {
     const treeType = await TreeType.findByTreeId(req.params.id);
@@ -51,238 +48,9 @@ router.get('/species/:id', auth, async (req, res) => {
   }
 });
 
-// Purchase a tree
-router.post('/purchase', auth, async (req, res) => {
-  try {
-    const { species } = req.body;
-    const user = req.user;
-
-    if (user.points < process.env.TREE_COST) {
-      return res.status(400).json({ message: 'Insufficient points' });
-    }
-
-    // Create new tree
-    const tree = new Tree({
-      userId: user._id,
-      species,
-      stage: 'seedling',
-      healthScore: 100,
-      plantedDate: new Date(),
-      wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time
-    });
-
-    await tree.save();
-
-    // Deduct points from user
-    user.points -= process.env.TREE_COST;
-    user.trees.push(tree._id);
-    await user.save();
-
-    res.json(tree);
-  } catch (error) {
-    logger.error('Purchase tree error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Get all trees for the current user
-router.get('/', auth, async (req, res) => {
-  try {
-    const trees = await Tree.find({ userId: req.user._id });
-    
-    // Update each tree's status in real-time
-    const updatedTrees = await Promise.all(
-      trees.map(async (tree) => {
-        await tree.updateStage();
-        tree.updateHealthScore();
-        await tree.save();
-        return {
-          ...tree.toObject(),
-          growthProgress: tree.getGrowthProgress(),
-          healthStatus: tree.getHealthStatus()
-        };
-      })
-    );
-    
-    res.json(updatedTrees);
-  } catch (error) {
-    console.error('Error fetching trees:', error);
-    res.status(500).json({ message: 'Error fetching trees' });
-  }
-});
-
-// Get all real trees for the current user (MUST be before /:id route)
-router.get('/real', auth, async (req, res) => {
-  try {
-    const realTrees = await RealTree.findByUser(req.user._id);
-    res.json(realTrees || []);
-  } catch (error) {
-    logger.warn('Real tree fetch error, returning empty array:', error.message);
-    logger.error('Real tree fetch error:', error);
-    // For real trees, if there's an error (like collection doesn't exist),
-    // return empty array instead of error to avoid client-side errors
-    res.json([]);
-  }
-});
-
-// Get a specific real tree (MUST be before /:id route)
-router.get('/real/:id', auth, async (req, res) => {
-  try {
-    const realTree = await RealTree.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!realTree) {
-      return res.status(404).json({ message: 'Real tree not found' });
-    }
-    
-    res.json(realTree.getDisplayInfo());
-  } catch (error) {
-    logger.warn('Individual real tree fetch error:', error.message);
-    logger.error('Error fetching individual real tree:', error);
-    
-    // If it's a validation error (like invalid ObjectId), return 404
-    if (error.name === 'CastError' || error.name === 'ValidationError') {
-      return res.status(404).json({ message: 'Real tree not found' });
-    }
-    
-    res.status(500).json({ message: 'Error fetching real tree' });
-  }
-});
-
-// Get a specific tree with real-time status
-router.get('/:id', auth, async (req, res) => {
-  try {
-    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!tree) {
-      return res.status(404).json({ message: 'Tree not found' });
-    }
-    
-    // Update tree status in real-time
-    await tree.updateStage();
-    tree.updateHealthScore();
-    await tree.save();
-    
-    res.json({
-      ...tree.toObject(),
-      growthProgress: tree.getGrowthProgress(),
-      healthStatus: tree.getHealthStatus()
-    });
-  } catch (error) {
-    console.error('Error fetching tree:', error);
-    res.status(500).json({ message: 'Error fetching tree' });
-  }
-});
-
-// Water a tree
-router.post('/:id/water', auth, async (req, res) => {
-  try {
-    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!tree) {
-      return res.status(404).json({ message: 'Tree not found' });
-    }
-
-    const waterResult = tree.water();
-    if (!waterResult.success) {
-      return res.status(400).json({ message: waterResult.message });
-    }
-
-    await tree.save();
-    
-    res.json({
-      success: true,
-      message: waterResult.message,
-      tree: {
-        ...tree.toObject(),
-        growthProgress: tree.getGrowthProgress(),
-        healthStatus: tree.getHealthStatus()
-      }
-    });
-  } catch (error) {
-    console.error('Error watering tree:', error);
-    res.status(500).json({ message: 'Error watering tree' });
-  }
-});
-
-// Get tree real-time status (for frequent updates)
-router.get('/:id/status', auth, async (req, res) => {
-  try {
-    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!tree) {
-      return res.status(404).json({ message: 'Tree not found' });
-    }
-    
-    // Update tree status in real-time
-    await tree.updateStage();
-    tree.updateHealthScore();
-    await tree.save();
-    
-    res.json({
-      _id: tree._id,
-      stage: tree.stage,
-      healthScore: tree.healthScore,
-      isDead: tree.isDead,
-      growthProgress: tree.getGrowthProgress(),
-      healthStatus: tree.getHealthStatus(),
-      lastWatered: tree.lastWatered,
-      totalWifiTime: tree.totalWifiTime
-    });
-  } catch (error) {
-    console.error('Error fetching tree status:', error);
-    res.status(500).json({ message: 'Error fetching tree status' });
-  }
-});
-
-// Create a new tree
-router.post('/', auth, async (req, res) => {
-  try {
-    const tree = new Tree({
-      ...req.body,
-      userId: req.user._id,
-      plantedDate: new Date(),
-      lastWatered: new Date(),
-      healthScore: 100,
-      stage: 'seedling',
-      wifiTimeAtRedeem: req.user.totalTimeConnected || 0, // Set baseline wifi time
-    });
-    await tree.save();
-    res.status(201).json(tree);
-  } catch (error) {
-    console.error('Error creating tree:', error);
-    res.status(500).json({ message: 'Error creating tree' });
-  }
-});
-
-// Update a tree
-router.put('/:id', auth, async (req, res) => {
-  try {
-    const tree = await Tree.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user._id },
-      { $set: req.body },
-      { new: true }
-    );
-    if (!tree) {
-      return res.status(404).json({ message: 'Tree not found' });
-    }
-    res.json(tree);
-  } catch (error) {
-    console.error('Error updating tree:', error);
-    res.status(500).json({ message: 'Error updating tree' });
-  }
-});
-
-// Delete a tree
-router.delete('/:id', auth, async (req, res) => {
-  try {
-    const tree = await Tree.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
-    if (!tree) {
-      return res.status(404).json({ message: 'Tree not found' });
-    }
-    res.json({ message: 'Tree deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting tree:', error);
-    res.status(500).json({ message: 'Error deleting tree' });
-  }
-});
-
-// Redeem a tree (virtual or real)
+// @route   POST /api/trees/redeem
+// @desc    Redeem points for a new virtual or real tree
+// @access  Private (Mobile)
 router.post('/redeem', auth, async (req, res) => {
   try {
     const { speciesId, treeType = 'virtual', location, treeSpecie } = req.body;
@@ -643,4 +411,322 @@ router.post('/redeem', auth, async (req, res) => {
   }
 });
 
-module.exports = router; 
+// @route   GET /api/trees
+// @desc    Get all of the current user's virtual trees
+// @access  Private (Mobile)
+router.get('/', auth, async (req, res) => {
+  try {
+    const trees = await Tree.find({ userId: req.user._id });
+    
+    // Update each tree's status in real-time
+    const updatedTrees = await Promise.all(
+      trees.map(async (tree) => {
+        await tree.updateStage();
+        tree.updateHealthScore();
+        await tree.save();
+        return {
+          ...tree.toObject(),
+          growthProgress: tree.getGrowthProgress(),
+          healthStatus: tree.getHealthStatus()
+        };
+      })
+    );
+    
+    res.json(updatedTrees);
+  } catch (error) {
+    console.error('Error fetching trees:', error);
+    res.status(500).json({ message: 'Error fetching trees' });
+  }
+});
+
+// @route   GET /api/trees/real
+// @desc    Get all of the current user's real trees
+// @access  Private (Mobile)
+router.get('/real', auth, async (req, res) => {
+  try {
+    const realTrees = await RealTree.findByUser(req.user._id);
+    res.json(realTrees || []);
+  } catch (error) {
+    logger.warn('Real tree fetch error, returning empty array:', error.message);
+    logger.error('Real tree fetch error:', error);
+    // For real trees, if there's an error (like collection doesn't exist),
+    // return empty array instead of error to avoid client-side errors
+    res.json([]);
+  }
+});
+
+// @route   GET /api/trees/:id
+// @desc    Get a specific virtual tree for the current user
+// @access  Private (Mobile)
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+    
+    // Update tree status in real-time
+    await tree.updateStage();
+    tree.updateHealthScore();
+    await tree.save();
+    
+    res.json({
+      ...tree.toObject(),
+      growthProgress: tree.getGrowthProgress(),
+      healthStatus: tree.getHealthStatus()
+    });
+  } catch (error) {
+    console.error('Error fetching tree:', error);
+    res.status(500).json({ message: 'Error fetching tree' });
+  }
+});
+
+// @route   POST /api/trees/:id/water
+// @desc    Water a specific virtual tree
+// @access  Private (Mobile)
+router.post('/:id/water', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+
+    const waterResult = tree.water();
+    if (!waterResult.success) {
+      return res.status(400).json({ message: waterResult.message });
+    }
+
+    await tree.save();
+    
+    res.json({
+      success: true,
+      message: waterResult.message,
+      tree: {
+        ...tree.toObject(),
+        growthProgress: tree.getGrowthProgress(),
+        healthStatus: tree.getHealthStatus()
+      }
+    });
+  } catch (error) {
+    console.error('Error watering tree:', error);
+    res.status(500).json({ message: 'Error watering tree' });
+  }
+});
+
+// =================================================================
+// ==                     ADMIN-ONLY APIS                       ==
+// =================================================================
+
+// @route   GET /api/trees/admin/all
+// @desc    Get all virtual trees from all users (for admin)
+// @access  Private (Admin)
+router.get('/admin/all', authAdmin, async (req, res) => {
+  try {
+    const trees = await Tree.find().populate('userId', 'fullname nickname');
+    res.json(trees);
+  } catch (error) {
+    logger.error('Admin get all trees error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   GET /api/trees/admin/realtrees
+// @desc    Get all real trees from all users (for admin)
+// @access  Private (Admin)
+router.get('/admin/realtrees', authAdmin, async (req, res) => {
+  try {
+    const realTrees = await RealTree.find().populate('userId', 'fullname nickname');
+    res.json(realTrees);
+  } catch (error) {
+    logger.error('Admin get all real trees error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   GET /api/trees/admin/treetypes
+// @desc    Get all tree types (for admin)
+// @access  Private (Admin)
+router.get('/admin/treetypes', authAdmin, async (req, res) => {
+  try {
+    const treeTypes = await TreeType.find();
+    res.json(treeTypes);
+  } catch (error) {
+    logger.error('Admin get all tree types error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   POST /api/trees/admin/treetypes
+// @desc    Create a new tree type (for admin)
+// @access  Private (Admin)
+router.post('/admin/treetypes', authAdmin, async (req, res) => {
+  try {
+    const newTreeType = new TreeType(req.body);
+    await newTreeType.save();
+    res.status(201).json(newTreeType);
+  } catch (error) {
+    logger.error('Admin create tree type error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   PUT /api/trees/admin/treetypes/:id
+// @desc    Update a tree type (for admin)
+// @access  Private (Admin)
+router.put('/admin/treetypes/:id', authAdmin, async (req, res) => {
+  try {
+    const updatedTreeType = await TreeType.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedTreeType) {
+      return res.status(404).json({ message: 'Tree type not found' });
+    }
+    res.json(updatedTreeType);
+  } catch (error) {
+    logger.error('Admin update tree type error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   DELETE /api/trees/admin/treetypes/:id
+// @desc    Delete a tree type (for admin)
+// @access  Private (Admin)
+router.delete('/admin/treetypes/:id', authAdmin, async (req, res) => {
+  try {
+    const deletedTreeType = await TreeType.findByIdAndDelete(req.params.id);
+    if (!deletedTreeType) {
+      return res.status(404).json({ message: 'Tree type not found' });
+    }
+    res.json({ message: 'Tree type deleted successfully' });
+  } catch (error) {
+    logger.error('Admin delete tree type error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+
+// =================================================================
+// ==                  DEPRECATED/UNUSED APIS                   ==
+// =================================================================
+
+// Note: The following routes were identified as potentially deprecated or unused.
+// Please verify they are no longer needed before deleting them manually.
+
+// @route   GET /api/trees/types
+// @desc    (DEPRECATED) Get all available tree types (legacy)
+// @access  Private
+router.get('/types', auth, async (req, res) => {
+  try {
+    const types = await Tree.distinct('species');
+    res.json(types);
+  } catch (error) {
+    logger.error('Get tree types error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/trees/purchase
+// @desc    (DEPRECATED) Purchase a tree (replaced by /redeem)
+// @access  Private
+router.post('/purchase', auth, async (req, res) => {
+  try {
+    const { species } = req.body;
+    const user = req.user;
+
+    if (user.points < process.env.TREE_COST) {
+      return res.status(400).json({ message: 'Insufficient points' });
+    }
+
+    // Create new tree
+    const tree = new Tree({
+      userId: user._id,
+      species,
+      stage: 'seedling',
+      healthScore: 100,
+      plantedDate: new Date(),
+      wifiTimeAtRedeem: user.totalTimeConnected || 0, // Set baseline wifi time
+    });
+
+    await tree.save();
+
+    // Deduct points from user
+    user.points -= process.env.TREE_COST;
+    user.trees.push(tree._id);
+    await user.save();
+
+    res.json(tree);
+  } catch (error) {
+    logger.error('Purchase tree error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/trees
+// @desc    (DEPRECATED) Create a new tree (replaced by /redeem)
+// @access  Private
+router.post('/', auth, async (req, res) => {
+  try {
+    const tree = new Tree({
+      ...req.body,
+      userId: req.user._id,
+      plantedDate: new Date(),
+      lastWatered: new Date(),
+      healthScore: 100,
+      stage: 'seedling',
+      wifiTimeAtRedeem: req.user.totalTimeConnected || 0, // Set baseline wifi time
+    });
+    await tree.save();
+    res.status(201).json(tree);
+  } catch (error) {
+    console.error('Error creating tree:', error);
+    res.status(500).json({ message: 'Error creating tree' });
+  }
+});
+
+// @route   PUT /api/trees/:id
+// @desc    (DEPRECATED) Update a tree (specific updates are preferred)
+// @access  Private
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $set: req.body },
+      { new: true }
+    );
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+    res.json(tree);
+  } catch (error) {
+    console.error('Error updating tree:', error);
+    res.status(500).json({ message: 'Error updating tree' });
+  }
+});
+
+// @route   DELETE /api/trees/:id
+// @desc    (DEPRECATED) Delete a tree (users should not be able to delete trees)
+// @access  Private
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const tree = await Tree.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    if (!tree) {
+      return res.status(404).json({ message: 'Tree not found' });
+    }
+    res.json({ message: 'Tree deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting tree:', error);
+    res.status(500).json({ message: 'Error deleting tree' });
+  }
+});
+
+module.exports = router;
+
+// =================================================================
+// ==                MANUAL DELETION CHECKLIST                ==
+// =================================================================
+// The following routes were identified as potentially deprecated or unused.
+// Please verify they are no longer needed before deleting them manually.
+// 1. GET /api/trees/types
+// 2. POST /api/trees/purchase
+// 3. POST /api/trees/
+// 4. PUT /api/trees/:id
+// 5. DELETE /api/trees/:id
+// =================================================================

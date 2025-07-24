@@ -1,300 +1,181 @@
 const mongoose = require('mongoose');
 
+// =================================================================
+// ==                        TREE SCHEMA                        ==
+// =================================================================
+
 const treeSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  species: {
-    type: String,
-    required: true
-    // Removed enum restriction to allow any species ID from TreeType collection
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  plantedDate: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
-  lastWatered: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  species: { type: String, required: true, comment: "Corresponds to a TreeType _id" },
+  name: { type: String, required: true },
+  
+  // --- Growth & Health ---
+  plantedDate: { type: Date, default: Date.now },
+  lastWatered: { type: Date, default: Date.now },
   stage: {
     type: String,
     enum: ['seedling', 'sprout', 'sapling', 'young_tree', 'mature_tree', 'ancient_tree'],
     default: 'seedling'
   },
-  healthScore: {
-    type: Number,
-    min: 0,
-    max: 100,
-    default: 100
-  },
-  isDead: {
-    type: Boolean,
-    default: false
-  },
-  deathDate: {
-    type: Date,
-    default: null
-  },
-  // WiFi connection time tracking for tree growth
-  totalWifiTime: {
-    type: Number,
-    default: 0,
-    comment: 'Total wifi connection time for this tree in seconds (starts counting from when tree is redeemed)'
-  },
-  wifiTimeAtRedeem: {
-    type: Number,
-    default: 0,
-    comment: 'User total wifi time when tree was redeemed (baseline for calculating tree-specific wifi time)'
-  },
-  location: {
-    latitude: {
-      type: Number,
-      default: 0
-    },
-    longitude: {
-      type: Number,
-      default: 0
-    }
-  },
-  imageUrl: String,
+  healthScore: { type: Number, min: 0, max: 100, default: 100 },
+  isDead: { type: Boolean, default: false },
+  deathDate: { type: Date, default: null },
+
+  // --- WiFi Time Tracking for Growth ---
+  totalWifiTime: { type: Number, default: 0, comment: 'Total WiFi time for this tree in seconds.' },
+  wifiTimeAtRedeem: { type: Number, default: 0, comment: 'Baseline of user total WiFi time at redemption.' },
+
+  // --- History ---
   milestones: [{
-    date: {
-      type: Date,
-      default: Date.now
-    },
-    type: {
-      type: String,
-      enum: ['PLANTED', 'STAGE_CHANGE', 'PERFECT_HEALTH', 'WATERED', 'DIED']
-    },
+    date: { type: Date, default: Date.now },
+    type: { type: String, enum: ['PLANTED', 'STAGE_CHANGE', 'WATERED', 'DIED'] },
     description: String,
-    stageFrom: String,
-    stageTo: String
   }]
-}, {
-  timestamps: true
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Add milestone when tree is created
+
+// =================================================================
+// ==                   MONGOOSE MIDDLEWARE                     ==
+// =================================================================
+
+/**
+ * Before saving, add a 'PLANTED' milestone if it's a new tree.
+ */
 treeSchema.pre('save', function(next) {
   if (this.isNew) {
     this.milestones.push({
       type: 'PLANTED',
-      description: 'Tree was planted'
+      description: 'The journey begins. Your tree has been planted!'
     });
   }
   next();
 });
 
-// Calculate health score based on watering frequency (tree dies after 5 days without watering)
-treeSchema.methods.updateHealthScore = function() {
-  // Skip health calculation if tree is already dead
-  if (this.isDead) {
-    return this.healthScore;
-  }
 
-  const now = new Date();
-  const daysSinceWatered = (now - this.lastWatered) / (1000 * 60 * 60 * 24);
+// =================================================================
+// ==                      INSTANCE METHODS                     ==
+// =================================================================
+
+/**
+ * Updates the tree's health score. A tree dies if not watered for 5 days.
+ * Health degrades by 20 points per day without water.
+ */
+treeSchema.methods.updateHealthScore = function() {
+  if (this.isDead) return;
+
+  const daysSinceWatered = (new Date() - this.lastWatered) / (1000 * 60 * 60 * 24);
   
   if (daysSinceWatered >= 5) {
-    // Tree dies after 5 days without watering
     this.healthScore = 0;
     this.isDead = true;
-    this.deathDate = now;
-    
-    this.milestones.push({
-      type: 'DIED',
-      description: 'Tree died from lack of watering (5+ days without water)'
-    });
+    this.deathDate = new Date();
+    this.milestones.push({ type: 'DIED', description: 'Died from lack of water.' });
   } else {
-    // Gradual health reduction: 20 points per day without watering
-    const healthReduction = Math.floor(daysSinceWatered) * 20;
-    this.healthScore = Math.max(0, 100 - healthReduction);
+    this.healthScore = Math.max(0, 100 - (Math.floor(daysSinceWatered) * 20));
   }
-  
-  return this.healthScore;
 };
 
-// Update stage based on wifi connection time (4 hours per stage)
+/**
+ * Updates the tree's growth stage based on WiFi time.
+ * NOTE: This method has a dependency on the User model, which is an architectural smell.
+ * This logic might be better placed in a service layer.
+ */
 treeSchema.methods.updateStage = async function() {
-  // Skip stage update if tree is dead
-  if (this.isDead) {
-    return this.stage;
-  }
+  if (this.isDead) return;
 
   try {
-    // Get user's current total wifi time
     const User = mongoose.model('User');
     const user = await User.findById(this.userId);
-    
-    if (!user) {
-      return this.stage;
-    }
+    if (!user) return;
 
-    // Calculate tree-specific wifi time (total wifi time since tree was redeemed)
-    const treeWifiTime = user.totalTimeConnected - this.wifiTimeAtRedeem;
-    this.totalWifiTime = Math.max(0, treeWifiTime);
+    this.totalWifiTime = Math.max(0, user.totalTimeConnected - this.wifiTimeAtRedeem);
 
-    // Define stage requirements (4 hours = 14400 seconds per stage)
-    const HOURS_PER_STAGE = 4;
-    const SECONDS_PER_STAGE = HOURS_PER_STAGE * 60 * 60; // 14400 seconds
-    
+    const SECONDS_PER_STAGE = 4 * 3600; // 4 hours
     const stages = ['seedling', 'sprout', 'sapling', 'young_tree', 'mature_tree', 'ancient_tree'];
-    let newStage = 'seedling';
-    
-    // Determine stage based on wifi time
-    for (let i = 0; i < stages.length; i++) {
-      const requiredTime = i * SECONDS_PER_STAGE;
-      if (this.totalWifiTime >= requiredTime) {
-        newStage = stages[i];
-      } else {
-        break;
-      }
-    }
+    const currentStageIndex = Math.floor(this.totalWifiTime / SECONDS_PER_STAGE);
+    const newStage = stages[Math.min(currentStageIndex, stages.length - 1)];
 
-    // Add milestone if stage changed
     if (newStage !== this.stage) {
-      const oldStage = this.stage;
       this.stage = newStage;
-      
       this.milestones.push({
         type: 'STAGE_CHANGE',
-        description: `Tree grew from ${oldStage} to ${newStage} after ${Math.floor(this.totalWifiTime / 3600)} hours of wifi connection`,
-        stageFrom: oldStage,
-        stageTo: newStage
+        description: `Grew into a ${newStage}!`
       });
-
-      // Gửi push notification cho user khi cây lên stage mới
-      try {
-        const notificationServiceV1 = require('../services/notificationServiceV1');
-        if (user.pushToken && user.notificationSettings?.pushNotificationsEnabled) {
-          await notificationServiceV1.sendPushNotification(
-            user.pushToken,
-            '🌱 Cây của bạn đã lớn hơn rồi!',
-            `Chúc mừng! Cây UniTree của bạn vừa phát triển sang giai đoạn mới: ${newStage}.`,
-            { type: 'tree_stage_up', stage: newStage }
-          );
-        }
-      } catch (notifyErr) {
-        console.error('Error sending stage up notification:', notifyErr);
-      }
     }
-    
-    return this.stage;
   } catch (error) {
-    console.error('Error updating tree stage:', error);
-    return this.stage;
+    console.error(`Error updating stage for tree ${this._id}:`, error);
   }
 };
 
-// Water the tree
+/**
+ * Waters the tree, restoring its health to 100.
+ * A tree can only be watered once every 24 hours.
+ * @returns {{success: boolean, message: string}}
+ */
 treeSchema.methods.water = function() {
-  // Cannot water a dead tree
   if (this.isDead) {
-    return { success: false, message: 'Cannot water a dead tree' };
+    return { success: false, message: 'This tree has passed on. It can no longer be watered.' };
+  }
+  if ((new Date() - this.lastWatered) < (24 * 60 * 60 * 1000)) {
+    return { success: false, message: 'This tree has been watered recently. Try again tomorrow.' };
   }
 
-  const now = new Date();
-  const daysSinceLastWatered = (now - this.lastWatered) / (1000 * 60 * 60 * 24);
-  
-  // Prevent over-watering (can only water once per day)
-  if (daysSinceLastWatered < 1) {
-    return { success: false, message: 'Tree has already been watered today' };
-  }
-
-  this.lastWatered = now;
-  this.healthScore = 100; // Restore full health when watered
-  
-  this.milestones.push({
-    type: 'WATERED',
-    description: 'Tree was watered and health restored to 100%'
-  });
-
-  return { success: true, message: 'Tree watered successfully' };
+  this.lastWatered = new Date();
+  this.healthScore = 100;
+  this.milestones.push({ type: 'WATERED', description: 'You watered the tree. Health restored!' });
+  return { success: true, message: 'Tree watered successfully!' };
 };
 
-// Get tree growth progress information
-treeSchema.methods.getGrowthProgress = function() {
-  const HOURS_PER_STAGE = 4;
-  const SECONDS_PER_STAGE = HOURS_PER_STAGE * 60 * 60;
-  const stages = ['seedling', 'sprout', 'sapling', 'young_tree', 'mature_tree', 'ancient_tree'];
-  
-  const currentStageIndex = stages.indexOf(this.stage);
-  const nextStageIndex = currentStageIndex + 1;
-  
-  // Calculate progress to next stage
-  const currentStageRequiredTime = currentStageIndex * SECONDS_PER_STAGE;
-  const nextStageRequiredTime = nextStageIndex * SECONDS_PER_STAGE;
-  const progressInCurrentStage = this.totalWifiTime - currentStageRequiredTime;
-  const timeNeededForNextStage = nextStageRequiredTime - this.totalWifiTime;
-  
-  return {
-    currentStage: this.stage,
-    nextStage: nextStageIndex < stages.length ? stages[nextStageIndex] : null,
-    isMaxStage: nextStageIndex >= stages.length,
-    totalWifiHours: Math.floor(this.totalWifiTime / 3600),
-    progressInCurrentStage: Math.max(0, progressInCurrentStage),
-    timeNeededForNextStage: nextStageIndex < stages.length ? Math.max(0, timeNeededForNextStage) : 0,
-    progressPercent: nextStageIndex < stages.length 
-      ? Math.min(100, (progressInCurrentStage / SECONDS_PER_STAGE) * 100)
-      : 100,
-    hoursToNextStage: nextStageIndex < stages.length 
-      ? Math.ceil(timeNeededForNextStage / 3600)
-      : 0
-  };
-};
+// =================================================================
+// ==                         VIRTUALS                          ==
+// =================================================================
 
-// Get health status information
-treeSchema.methods.getHealthStatus = function() {
-  if (this.isDead) {
+/**
+ * Virtual property to get detailed growth progress information.
+ */
+treeSchema.virtual('growthProgress').get(function() {
+    const SECONDS_PER_STAGE = 4 * 3600;
+    const stages = ['seedling', 'sprout', 'sapling', 'young_tree', 'mature_tree', 'ancient_tree'];
+    const currentStageIndex = stages.indexOf(this.stage);
+    
+    if (currentStageIndex === -1 || currentStageIndex === stages.length - 1) {
+        return { isMaxStage: true, progressPercent: 100, hoursToNextStage: 0 };
+    }
+
+    const timeInCurrentStage = this.totalWifiTime - (currentStageIndex * SECONDS_PER_STAGE);
+    const progressPercent = Math.min(100, (timeInCurrentStage / SECONDS_PER_STAGE) * 100);
+    
     return {
-      status: 'dead',
-      healthScore: 0,
-      daysSinceWatered: null,
-      daysUntilDeath: 0,
-      canWater: false,
-      deathDate: this.deathDate
+        isMaxStage: false,
+        progressPercent: progressPercent,
+        hoursToNextStage: Math.ceil((SECONDS_PER_STAGE - timeInCurrentStage) / 3600)
     };
-  }
-
-  const now = new Date();
-  const daysSinceWatered = (now - this.lastWatered) / (1000 * 60 * 60 * 24);
-  const daysUntilDeath = Math.max(0, 5 - daysSinceWatered);
-  
-  let status = 'healthy';
-  if (daysSinceWatered >= 4) {
-    status = 'critical';
-  } else if (daysSinceWatered >= 2) {
-    status = 'unhealthy';
-  }
-
-  return {
-    status,
-    healthScore: this.healthScore,
-    daysSinceWatered: Math.floor(daysSinceWatered * 10) / 10, // Round to 1 decimal
-    daysUntilDeath: Math.floor(daysUntilDeath * 10) / 10, // Round to 1 decimal
-    canWater: daysSinceWatered >= 1,
-    lastWatered: this.lastWatered
-  };
-};
-
-// Pre-save middleware to update health and stage
-treeSchema.pre('save', async function(next) {
-  if (!this.isNew) {
-    this.updateHealthScore();
-    await this.updateStage();
-  }
-  next();
 });
 
-const Tree = mongoose.model('Tree', treeSchema);
+/**
+ * Virtual property to get detailed health status information.
+ */
+treeSchema.virtual('healthStatus').get(function() {
+    if (this.isDead) {
+      return { status: 'dead', healthScore: 0, canWater: false, daysUntilDeath: 0 };
+    }
+    const daysSinceWatered = (new Date() - this.lastWatered) / (1000 * 60 * 60 * 24);
+    let status = 'healthy';
+    if (daysSinceWatered >= 4) status = 'critical';
+    else if (daysSinceWatered >= 2) status = 'unhealthy';
+    
+    return {
+      status,
+      healthScore: this.healthScore,
+      canWater: daysSinceWatered >= 1,
+      daysUntilDeath: Math.max(0, 5 - daysSinceWatered)
+    };
+});
 
+
+const Tree = mongoose.model('Tree', treeSchema);
 module.exports = Tree; 

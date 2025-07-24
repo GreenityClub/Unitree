@@ -1,256 +1,132 @@
-const cron = require('cron');
+const { CronJob } = require('cron');
 const notificationService = require('./notificationService');
 const logger = require('../utils/logger');
 const WifiSession = require('../models/WifiSession');
 const User = require('../models/User');
 const Point = require('../models/Point');
+const { env } = require('../config/env');
+
+// =================================================================
+// ==                        CRON SERVICE                       ==
+// =================================================================
 
 class CronService {
   constructor() {
     this.jobs = new Map();
+    this.timeZone = env.TIMEZONE || 'Asia/Ho_Chi_Minh';
   }
 
   /**
-   * Initialize all cron jobs
+   * Initializes and starts all scheduled jobs.
    */
   initialize() {
+    logger.info('Initializing cron service...');
+    this.scheduleInactiveUserReminders();
+    this.scheduleWifiSessionCleanup();
+    logger.info('Cron service initialized successfully.');
+  }
+
+  /**
+   * Schedules a job to send reminders to inactive users every 2 hours during the day.
+   */
+  scheduleInactiveUserReminders() {
+    // Runs at the top of the hour, every 2 hours, from 8 AM to 10 PM.
+    const job = new CronJob(
+      '0 8-22/2 * * *',
+      async () => {
+        logger.info('Cron job: Sending inactive user reminders...');
+        await notificationService.sendInactiveUserReminders();
+      },
+      null,
+      true, // Start immediately
+      this.timeZone
+    );
+    this.jobs.set('inactiveUserReminders', job);
+    logger.info(`Scheduled job: Inactive User Reminders (every 2 hours, 8am-10pm ${this.timeZone}).`);
+  }
+
+  /**
+   * Schedules a job to clean up orphaned/timed-out WiFi sessions every 10 minutes.
+   */
+  scheduleWifiSessionCleanup() {
+    const job = new CronJob(
+      '*/10 * * * *', // Every 10 minutes
+      async () => {
+        logger.info('Cron job: Cleaning up timed-out WiFi sessions...');
+        await this.cleanupTimedOutSessions();
+      },
+      null,
+      true, // Start immediately
+      this.timeZone
+    );
+    this.jobs.set('wifiSessionCleanup', job);
+    logger.info('Scheduled job: WiFi Session Cleanup (every 10 minutes).');
+  }
+
+  /**
+   * Logic to find and terminate WiFi sessions that have been active for too long.
+   */
+  async cleanupTimedOutSessions() {
+    const TIMEOUT_HOURS = 2;
+    const cutoff = new Date(Date.now() - TIMEOUT_HOURS * 60 * 60 * 1000);
+    
     try {
-      // Schedule reminder notifications every 2 hours during business hours (7 AM - 6 PM)
-      this.scheduleReminderNotifications();
-      // Schedule WiFi session timeout cleanup
-      this.scheduleWifiSessionTimeoutCleanup();
-      logger.info('✅ Cron service initialized successfully');
-    } catch (error) {
-      logger.error('❌ Failed to initialize cron service:', error);
-    }
-  }
+      const orphanedSessions = await WifiSession.find({
+        isActive: true,
+        startTime: { $lt: cutoff }
+      });
 
-  /**
-   * Schedule reminder notifications
-   * Runs every 2 hours between 7 AM - 6 PM (Hanoi time - GMT+7)
-   */
-  scheduleReminderNotifications() {
-    // Cron pattern: Every 2 hours from 7 AM to 6 PM
-    // 0 7,9,11,13,15,17 * * * - at 7AM, 9AM, 11AM, 1PM, 3PM, 5PM (Hanoi time)
-    const cronPattern = '0 7,9,11,13,15,17 * * *';
-    
-    const reminderJob = new cron.CronJob(
-      cronPattern,
-      async () => {
-        try {
-          logger.info('🔔 Starting scheduled reminder notifications...');
-          const result = await notificationService.sendAppReminderNotifications();
-          
-          if (result.success) {
-            logger.info(`✅ Scheduled reminders completed: ${result.sent} notifications sent`);
-          } else {
-            logger.warn(`⚠️ Scheduled reminders completed with issues: ${result.error}`);
-          }
-        } catch (error) {
-          logger.error('❌ Error in scheduled reminder notifications:', error);
-        }
-      },
-      null, // onComplete callback
-      false, // start immediately
-      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
-    );
+      if (orphanedSessions.length === 0) {
+        logger.info('No timed-out WiFi sessions found.');
+        return;
+      }
 
-    // Start the job
-    reminderJob.start();
-    this.jobs.set('reminderNotifications', reminderJob);
-    
-    logger.info('📅 Reminder notification cron job scheduled: Every 2 hours from 7 AM to 6 PM (Hanoi time - GMT+7)');
-  }
+      logger.info(`Found ${orphanedSessions.length} timed-out WiFi sessions to clean up.`);
 
-  /**
-   * Schedule WiFi session timeout cleanup (runs every 10 minutes)
-   */
-  scheduleWifiSessionTimeoutCleanup() {
-    const cleanupPattern = '*/10 * * * *'; // Every 10 minutes
-    const TIMEOUT_SECONDS = 2 * 60 * 60; // 2 hours
+      for (const session of orphanedSessions) {
+        const durationSeconds = Math.floor((new Date() - session.startTime) / 1000);
+        const pointsEarned = Math.floor(durationSeconds / 60);
 
-    const cleanupJob = new cron.CronJob(
-      cleanupPattern,
-      async () => {
-        try {
-          logger.info('🕒 Running WiFi session timeout cleanup...');
-          const now = new Date();
-          const cutoff = new Date(now.getTime() - TIMEOUT_SECONDS * 1000);
-          // Find all sessions still active and started before cutoff
-          const orphanedSessions = await WifiSession.find({
-            isActive: true,
-            startTime: { $lt: cutoff }
-          });
-          let cleanedCount = 0;
-          for (const session of orphanedSessions) {
-            const endTime = now;
-            session.endTime = endTime;
-            session.isActive = false;
-            const durationSeconds = Math.floor((endTime - session.startTime) / 1000);
-            session.duration = durationSeconds;
-            // Calculate points for the session
-            const minSessionDuration = parseInt(process.env.MIN_SESSION_DURATION || '300', 10);
-            if (durationSeconds >= minSessionDuration) {
-              const pointsEarned = Math.floor(durationSeconds / 60);
-              // Check for existing transaction to prevent double point
-              const existingTransaction = await Point.findOne({
-                userId: session.user,
-                type: 'WIFI_SESSION',
-                'metadata.startTime': session.startTime,
-                'metadata.endTime': endTime
-              });
-              if (!existingTransaction) {
-                await User.findByIdAndUpdate(
-                  session.user,
-                  {
-                    $inc: {
-                      points: pointsEarned,
-                      allTimePoints: pointsEarned,
-                      dayTimeConnected: durationSeconds,
-                      weekTimeConnected: durationSeconds,
-                      monthTimeConnected: durationSeconds,
-                      totalTimeConnected: durationSeconds
-                    }
-                  }
-                );
-                const pointTransaction = new Point({
-                  userId: session.user,
-                  amount: pointsEarned,
-                  type: 'WIFI_SESSION',
-                  metadata: {
-                    startTime: session.startTime,
-                    endTime: endTime,
-                    duration: durationSeconds,
-                    description: `WiFi session on ${session.ipAddress} (timeout cleanup)`
-                  }
-                });
-                await pointTransaction.save();
-                session.pointsEarned = pointsEarned;
-              } else {
-                logger.info(`Timeout cleanup: Transaction already exists for user ${session.user}, session ${session._id}`);
-              }
+        session.isActive = false;
+        session.endTime = new Date();
+        session.duration = durationSeconds;
+        session.pointsEarned = pointsEarned > 0 ? pointsEarned : 0;
+        
+        if (pointsEarned > 0) {
+          await User.findByIdAndUpdate(session.user, {
+            $inc: {
+              points: pointsEarned,
+              allTimePoints: pointsEarned,
+              totalTimeConnected: durationSeconds,
             }
-            await session.save();
-            cleanedCount++;
-          }
-          logger.info(`🕒 WiFi session timeout cleanup done. Cleaned: ${cleanedCount}`);
-        } catch (error) {
-          logger.error('❌ Error in WiFi session timeout cleanup:', error);
+          });
+          await Point.create({
+              userId: session.user,
+              amount: pointsEarned,
+              type: 'WIFI_SESSION',
+              metadata: { 
+                  description: `Session timed out after ${TIMEOUT_HOURS} hours.`,
+                  startTime: session.startTime,
+                  endTime: session.endTime
+              }
+          });
         }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh'
-    );
-    cleanupJob.start();
-    this.jobs.set('wifiSessionTimeoutCleanup', cleanupJob);
-    logger.info('🕒 WiFi session timeout cleanup cron job scheduled: Every 10 minutes (sessions >2h)');
-  }
-
-  /**
-   * Schedule test job (runs every 30 minutes) - for development/testing
-   */
-  scheduleTestJob() {
-    const testPattern = '*/30 * * * *'; // Every 30 minutes
-    
-    const testJob = new cron.CronJob(
-      testPattern,
-      async () => {
-        try {
-          logger.info('🧪 Running test cron job...');
-          // Test functionality here
-          logger.info('✅ Test cron job completed');
-        } catch (error) {
-          logger.error('❌ Error in test cron job:', error);
-        }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
-    );
-
-    testJob.start();
-    this.jobs.set('testJob', testJob);
-    
-    logger.info('🧪 Test cron job scheduled: Every 30 minutes (Hanoi time - GMT+7)');
-  }
-
-  /**
-   * Schedule daily cleanup job (runs at midnight Hanoi time)
-   */
-  scheduleDailyCleanup() {
-    const cleanupPattern = '0 0 * * *'; // Every day at midnight
-    
-    const cleanupJob = new cron.CronJob(
-      cleanupPattern,
-      async () => {
-        try {
-          logger.info('🧹 Starting daily cleanup job...');
-          
-          // Add any daily cleanup tasks here
-          // For example: clean up old notification logs, expired tokens, etc.
-          
-          logger.info('✅ Daily cleanup job completed');
-        } catch (error) {
-          logger.error('❌ Error in daily cleanup job:', error);
-        }
-      },
-      null,
-      false,
-      'Asia/Ho_Chi_Minh' // Hanoi, Vietnam timezone (GMT+7)
-    );
-
-    cleanupJob.start();
-    this.jobs.set('dailyCleanup', cleanupJob);
-    
-    logger.info('🧹 Daily cleanup cron job scheduled: Every day at midnight (Hanoi time - GMT+7)');
-  }
-
-  /**
-   * Stop a specific cron job
-   */
-  stopJob(jobName) {
-    const job = this.jobs.get(jobName);
-    if (job) {
-      job.stop();
-      logger.info(`Cron job '${jobName}' stopped`);
-      return true;
+        await session.save();
+      }
+      logger.info(`Successfully cleaned up ${orphanedSessions.length} timed-out sessions.`);
+    } catch (error) {
+      logger.error('Error during WiFi session cleanup:', error);
     }
-    logger.warn(`Cron job '${jobName}' not found`);
-    return false;
   }
 
   /**
-   * Stop all cron jobs
+   * Stops all running cron jobs.
    */
-  stopAllJobs() {
+  stopAll() {
     this.jobs.forEach((job, name) => {
       job.stop();
-      logger.info(`Cron job '${name}' stopped`);
+      logger.info(`Stopped cron job: '${name}'`);
     });
-    logger.info('All cron jobs stopped');
-  }
-
-  /**
-   * Get status of all cron jobs
-   */
-  getJobsStatus() {
-    const status = {};
-    this.jobs.forEach((job, name) => {
-      status[name] = {
-        running: job.running,
-        nextDate: job.nextDate()?.toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}) || null
-      };
-    });
-    return status;
-  }
-
-  /**
-   * Trigger reminder notifications manually (for testing)
-   */
-  async triggerReminderNotifications() {
-    logger.info('🔔 Manually triggering reminder notifications...');
-    return await notificationService.sendAppReminderNotifications();
   }
 }
 

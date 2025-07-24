@@ -18,7 +18,8 @@ const wifiRoutes = require('./routes/wifi');
 const treeRoutes = require('./routes/tree');
 const pointsRoutes = require('./routes/points');
 const notificationRoutes = require('./routes/notification');
-const adminRoutes = require('./routes/admin');
+const adminRoutes = require('./routes/admins'); // Routes for managing admins (CRUD)
+const statisticsRoutes = require('./routes/statistics');
 
 const app = express();
 
@@ -195,7 +196,8 @@ app.use('/api/trees', treeRoutes);
 app.use('/api/points', pointsRoutes);
 app.use('/api/user', notificationRoutes); // Some routes are under /api/user
 app.use('/api/notification', notificationRoutes);
-app.use('/api/admins', adminRoutes);
+app.use('/api/admins', adminRoutes); // Correctly mount admin management routes
+app.use('/api/statistics', statisticsRoutes);
 
 // Global error handling middleware (should be last)
 app.use(globalErrorHandler);

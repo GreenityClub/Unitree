@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { AdminLayout } from '../../components/Layout';
 import Card from '../../components/ui/Card';
 import Icon from '../../components/ui/Icon';
 import { format } from 'date-fns';
@@ -74,7 +75,7 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <>
+    <AdminLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
         <p className="text-gray-600">Welcome to the Unitree Admin Dashboard</p>
@@ -130,7 +131,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </Card>
       </div>
-    </>
+    </AdminLayout>
   );
 };
 

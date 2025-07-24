@@ -1,162 +1,127 @@
 const logger = require('./logger');
+const { env } = require('../config/env');
+
+// =================================================================
+// ==                      MEMORY MONITOR                       ==
+// =================================================================
 
 class MemoryMonitor {
   constructor() {
-    this.memoryUsageHistory = [];
+    this.history = [];
     this.maxHistoryLength = 20;
-    this.warningThreshold = 350; // MB
-    this.criticalThreshold = 400; // MB
-    this.lastGCTime = Date.now();
-    this.gcInterval = 5 * 60 * 1000; // 5 minutes
+    this.monitoringInterval = null;
+
+    // Configurable thresholds (in MB)
+    this.warningThreshold = parseInt(env.MEMORY_WARNING_THRESHOLD, 10) || 350;
+    this.criticalThreshold = parseInt(env.MEMORY_CRITICAL_THRESHOLD, 10) || 450;
+    
+    logger.info(`Memory thresholds set: Warning > ${this.warningThreshold}MB, Critical > ${this.criticalThreshold}MB`);
   }
 
-  getMemoryUsage() {
+  /**
+   * Starts the memory monitoring process.
+   * @param {number} [intervalMinutes=5] - The interval in minutes to log memory usage.
+   */
+  start(intervalMinutes = 5) {
+    if (this.monitoringInterval) {
+      logger.warn('Memory monitoring is already running.');
+      return;
+    }
+    logger.info(`Starting memory monitoring every ${intervalMinutes} minutes.`);
+    this.logUsage(); // Initial log
+    this.monitoringInterval = setInterval(() => this.logUsage(), intervalMinutes * 60 * 1000);
+  }
+
+  /**
+   * Stops the memory monitoring process.
+   */
+  stop() {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
+      logger.info('Memory monitoring stopped.');
+    }
+  }
+
+  /**
+   * Retrieves and formats the current memory usage of the process.
+   * @returns {Object} - An object containing memory usage statistics in MB.
+   */
+  getUsage() {
     const usage = process.memoryUsage();
     return {
-      rss: Math.round(usage.rss / 1024 / 1024), // MB
-      heapUsed: Math.round(usage.heapUsed / 1024 / 1024), // MB
-      heapTotal: Math.round(usage.heapTotal / 1024 / 1024), // MB
-      external: Math.round(usage.external / 1024 / 1024), // MB
-      timestamp: new Date().toISOString()
+      rss: Math.round(usage.rss / 1024 / 1024),
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
     };
   }
 
-  logMemoryUsage() {
-    const usage = this.getMemoryUsage();
-    
-    // Add to history
-    this.memoryUsageHistory.push(usage);
-    if (this.memoryUsageHistory.length > this.maxHistoryLength) {
-      this.memoryUsageHistory.shift();
+  /**
+   * Logs the current memory usage and checks against thresholds.
+   */
+  logUsage() {
+    const usage = this.getUsage();
+    this.history.push(usage.rss);
+    if (this.history.length > this.maxHistoryLength) {
+      this.history.shift();
     }
 
-    // Log current usage
-    logger.info(`Memory Usage: RSS: ${usage.rss}MB, Heap: ${usage.heapUsed}/${usage.heapTotal}MB, External: ${usage.external}MB`);
+    const logMessage = `Memory Usage: RSS=${usage.rss}MB, Heap=${usage.heapUsed}/${usage.heapTotal}MB`;
 
-    // Check for warnings
     if (usage.rss > this.criticalThreshold) {
-      logger.warn(`🚨 CRITICAL: Memory usage very high: ${usage.rss}MB (threshold: ${this.criticalThreshold}MB)`);
-      this.forceGarbageCollection();
+      logger.error(`CRITICAL: ${logMessage}. Exceeds threshold of ${this.criticalThreshold}MB.`);
+      this.triggerGC();
     } else if (usage.rss > this.warningThreshold) {
-      logger.warn(`⚠️ WARNING: Memory usage high: ${usage.rss}MB (threshold: ${this.warningThreshold}MB)`);
+      logger.warn(`WARNING: ${logMessage}. Exceeds threshold of ${this.warningThreshold}MB.`);
+    } else {
+      logger.info(logMessage);
     }
-
-    // Auto garbage collection
-    if (Date.now() - this.lastGCTime > this.gcInterval) {
-      this.forceGarbageCollection();
-    }
-
-    return usage;
   }
 
-  forceGarbageCollection() {
+  /**
+   * Manually triggers garbage collection if available.
+   */
+  triggerGC() {
     try {
       if (global.gc) {
-        const beforeGC = this.getMemoryUsage();
+        const before = this.getUsage().rss;
         global.gc();
-        const afterGC = this.getMemoryUsage();
-        this.lastGCTime = Date.now();
-        
-        const saved = beforeGC.rss - afterGC.rss;
-        if (saved > 5) { // Only log if significant memory was freed
-          logger.info(`🗑️ Garbage collection freed ${saved}MB (${beforeGC.rss}MB → ${afterGC.rss}MB)`);
-        }
+        const after = this.getUsage().rss;
+        logger.info(`Garbage Collection triggered. Freed ${before - after}MB.`);
       } else {
-        logger.warn('Garbage collection not available (run with --expose-gc flag)');
+        logger.warn('Garbage collection unavailable. Run with --expose-gc flag.');
       }
     } catch (error) {
-      logger.error('Error during garbage collection:', error);
+      logger.error('Error during manual garbage collection:', error);
     }
   }
 
-  getMemoryStats() {
-    if (this.memoryUsageHistory.length === 0) {
-      return this.getMemoryUsage();
+  /**
+   * Provides a summary of the current memory statistics and trend.
+   * @returns {Object} - An object with current, average, max RSS, trend, and status.
+   */
+  getStats() {
+    if (this.history.length === 0) return { current: this.getUsage().rss };
+
+    const recentHistory = this.history.slice(-5);
+    const average = Math.round(recentHistory.reduce((a, b) => a + b, 0) / recentHistory.length);
+    const max = Math.max(...recentHistory);
+    const current = this.history[this.history.length - 1];
+
+    let trend = 'stable';
+    if (this.history.length >= 3) {
+      const first = this.history[this.history.length - 3];
+      const diff = current - first;
+      if (diff > 20) trend = 'increasing';
+      if (diff < -20) trend = 'decreasing';
     }
-
-    const recent = this.memoryUsageHistory.slice(-5);
-    const avgRss = Math.round(recent.reduce((sum, usage) => sum + usage.rss, 0) / recent.length);
-    const maxRss = Math.max(...recent.map(usage => usage.rss));
-    const current = this.getMemoryUsage();
-
-    return {
-      current: current.rss,
-      average: avgRss,
-      maximum: maxRss,
-      trend: this.getMemoryTrend(),
-      status: this.getMemoryStatus(current.rss)
-    };
-  }
-
-  getMemoryTrend() {
-    if (this.memoryUsageHistory.length < 3) return 'stable';
     
-    const recent = this.memoryUsageHistory.slice(-3);
-    const first = recent[0].rss;
-    const last = recent[recent.length - 1].rss;
-    const diff = last - first;
-    
-    if (diff > 20) return 'increasing';
-    if (diff < -20) return 'decreasing';
-    return 'stable';
-  }
+    let status = 'normal';
+    if (current > this.criticalThreshold) status = 'critical';
+    else if (current > this.warningThreshold) status = 'warning';
 
-  getMemoryStatus(rss) {
-    if (rss > this.criticalThreshold) return 'critical';
-    if (rss > this.warningThreshold) return 'warning';
-    return 'normal';
-  }
-
-  startMonitoring(intervalMinutes = 5) {
-    logger.info(`Starting memory monitoring (interval: ${intervalMinutes} minutes)`);
-    
-    // Initial log
-    this.logMemoryUsage();
-    
-    // Set up regular monitoring
-    setInterval(() => {
-      this.logMemoryUsage();
-    }, intervalMinutes * 60 * 1000);
-
-    // Set up process event handlers
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM received - final memory stats:');
-      const stats = this.getMemoryStats();
-      logger.info(`Final memory usage: ${stats.current}MB (avg: ${stats.average}MB, max: ${stats.maximum}MB, trend: ${stats.trend})`);
-    });
-
-    process.on('exit', () => {
-      logger.info('Process exiting - memory monitoring stopped');
-    });
-
-    // Handle memory warnings
-    process.on('warning', (warning) => {
-      if (warning.name === 'MaxListenersExceededWarning' || warning.name === 'DeprecationWarning') {
-        return; // Ignore these common warnings
-      }
-      logger.warn(`Process warning: ${warning.name} - ${warning.message}`);
-    });
-  }
-
-  // Clean up old connections and cached data
-  cleanup() {
-    try {
-      // Force garbage collection
-      this.forceGarbageCollection();
-      
-      // Clear old history
-      if (this.memoryUsageHistory.length > this.maxHistoryLength) {
-        this.memoryUsageHistory = this.memoryUsageHistory.slice(-this.maxHistoryLength);
-      }
-      
-      logger.info('Memory cleanup completed');
-    } catch (error) {
-      logger.error('Error during memory cleanup:', error);
-    }
+    return { current, average, max, trend, status };
   }
 }
 
-// Create singleton instance
-const memoryMonitor = new MemoryMonitor();
-
-module.exports = memoryMonitor; 
+module.exports = new MemoryMonitor(); 
