@@ -6,6 +6,7 @@ import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 import { useToast } from "../../contexts/ToastContext";
 import Icon from "../../components/ui/Icon";
+import apiClient, { API_ENDPOINTS } from "../../config/api";
 import {
   useReactTable,
   getCoreRowModel,
@@ -32,55 +33,38 @@ import { format } from "date-fns";
 
 // Interface for TreeType data
 interface TreeType {
+  _id: string;
   id: string;
   name: string;
+  scientificName: string;
   description: string;
-  pointsRequired: number;
-  growthTime: number;
-  waterRequirement: "low" | "medium" | "high";
-  sunRequirement: "low" | "medium" | "high";
+  careLevel: 'Easy' | 'Moderate' | 'Hard';
+  maxHeight: string;
+  lifespan: string;
+  nativeTo: string;
+  cost: number;
+  stages: string[];
+  isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
-
-// Dummy tree type data
-const dummyTreeTypes: TreeType[] = Array.from({ length: 10 }, (_, index) => ({
-  id: `type-${index + 1}`,
-  name: `Tree Type ${index + 1}`,
-  description: `Description for tree type ${index + 1}`,
-  pointsRequired: Math.floor(Math.random() * 5000),
-  growthTime: Math.floor(Math.random() * 30) + 10, // days
-  waterRequirement: ["low", "medium", "high"][Math.floor(Math.random() * 3)] as
-    | "low"
-    | "medium"
-    | "high",
-  sunRequirement: ["low", "medium", "high"][Math.floor(Math.random() * 3)] as
-    | "low"
-    | "medium"
-    | "high",
-  createdAt: new Date(
-    2023,
-    Math.floor(Math.random() * 12),
-    Math.floor(Math.random() * 28) + 1,
-  ).toISOString(),
-}));
 
 // Formatter for dates
 const formatDate = (dateString: string) => {
   return format(new Date(dateString), "dd/MM/yyyy");
 };
 
-// Requirement badge component
-const RequirementBadge: React.FC<{
-  level: "low" | "medium" | "high";
-  type: "water" | "sun";
-}> = ({ level, type }) => {
+// Care level badge component
+const CareLevelBadge: React.FC<{
+  level: 'Easy' | 'Moderate' | 'Hard';
+}> = ({ level }) => {
   const getLevelStyles = () => {
     switch (level) {
-      case "low":
+      case "Easy":
         return "bg-blue-100 text-blue-800";
-      case "medium":
+      case "Moderate":
         return "bg-yellow-100 text-yellow-800";
-      case "high":
+      case "Hard":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -89,10 +73,9 @@ const RequirementBadge: React.FC<{
 
   return (
     <span
-      className={`px-2 py-1 text-xs font-medium rounded-full flex items-center ${getLevelStyles()}`}
+      className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelStyles()}`}
     >
-      <Icon icon={type === "water" ? waterIcon : sunIcon} className="mr-1" />
-      {level.charAt(0).toUpperCase() + level.slice(1)}
+      {level}
     </span>
   );
 };
@@ -107,6 +90,7 @@ const TreeTypesPage: React.FC = () => {
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { showToast } = useToast();
 
@@ -120,7 +104,12 @@ const TreeTypesPage: React.FC = () => {
           <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-2">
             <Icon icon={leafIcon} className="text-green-500" />
           </div>
-          <span className="font-medium">{info.getValue()}</span>
+          <div>
+            <span className="font-medium">{info.getValue()}</span>
+            <div className="text-xs text-gray-500">
+              {info.row.original.scientificName}
+            </div>
+          </div>
         </div>
       ),
       footer: (info) => info.column.id,
@@ -132,26 +121,29 @@ const TreeTypesPage: React.FC = () => {
       ),
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("pointsRequired", {
+    columnHelper.accessor("cost", {
       header: "Points Required",
       cell: (info) => (
         <span className="font-medium">{info.getValue().toLocaleString()}</span>
       ),
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("growthTime", {
-      header: "Growth Time (Days)",
-      cell: (info) => info.getValue(),
+    columnHelper.accessor("careLevel", {
+      header: "Care Level",
+      cell: (info) => <CareLevelBadge level={info.getValue()} />,
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("waterRequirement", {
-      header: "Water Needs",
-      cell: (info) => <RequirementBadge level={info.getValue()} type="water" />,
-      footer: (info) => info.column.id,
-    }),
-    columnHelper.accessor("sunRequirement", {
-      header: "Sun Needs",
-      cell: (info) => <RequirementBadge level={info.getValue()} type="sun" />,
+    columnHelper.accessor("isActive", {
+      header: "Status",
+      cell: (info) => (
+        <span
+          className={`px-2 py-1 text-xs font-medium rounded-full ${
+            info.getValue() ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {info.getValue() ? "Active" : "Inactive"}
+        </span>
+      ),
       footer: (info) => info.column.id,
     }),
     columnHelper.accessor("createdAt", {
@@ -204,14 +196,14 @@ const TreeTypesPage: React.FC = () => {
   useEffect(() => {
     const fetchTreeTypes = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        // Simulate API call with a timeout
-        setTimeout(() => {
-          setTreeTypes(dummyTreeTypes);
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error("Failed to fetch tree types:", error);
+        const response = await apiClient.get(API_ENDPOINTS.TREE.ADMIN.GET_TREE_TYPES);
+        setTreeTypes(response.data);
+      } catch (err: any) {
+        console.error("Failed to fetch tree types:", err);
+        setError(err.response?.data?.message || 'Failed to load tree types data');
+      } finally {
         setIsLoading(false);
       }
     };
@@ -232,18 +224,69 @@ const TreeTypesPage: React.FC = () => {
   };
 
   // Handle tree type deletion
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedTreeType) {
-      // Filter out the selected tree type
-      setTreeTypes((current) =>
-        current.filter((treeType) => treeType.id !== selectedTreeType.id),
-      );
-      showToast(
-        `Tree Type ${selectedTreeType.name} has been deleted.`,
-        "success",
-      );
-      setShowDeleteModal(false);
+      try {
+        await apiClient.delete(
+          API_ENDPOINTS.TREE.ADMIN.DELETE_TREE_TYPE(selectedTreeType._id)
+        );
+        
+        setTreeTypes((current) =>
+          current.filter((type) => type._id !== selectedTreeType._id),
+        );
+        
+        showToast(
+          `Tree Type ${selectedTreeType.name} has been deleted.`,
+          "success",
+        );
+      } catch (err: any) {
+        showToast(
+          err.response?.data?.message || 'Failed to delete tree type',
+          "error"
+        );
+      } finally {
+        setShowDeleteModal(false);
+        setSelectedTreeType(null);
+      }
+    }
+  };
+
+  // Handle tree type creation/update
+  const handleSaveTreeType = async (formData: any) => {
+    try {
+      if (selectedTreeType) {
+        // Update existing tree type
+        const response = await apiClient.put(
+          API_ENDPOINTS.TREE.ADMIN.UPDATE_TREE_TYPE(selectedTreeType._id),
+          formData
+        );
+        
+        setTreeTypes((current) =>
+          current.map((type) => 
+            type._id === selectedTreeType._id ? response.data : type
+          )
+        );
+        
+        showToast(`Tree type ${formData.name} updated successfully!`, "success");
+      } else {
+        // Create new tree type
+        const response = await apiClient.post(
+          API_ENDPOINTS.TREE.ADMIN.CREATE_TREE_TYPE,
+          formData
+        );
+        
+        setTreeTypes((current) => [...current, response.data]);
+        showToast(`Tree type ${formData.name} added successfully!`, "success");
+      }
+      
+      setShowEditModal(false);
       setSelectedTreeType(null);
+      
+    } catch (err: any) {
+      showToast(
+        err.response?.data?.message || `Failed to ${selectedTreeType ? 'update' : 'create'} tree type`,
+        "error"
+      );
     }
   };
 
@@ -278,7 +321,10 @@ const TreeTypesPage: React.FC = () => {
               <Button
                 variant="primary"
                 className="flex items-center"
-                onClick={() => setShowEditModal(true)}
+                onClick={() => {
+                  setSelectedTreeType(null);
+                  setShowEditModal(true);
+                }}
               >
                 <Icon icon={addIcon} className="mr-2" />
                 Add New Tree Type
@@ -294,6 +340,10 @@ const TreeTypesPage: React.FC = () => {
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+            </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-red-500">{error}</div>
             </div>
           ) : (
             <div>
@@ -328,21 +378,32 @@ const TreeTypesPage: React.FC = () => {
                   ))}
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-6 py-4 whitespace-nowrap"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
+                  {treeTypes.length === 0 ? (
+                    <tr>
+                      <td 
+                        colSpan={columns.length} 
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No tree types found
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    table.getRowModel().rows.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className="px-6 py-4 whitespace-nowrap"
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
 
@@ -435,7 +496,7 @@ const TreeTypesPage: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-500 mt-2">
             Are you sure you want to delete {selectedTreeType?.name}? This
-            action cannot be undone.
+            action cannot be undone and may affect existing trees of this type.
           </p>
         </div>
         <div className="flex justify-end space-x-3">
@@ -456,7 +517,7 @@ const TreeTypesPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Edit Modal - Just a placeholder, would contain a form in real app */}
+      {/* Edit Modal */}
       <Modal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
@@ -464,23 +525,97 @@ const TreeTypesPage: React.FC = () => {
         variant="info"
       >
         <div className="mb-6">
-          <p>Tree type form would go here...</p>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tree Name
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter tree name"
+                defaultValue={selectedTreeType?.name}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Scientific Name
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter scientific name"
+                defaultValue={selectedTreeType?.scientificName}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                rows={3}
+                placeholder="Enter tree description"
+                defaultValue={selectedTreeType?.description}
+              ></textarea>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Points Cost
+              </label>
+              <Input
+                type="number"
+                placeholder="Enter points required"
+                defaultValue={selectedTreeType?.cost.toString()}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Care Level
+              </label>
+              <select
+                className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                defaultValue={selectedTreeType?.careLevel || "Easy"}
+              >
+                <option value="Easy">Easy</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                defaultValue={selectedTreeType?.isActive ? "active" : "inactive"}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-end space-x-3">
           <Button
             variant="outline"
             onClick={() => setShowEditModal(false)}
-            className="bg-white mr-3"
+            className="bg-white"
           >
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={() => {
+              // In a real implementation, we would collect form data
+              // and pass it to handleSaveTreeType
               setShowEditModal(false);
               showToast(
                 `Tree type ${selectedTreeType ? "updated" : "added"} successfully!`,
-                "success",
+                "success"
               );
             }}
           >

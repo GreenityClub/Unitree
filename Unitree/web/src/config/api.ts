@@ -16,9 +16,11 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // Check if URL path starts with /api/admin
+    // Check if URL path is for admin routes
     const isAdminRoute = config.url?.includes('/api/admins') || 
-                        config.url?.includes('/api/auth/admin');
+                        config.url?.includes('/api/auth/admin') ||
+                        config.url?.includes('/api/statistics') ||
+                        config.url?.includes('/api/users');  // Add /api/users to admin routes
     
     // Select the appropriate token based on the route
     const token = isAdminRoute 
@@ -41,9 +43,11 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Check if URL path starts with /api/admin
+    // Check if URL path is for admin routes
     const isAdminRoute = error.config?.url?.includes('/api/admins') || 
-                        error.config?.url?.includes('/api/auth/admin');
+                        error.config?.url?.includes('/api/auth/admin') ||
+                        error.config?.url?.includes('/api/statistics') ||
+                        error.config?.url?.includes('/api/users');  // Add /api/users to admin routes
                         
     if (error.response?.status === 401) {
       // Handle unauthorized access based on route type
@@ -90,6 +94,20 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/api/trees/${id}`,
     DELETE: (id: string) => `/api/trees/${id}`,
     TYPES: '/api/trees/types',
+    // Admin specific tree endpoints
+    ADMIN: {
+      GET_ALL: '/api/trees/admin/all',
+      GET_REAL_TREES: '/api/trees/admin/realtrees',
+      GET_TREE_TYPES: '/api/trees/admin/treetypes',
+      CREATE_TREE_TYPE: '/api/trees/admin/treetypes',
+      UPDATE_TREE_TYPE: (id: string) => `/api/trees/admin/treetypes/${id}`,
+      DELETE_TREE_TYPE: (id: string) => `/api/trees/admin/treetypes/${id}`
+    },
+    // Real tree specific endpoints
+    REAL: {
+      GET_ALL: '/api/trees/real',
+      REDEEM: '/api/trees/redeem'
+    }
   },
   // Points endpoints
   POINTS: {
@@ -119,6 +137,11 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/api/admins/${id}`,
     DELETE: (id: string) => `/api/admins/${id}`,
     RESET_PASSWORD: (id: string) => `/api/admins/${id}/reset-password`,
+  },
+  // Statistics endpoints
+  STATISTICS: {
+    OVERVIEW: '/api/statistics/overview',
+    MONTHLY: '/api/statistics/monthly',
   },
 };
 

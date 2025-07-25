@@ -3,6 +3,7 @@ import apiClient, { API_ENDPOINTS } from '../config/api';
 
 interface AdminUser {
   id: string;
+  _id: string; // Add _id field to match server response
   username: string;
   role: 'admin' | 'superadmin';
   permissions: {
@@ -67,7 +68,14 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
         try {
           const response = await apiClient.get(API_ENDPOINTS.AUTH.ADMIN_ME);
           if (response.data && response.data.success) {
-            setAdmin(response.data.admin);
+            // Ensure both id and _id are set
+            const adminData = response.data.admin;
+            if (adminData.id && !adminData._id) {
+              adminData._id = adminData.id;
+            } else if (adminData._id && !adminData.id) {
+              adminData.id = adminData._id;
+            }
+            setAdmin(adminData);
           } else {
             // Clear invalid token
             localStorage.removeItem('adminAuthToken');
@@ -91,6 +99,13 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       
       if (response.data && response.data.success) {
         const { token, admin } = response.data;
+        
+        // Ensure both id and _id are set
+        if (admin.id && !admin._id) {
+          admin._id = admin.id;
+        } else if (admin._id && !admin.id) {
+          admin.id = admin._id;
+        }
         
         localStorage.setItem('adminAuthToken', token);
         localStorage.setItem('admin', JSON.stringify(admin));

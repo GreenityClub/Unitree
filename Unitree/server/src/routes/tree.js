@@ -345,8 +345,8 @@ router.post('/redeem', auth, async (req, res) => {
         user.trees = updatedUser.trees;
 
         // Get initial tree status
-        const growthProgress = tree.getGrowthProgress();
-        const healthStatus = tree.getHealthStatus();
+        const growthProgress = tree.growthProgress;
+        const healthStatus = tree.healthStatus;
 
         // Send success response with complete information
         res.json({

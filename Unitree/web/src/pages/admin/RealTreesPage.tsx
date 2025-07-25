@@ -6,6 +6,7 @@ import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 import { useToast } from "../../contexts/ToastContext";
 import Icon from "../../components/ui/Icon";
+import apiClient, { API_ENDPOINTS } from "../../config/api";
 import {
   useReactTable,
   getCoreRowModel,
@@ -32,79 +33,37 @@ import {
 } from "../../utils/icons";
 import { format } from "date-fns";
 
-// Interface for RealTree data
-interface RealTree {
-  id: string;
-  treeName: string;
-  species: string;
-  location: string;
-  coordinates: {
-    latitude: number;
-    longitude: number;
-  };
-  plantedDate: string;
-  plantedBy: string;
-  studentId: string;
-  status: "healthy" | "needs-attention" | "critical";
-  lastInspection: string;
-  heightCm: number;
-  imageUrl?: string;
-}
-
-// Dummy data for real trees
-const dummyRealTrees: RealTree[] = Array.from({ length: 15 }, (_, index) => ({
-  id: `rt-${index + 1}`,
-  treeName: `Tree ${index + 1}`,
-  species: ["Oak", "Pine", "Maple", "Cherry", "Birch"][
-    Math.floor(Math.random() * 5)
-  ],
-  location: [
-    "Campus Garden",
-    "City Park",
-    "School Yard",
-    "Community Forest",
-    "Botanical Garden",
-  ][Math.floor(Math.random() * 5)],
-  coordinates: {
-    latitude: 10.8231 + Math.random() * 0.05,
-    longitude: 106.6297 + Math.random() * 0.05,
-  },
-  plantedDate: new Date(
-    2023,
-    Math.floor(Math.random() * 12),
-    Math.floor(Math.random() * 28) + 1,
-  ).toISOString(),
-  plantedBy: `Student ${Math.floor(Math.random() * 50) + 1}`,
-  studentId: `S${10000 + Math.floor(Math.random() * 1000)}`,
-  status: ["healthy", "needs-attention", "critical"][
-    Math.floor(Math.random() * 3)
-  ] as "healthy" | "needs-attention" | "critical",
-  lastInspection: new Date(
-    2023,
-    Math.floor(Math.random() * 12),
-    Math.floor(Math.random() * 28) + 1,
-  ).toISOString(),
-  heightCm: Math.floor(Math.random() * 300) + 30,
-  imageUrl:
-    Math.random() > 0.3 ? "https://example.com/tree-image.jpg" : undefined,
-}));
-
 // Formatter for dates
 const formatDate = (dateString: string) => {
   return format(new Date(dateString), "dd/MM/yyyy");
 };
 
+// Interface for RealTree data
+interface RealTree {
+  _id: string;
+  userId: string;
+  studentId: string;
+  treeSpecie: string;
+  plantedDate: string;
+  location: string;
+  stage: 'planted' | 'thriving' | 'dead';
+  pointsCost: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Status badge component
 const StatusBadge: React.FC<{
-  status: "healthy" | "needs-attention" | "critical";
+  status: "planted" | "thriving" | "dead";
 }> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
-      case "healthy":
+      case "thriving":
         return "bg-green-100 text-green-800";
-      case "needs-attention":
+      case "planted":
         return "bg-yellow-100 text-yellow-800";
-      case "critical":
+      case "dead":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -132,13 +91,14 @@ const RealTreesPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { showToast } = useToast();
 
   // Column definitions
   const columnHelper = createColumnHelper<RealTree>();
   const columns = [
-    columnHelper.accessor("treeName", {
+    columnHelper.accessor("treeSpecie", {
       header: "Tree Name",
       cell: (info) => (
         <div className="flex items-center">
@@ -147,9 +107,6 @@ const RealTreesPage: React.FC = () => {
           </div>
           <div>
             <div className="font-medium">{info.getValue()}</div>
-            <div className="text-xs text-gray-500">
-              {info.row.original.species}
-            </div>
           </div>
         </div>
       ),
@@ -165,15 +122,15 @@ const RealTreesPage: React.FC = () => {
       ),
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("plantedBy", {
+    columnHelper.accessor("studentId", {
       header: "Planted By",
       cell: (info) => (
         <div className="flex items-center">
           <Icon icon={userIcon} className="text-gray-500 mr-2" />
           <div>
-            <div>{info.getValue()}</div>
+            <div>Student</div>
             <div className="text-xs text-gray-500">
-              ID: {info.row.original.studentId}
+              ID: {info.getValue()}
             </div>
           </div>
         </div>
@@ -190,14 +147,14 @@ const RealTreesPage: React.FC = () => {
       ),
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("status", {
+    columnHelper.accessor("stage", {
       header: "Status",
       cell: (info) => <StatusBadge status={info.getValue()} />,
       footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("heightCm", {
-      header: "Height",
-      cell: (info) => `${info.getValue()} cm`,
+    columnHelper.accessor("pointsCost", {
+      header: "Points Cost",
+      cell: (info) => `${info.getValue()} points`,
       footer: (info) => info.column.id,
     }),
     columnHelper.display({
@@ -252,14 +209,14 @@ const RealTreesPage: React.FC = () => {
   useEffect(() => {
     const fetchRealTrees = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        // Simulate API call with a timeout
-        setTimeout(() => {
-          setRealTrees(dummyRealTrees);
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error("Failed to fetch real trees:", error);
+        const response = await apiClient.get(API_ENDPOINTS.TREE.ADMIN.GET_REAL_TREES);
+        setRealTrees(response.data);
+      } catch (err: any) {
+        console.error("Failed to fetch real trees:", err);
+        setError(err.response?.data?.message || 'Failed to load real tree data');
+      } finally {
         setIsLoading(false);
       }
     };
@@ -286,18 +243,31 @@ const RealTreesPage: React.FC = () => {
   };
 
   // Handle tree deletion
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedTree) {
-      // Filter out the selected tree
-      setRealTrees((current) =>
-        current.filter((tree) => tree.id !== selectedTree.id),
-      );
-      showToast(
-        `Real tree ${selectedTree.treeName} has been deleted.`,
-        "success",
-      );
-      setShowDeleteModal(false);
-      setSelectedTree(null);
+      try {
+        // Here you would make an API call to delete the tree
+        // await apiClient.delete(`/api/trees/admin/realtrees/${selectedTree._id}`);
+        
+        // For now, we'll just filter it out from state
+        setRealTrees((current) =>
+          current.filter((tree) => tree._id !== selectedTree._id),
+        );
+        
+        showToast(
+          `Real tree ${selectedTree.treeSpecie} has been deleted.`,
+          "success",
+        );
+        
+      } catch (err: any) {
+        showToast(
+          err.response?.data?.message || 'Failed to delete tree',
+          "error",
+        );
+      } finally {
+        setShowDeleteModal(false);
+        setSelectedTree(null);
+      }
     }
   };
 
@@ -318,7 +288,7 @@ const RealTreesPage: React.FC = () => {
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="Search trees by name, species, location or planted by..."
+                  placeholder="Search trees by species, location or student ID..."
                   value={globalFilter || ""}
                   onChange={(e) => setGlobalFilter(e.target.value)}
                   className="pl-10"
@@ -356,6 +326,10 @@ const RealTreesPage: React.FC = () => {
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
             </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-red-500">{error}</div>
+            </div>
           ) : (
             <div>
               <table className="min-w-full divide-y divide-gray-200">
@@ -389,21 +363,32 @@ const RealTreesPage: React.FC = () => {
                   ))}
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-6 py-4 whitespace-nowrap"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
+                  {realTrees.length === 0 ? (
+                    <tr>
+                      <td 
+                        colSpan={columns.length} 
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No real trees found
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    table.getRowModel().rows.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className="px-6 py-4 whitespace-nowrap"
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
 
@@ -496,7 +481,7 @@ const RealTreesPage: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-500 mt-2">
             Are you sure you want to delete the record for{" "}
-            {selectedTree?.treeName}? This will only remove the digital record,
+            {selectedTree?.treeSpecie}? This will only remove the digital record,
             not the actual tree.
           </p>
         </div>
@@ -526,7 +511,66 @@ const RealTreesPage: React.FC = () => {
         variant="info"
       >
         <div className="mb-6">
-          <p>Tree record form would go here...</p>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tree Species
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter tree species"
+                defaultValue={selectedTree?.treeSpecie}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter planting location"
+                defaultValue={selectedTree?.location}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Student ID
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter student ID"
+                defaultValue={selectedTree?.studentId}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select 
+                className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                defaultValue={selectedTree?.stage || "planted"}
+              >
+                <option value="planted">Planted</option>
+                <option value="thriving">Thriving</option>
+                <option value="dead">Dead</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea 
+                className="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                rows={3}
+                placeholder="Additional notes about this tree"
+                defaultValue={selectedTree?.notes}
+              ></textarea>
+            </div>
+          </div>
         </div>
         <div className="flex justify-end space-x-3">
           <Button
@@ -560,41 +604,14 @@ const RealTreesPage: React.FC = () => {
       >
         {selectedTree && (
           <div className="mb-6">
-            <div className="mb-6 flex justify-center">
-              {selectedTree.imageUrl ? (
-                <img
-                  src={selectedTree.imageUrl}
-                  alt={selectedTree.treeName}
-                  className="w-full max-w-sm rounded-lg shadow-md"
-                />
-              ) : (
-                <div className="w-full max-w-sm h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Icon icon={treeIcon} className="text-gray-400 text-5xl" />
-                </div>
-              )}
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Tree Name</h4>
-                <p className="text-lg">{selectedTree.treeName}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Species</h4>
-                <p className="text-lg">{selectedTree.species}</p>
+                <h4 className="text-sm font-medium text-gray-500">Tree Species</h4>
+                <p className="text-lg">{selectedTree.treeSpecie}</p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500">Location</h4>
                 <p className="text-lg">{selectedTree.location}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">
-                  Coordinates
-                </h4>
-                <p className="text-lg">
-                  {selectedTree.coordinates.latitude.toFixed(6)},{" "}
-                  {selectedTree.coordinates.longitude.toFixed(6)}
-                </p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500">
@@ -606,26 +623,24 @@ const RealTreesPage: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500">
-                  Planted By
+                  Student ID
                 </h4>
-                <p className="text-lg">
-                  {selectedTree.plantedBy} ({selectedTree.studentId})
-                </p>
+                <p className="text-lg">{selectedTree.studentId}</p>
               </div>
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Height</h4>
-                <p className="text-lg">{selectedTree.heightCm} cm</p>
+                <h4 className="text-sm font-medium text-gray-500">Points Cost</h4>
+                <p className="text-lg">{selectedTree.pointsCost} points</p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500">Status</h4>
-                <StatusBadge status={selectedTree.status} />
+                <StatusBadge status={selectedTree.stage} />
               </div>
-              <div>
+              <div className="col-span-2">
                 <h4 className="text-sm font-medium text-gray-500">
-                  Last Inspection
+                  Notes
                 </h4>
-                <p className="text-lg">
-                  {formatDate(selectedTree.lastInspection)}
+                <p className="text-lg whitespace-pre-wrap">
+                  {selectedTree.notes || 'No additional notes'}
                 </p>
               </div>
             </div>

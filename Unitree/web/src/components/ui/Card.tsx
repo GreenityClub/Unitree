@@ -7,7 +7,7 @@ const Card: React.FC<CardProps> = ({
   className = '',
   onClick,
   rounded = 'lg', // Default to rounded-lg if not specified
-  variant = 'default', // Default, primary, secondary, tertiary, accent
+  variant = 'default', // Default, primary, secondary, tertiary, accent, danger
 }) => {
   // Map rounded prop values to actual pixel values
   const getBorderRadiusValue = () => {
@@ -33,11 +33,12 @@ const Card: React.FC<CardProps> = ({
     secondary: 'card-secondary shadow-sm',
     tertiary: 'card-tertiary shadow-sm',
     accent: 'card-accent shadow-sm',
+    danger: 'bg-red-50 border border-red-200 shadow-sm', // Add danger variant
   };
   
   const baseClasses = 'overflow-hidden';
   const clickableClasses = onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : '';
-  const classes = `${baseClasses} ${variantClasses[variant]} ${clickableClasses} ${className}`;
+  const classes = `${baseClasses} ${variantClasses[variant as keyof typeof variantClasses] || variantClasses.default} ${clickableClasses} ${className}`;
   
   const style = {
     borderRadius: getBorderRadiusValue()
@@ -51,9 +52,10 @@ const Card: React.FC<CardProps> = ({
       secondary: 'text-text',
       tertiary: 'text-text',
       accent: 'text-text',
+      danger: 'text-red-700', // Add danger title style
     };
     
-    return `text-lg font-medium ${titleClasses[variant]}`;
+    return `text-lg font-medium ${titleClasses[variant as keyof typeof titleClasses] || titleClasses.default}`;
   };
   
   // Border style based on variant
@@ -64,9 +66,10 @@ const Card: React.FC<CardProps> = ({
       secondary: 'border-secondary',
       tertiary: 'border-tertiary',
       accent: 'border-accent',
+      danger: 'border-red-200', // Add danger border style
     };
     
-    return `border-b ${borderClasses[variant]}`;
+    return `border-b ${borderClasses[variant as keyof typeof borderClasses] || borderClasses.default}`;
   };
   
   return (

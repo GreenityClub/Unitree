@@ -175,7 +175,7 @@ export interface CardProps {
   className?: string;
   onClick?: () => void;
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
-  variant?: 'default' | 'primary' | 'secondary' | 'tertiary' | 'accent';
+  variant?: 'default' | 'primary' | 'secondary' | 'tertiary' | 'accent' | 'danger';
 }
 
 export interface ModalProps {

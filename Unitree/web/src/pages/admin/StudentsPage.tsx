@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import { useToast } from '../../contexts/ToastContext';
 import Icon from '../../components/ui/Icon';
+import apiClient, { API_ENDPOINTS } from '../../config/api';
 import {
   useReactTable,
   getCoreRowModel,
@@ -25,29 +26,19 @@ import { format } from 'date-fns';
 
 // Interface for Student data
 interface Student {
-  id: string;
-  fullName: string;
+  _id: string;
+  fullname: string;
   email: string;
   studentId: string;
   points: number;
-  trees: number;
-  level: number;
+  allTimePoints: number;
+  trees: string[]; // Array of tree IDs
+  realTrees: string[]; // Array of real tree IDs
   createdAt: string;
-  status: 'active' | 'inactive' | 'suspended';
+  university: string;
+  avatar?: string;
+  lastActive?: string;
 }
-
-// Dummy student data - would be fetched from API in real app
-const dummyStudents: Student[] = Array.from({ length: 100 }, (_, index) => ({
-  id: `stud-${index + 1}`,
-  fullName: `Student ${index + 1}`,
-  email: `student${index + 1}@example.com`,
-  studentId: `S${10000 + index}`,
-  points: Math.floor(Math.random() * 5000),
-  trees: Math.floor(Math.random() * 20),
-  level: Math.floor(Math.random() * 10) + 1,
-  createdAt: new Date(2023, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString(),
-  status: ['active', 'inactive', 'suspended'][Math.floor(Math.random() * 3)] as 'active' | 'inactive' | 'suspended',
-}));
 
 // Formatter for dates
 const formatDate = (dateString: string) => {
@@ -55,23 +46,21 @@ const formatDate = (dateString: string) => {
 };
 
 // Status badge component
-const StatusBadge: React.FC<{ status: 'active' | 'inactive' | 'suspended' }> = ({ status }) => {
+const StatusBadge: React.FC<{ lastActive?: string }> = ({ lastActive }) => {
+  // Consider a user active if they've been active in the last 7 days
+  const isActive = lastActive && new Date(lastActive) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  
   const getStatusStyles = () => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+    if (isActive) {
+      return 'bg-green-100 text-green-800';
+    } else {
+      return 'bg-gray-100 text-gray-800';
     }
   };
 
   return (
     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusStyles()}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {isActive ? 'Active' : 'Inactive'}
     </span>
   );
 };
@@ -84,6 +73,12 @@ const StudentsPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0
+  });
 
   const { showToast } = useToast();
   
@@ -95,12 +90,20 @@ const StudentsPage: React.FC = () => {
       cell: info => info.getValue(),
       footer: info => info.column.id,
     }),
-    columnHelper.accessor('fullName', {
+    columnHelper.accessor('fullname', {
       header: 'Name',
       cell: info => (
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
-            <Icon icon={userIcon} className="text-blue-500" />
+            {info.row.original.avatar ? (
+              <img 
+                src={info.row.original.avatar} 
+                alt={info.getValue()} 
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <Icon icon={userIcon} className="text-blue-500" />
+            )}
           </div>
           {info.getValue()}
         </div>
@@ -124,7 +127,8 @@ const StudentsPage: React.FC = () => {
       ),
       footer: info => info.column.id,
     }),
-    columnHelper.accessor('trees', {
+    columnHelper.accessor(row => row.trees?.length || 0, {
+      id: 'trees',
       header: () => (
         <div className="flex items-center">
           <Icon icon={treeIcon} className="mr-1 text-green-500" />
@@ -134,15 +138,9 @@ const StudentsPage: React.FC = () => {
       cell: info => info.getValue(),
       footer: info => info.column.id,
     }),
-    columnHelper.accessor('level', {
-      header: 'Level',
-      cell: info => (
-        <div className="flex items-center">
-          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-            <span className="text-sm font-medium text-purple-700">{info.getValue()}</span>
-          </div>
-        </div>
-      ),
+    columnHelper.accessor('university', {
+      header: 'University',
+      cell: info => info.getValue(),
       footer: info => info.column.id,
     }),
     columnHelper.accessor('createdAt', {
@@ -150,9 +148,10 @@ const StudentsPage: React.FC = () => {
       cell: info => formatDate(info.getValue()),
       footer: info => info.column.id,
     }),
-    columnHelper.accessor('status', {
+    columnHelper.accessor(row => row.lastActive, {
+      id: 'status',
       header: 'Status',
-      cell: info => <StatusBadge status={info.getValue()} />,
+      cell: info => <StatusBadge lastActive={info.getValue()} />,
       footer: info => info.column.id,
     }),
     columnHelper.display({
@@ -160,13 +159,6 @@ const StudentsPage: React.FC = () => {
       header: 'Actions',
       cell: props => (
         <div className="flex space-x-2">
-          <button
-            onClick={() => handleEdit(props.row.original)}
-            className="p-1 rounded-full hover:bg-gray-100"
-            title="Edit student"
-          >
-            <Icon icon={editIcon} className="text-blue-500" />
-          </button>
           <button
             onClick={() => handleDelete(props.row.original)}
             className="p-1 rounded-full hover:bg-gray-100"
@@ -198,27 +190,31 @@ const StudentsPage: React.FC = () => {
 
   // Load students on component mount
   useEffect(() => {
-    const fetchStudents = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call with a timeout
-        setTimeout(() => {
-          setStudents(dummyStudents);
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error('Failed to fetch students:', error);
-        setIsLoading(false);
-      }
-    };
-
     fetchStudents();
-  }, []);
+  }, [pagination.page, pagination.limit]);
 
-  // Handle opening the edit modal
-  const handleEdit = (student: Student) => {
-    setSelectedStudent(student);
-    setShowEditModal(true);
+  const fetchStudents = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get('/api/users', {
+        params: {
+          page: pagination.page,
+          limit: pagination.limit,
+          search: globalFilter
+        }
+      });
+      setStudents(response.data.users);
+      setPagination(prev => ({
+        ...prev,
+        total: response.data.total
+      }));
+    } catch (err) {
+      console.error('Failed to fetch students:', err);
+      setError('Failed to load student data. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle opening the delete modal
@@ -228,31 +224,27 @@ const StudentsPage: React.FC = () => {
   };
 
   // Handle student deletion
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedStudent) {
-      // Filter out the selected student
-      setStudents(current => current.filter(student => student.id !== selectedStudent.id));
-      showToast(`Student ${selectedStudent.fullName} has been deleted.`, 'success');
-      setShowDeleteModal(false);
-      setSelectedStudent(null);
+      try {
+        await apiClient.delete(`/api/users/${selectedStudent._id}`);
+        showToast(`Student ${selectedStudent.fullname} has been deleted.`, 'success');
+        fetchStudents(); // Refresh the list
+      } catch (err: any) {
+        showToast(err.response?.data?.message || 'Failed to delete student.', 'error');
+      } finally {
+        setShowDeleteModal(false);
+        setSelectedStudent(null);
+      }
     }
   };
 
   // Pagination controls
-  const nextPage = () => {
-    if (table.getCanNextPage()) {
-      table.nextPage();
-    }
-  };
-
-  const prevPage = () => {
-    if (table.getCanPreviousPage()) {
-      table.previousPage();
-    }
-  };
-
-  const gotoPage = (pageIndex: number) => {
-    table.setPageIndex(pageIndex);
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
   };
 
   return (
@@ -273,6 +265,11 @@ const StudentsPage: React.FC = () => {
                   placeholder="Search students by name, email or ID..."
                   value={globalFilter || ''}
                   onChange={e => setGlobalFilter(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      fetchStudents();
+                    }
+                  }}
                   className="pl-10"
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -280,17 +277,12 @@ const StudentsPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="bg-white">
-                All Students
-              </Button>
-              <Button variant="outline" className="bg-white">
-                Active
-              </Button>
-              <Button variant="outline" className="bg-white">
-                Inactive
-              </Button>
-            </div>
+            <Button 
+              variant="primary" 
+              onClick={fetchStudents}
+            >
+              Search
+            </Button>
           </div>
         </div>
       </Card>
@@ -302,6 +294,8 @@ const StudentsPage: React.FC = () => {
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
+          ) : error ? (
+            <div className="p-4 text-center text-red-500">{error}</div>
           ) : (
             <div>
               <table className="min-w-full divide-y divide-gray-200">
@@ -332,15 +326,23 @@ const StudentsPage: React.FC = () => {
                   ))}
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {table.getRowModel().rows.map(row => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
+                  {students.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+                        No students found
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
               
@@ -350,65 +352,70 @@ const StudentsPage: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-700">
                       Showing{' '}
-                      <span className="font-medium">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span>{' '}
+                      <span className="font-medium">
+                        {students.length > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0}
+                      </span>{' '}
                       to{' '}
                       <span className="font-medium">
-                        {Math.min(
-                          (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                          table.getFilteredRowModel().rows.length
-                        )}
+                        {Math.min(pagination.page * pagination.limit, pagination.total)}
                       </span>{' '}
-                      of <span className="font-medium">{table.getFilteredRowModel().rows.length}</span> results
+                      of <span className="font-medium">{pagination.total}</span> results
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
                       className="bg-white"
-                      onClick={() => table.setPageIndex(0)}
-                      disabled={!table.getCanPreviousPage()}
+                      onClick={() => handlePageChange(1)}
+                      disabled={pagination.page === 1}
                     >
                       First
                     </Button>
                     <Button
                       variant="outline"
                       className="bg-white"
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
                     >
                       Previous
                     </Button>
                     <div className="flex items-center">
-                      {Array.from({ length: table.getPageCount() }, (_, i) => (
-                        <button
-                          key={i}
-                          className={`px-3 py-1 text-sm ${
-                            table.getState().pagination.pageIndex === i
-                              ? 'bg-blue-100 text-blue-700 font-medium rounded-md'
-                              : 'text-gray-700 hover:bg-gray-100 rounded-md'
-                          }`}
-                          onClick={() => gotoPage(i)}
-                        >
-                          {i + 1}
-                        </button>
-                      )).slice(
-                        Math.max(0, table.getState().pagination.pageIndex - 1),
-                        Math.min(table.getPageCount(), table.getState().pagination.pageIndex + 3)
+                      {Array.from(
+                        { length: Math.ceil(pagination.total / pagination.limit) },
+                        (_, i) => (
+                          <button
+                            key={i}
+                            className={`px-3 py-1 text-sm ${
+                              pagination.page === i + 1
+                                ? 'bg-blue-100 text-blue-700 font-medium rounded-md'
+                                : 'text-gray-700 hover:bg-gray-100 rounded-md'
+                            }`}
+                            onClick={() => handlePageChange(i + 1)}
+                          >
+                            {i + 1}
+                          </button>
+                        )
+                      ).slice(
+                        Math.max(0, pagination.page - 2),
+                        Math.min(
+                          Math.ceil(pagination.total / pagination.limit),
+                          pagination.page + 1
+                        )
                       )}
                     </div>
                     <Button
                       variant="outline"
                       className="bg-white"
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
                     >
                       Next
                     </Button>
                     <Button
                       variant="outline"
                       className="bg-white"
-                      onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                      disabled={!table.getCanNextPage()}
+                      onClick={() => handlePageChange(Math.ceil(pagination.total / pagination.limit))}
+                      disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
                     >
                       Last
                     </Button>
@@ -433,7 +440,10 @@ const StudentsPage: React.FC = () => {
           </div>
           <h3 className="text-lg font-medium text-gray-900">Delete Student</h3>
           <p className="text-sm text-gray-500 mt-2">
-            Are you sure you want to delete {selectedStudent?.fullName}? This action cannot be undone.
+            Are you sure you want to delete {selectedStudent?.fullname}? This action cannot be undone.
+          </p>
+          <p className="text-sm text-red-500 mt-2 font-bold">
+            This will permanently delete all data associated with this student, including trees, points, and WiFi sessions.
           </p>
         </div>
         <div className="flex justify-end space-x-3">
@@ -450,27 +460,6 @@ const StudentsPage: React.FC = () => {
             className="bg-red-600 hover:bg-red-700 text-white"
           >
             Delete
-          </Button>
-        </div>
-      </Modal>
-
-      {/* Edit Modal - Just a placeholder, would contain a form in real app */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit Student"
-        variant="info"
-      >
-        <div className="text-center mb-6">
-          <p>Edit form would go here...</p>
-        </div>
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            onClick={() => setShowEditModal(false)}
-            className="bg-white"
-          >
-            Close
           </Button>
         </div>
       </Modal>

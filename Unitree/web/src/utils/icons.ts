@@ -81,6 +81,7 @@ export const chartIcon = faChartBar;
 export const addIcon = faPlus;
 export const editIcon = faPencilAlt;
 export const deleteIcon = faTrash;
+export const trashIcon = faTrash; // Add trashIcon as an alias for deleteIcon
 export const saveIcon = faSave;
 export const eyeIcon = faEye;
 export const eyeSlashIcon = faEyeSlash;
