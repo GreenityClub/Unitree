@@ -7,6 +7,7 @@ import Modal from '../../components/ui/Modal';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { usersIcon, userIcon, editIcon, deleteIcon } from '../../utils/icons';
 import apiClient, { API_ENDPOINTS } from '../../config/api';
+import { Navigate } from 'react-router-dom';
 
 interface Admin {
   _id: string;
@@ -33,6 +34,14 @@ const AdminsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
+  
+  // Check if current user is a superadmin
+  const isSuperAdmin = currentAdmin?.role === 'superadmin';
+  
+  // If not a superadmin, redirect to dashboard
+  if (!isSuperAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
   
   // Form state for creating a new admin
   const [newAdmin, setNewAdmin] = useState({
@@ -61,9 +70,6 @@ const AdminsPage: React.FC = () => {
   const fetchAdmins = async () => {
     try {
       setIsLoading(true);
-      
-      // Log the current token for debugging
-      console.log('Current admin token:', localStorage.getItem('adminAuthToken'));
       
       const response = await apiClient.get(API_ENDPOINTS.ADMIN.GET_ALL);
       
@@ -140,7 +146,6 @@ const AdminsPage: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const isSuperAdmin = currentAdmin?.role === 'superadmin';
   const canManageAdmins = isSuperAdmin || currentAdmin?.permissions?.manageAdmins;
 
   return (

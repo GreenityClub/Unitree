@@ -1,6 +1,7 @@
 import React, { ReactNode, useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './ui/Icon';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 import {
   dashboardIcon,
   usersIcon,
@@ -38,6 +39,9 @@ interface AdminLayoutProps {
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
+  const { admin } = useAdminAuth();
+  const isSuperAdmin = admin?.role === 'superadmin';
+  
   const [collapsed, setCollapsed] = useState(() => {
     // Đọc trạng thái từ localStorage khi component được mount
     const savedState = localStorage.getItem('sidebarCollapsed');
@@ -131,30 +135,32 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 </NavLink>
               </li>
               
-              {/* Admins */}
-              <li>
-                <NavLink 
-                  to="/admin/admins" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/admins') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                                          <Icon 
-                      icon={userIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/admins') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-300 ${isActive('/admin/admins') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
-                      Admins
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {/* Admins - only visible to superadmin */}
+              {isSuperAdmin && (
+                <li>
+                  <NavLink 
+                    to="/admin/admins" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/admins') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                                            <Icon 
+                        icon={userIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/admins') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-300 ${isActive('/admin/admins') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
+                        Admins
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Students */}
               <li>
