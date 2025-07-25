@@ -156,7 +156,9 @@ export const API_ENDPOINTS = {
     TREE_TYPES: '/api/statistics/tree-types',
     USER_ACTIVITY: '/api/statistics/user-activity',
     POINTS_DISTRIBUTION: '/api/statistics/points-distribution',
-    DAILY_SESSIONS: '/api/statistics/daily-sessions'
+    DAILY_SESSIONS: '/api/statistics/daily-sessions',
+    WIFI_HOURS: '/api/statistics/wifi-hours',
+    POINTS_EARNED: '/api/statistics/points-earned'
   },
 };
 
