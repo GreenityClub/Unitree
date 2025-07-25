@@ -163,179 +163,193 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               )}
               
               {/* Students */}
-              <li>
-                <NavLink 
-                  to="/admin/students" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/students') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
+              {admin?.permissions?.manageStudents && (
+                <li>
+                  <NavLink 
+                    to="/admin/students" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/students') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
                                           <Icon 
                       icon={usersIcon} 
                       className={`transition-all duration-300 ${isActive('/admin/students') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
                     />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-300 ${isActive('/admin/students') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
-                      Students
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-300 ${isActive('/admin/students') ? 'font-bold text-primary transform scale-125' : 'text-text group-hover:text-primary group-hover:scale-110'}`}>
+                        Students
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Trees */}
-              <li>
-                <NavLink 
-                  to="/admin/trees" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/trees') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={treeIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      Trees
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.manageTrees && (
+                <li>
+                  <NavLink 
+                    to="/admin/trees" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/trees') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={treeIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Trees
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Tree Types */}
-              <li>
-                <NavLink 
-                  to="/admin/tree-types" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/tree-types') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={leafIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/tree-types') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/tree-types') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      Tree Types
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.manageTreeTypes && (
+                <li>
+                  <NavLink 
+                    to="/admin/tree-types" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/tree-types') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={leafIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/tree-types') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/tree-types') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Tree Types
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Real Trees */}
-              <li>
-                <NavLink 
-                  to="/admin/real-trees" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/real-trees') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={treeIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/real-trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/real-trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      Real Trees
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.manageRealTrees && (
+                <li>
+                  <NavLink 
+                    to="/admin/real-trees" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/real-trees') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={treeIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/real-trees') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/real-trees') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Real Trees
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Points */}
-              <li>
-                <NavLink 
-                  to="/admin/points" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/points') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={medalIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/points') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/points') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      Points
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.managePoints && (
+                <li>
+                  <NavLink 
+                    to="/admin/points" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/points') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={medalIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/points') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/points') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Points
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* WiFi Sessions */}
-              <li>
-                <NavLink 
-                  to="/admin/wifi" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/wifi') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={wifiIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/wifi') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/wifi') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      WiFi Sessions
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.manageWifiSessions && (
+                <li>
+                  <NavLink 
+                    to="/admin/wifi" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/wifi') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={wifiIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/wifi') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/wifi') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        WiFi Sessions
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
               
               {/* Statistics */}
-              <li>
-                <NavLink 
-                  to="/admin/statistics" 
-                  className={({ isActive }) => 
-                    `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
-                  }
-                >
-                  {isActive('/admin/statistics') && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
-                  )}
-                  <div className="w-16 flex items-center justify-center flex-shrink-0">
-                    <Icon 
-                      icon={chartIcon} 
-                      className={`transition-all duration-300 ${isActive('/admin/statistics') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
-                    />
-                  </div>
-                  <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <span className={`transition-all duration-200 ${isActive('/admin/statistics') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
-                      Statistics
-                    </span>
-                  </div>
-                </NavLink>
-              </li>
+              {admin?.permissions?.viewStatistics && (
+                <li>
+                  <NavLink 
+                    to="/admin/statistics" 
+                    className={({ isActive }) => 
+                      `h-12 flex items-center relative transition-all duration-300 hover:scale-110 hover:bg-primary/10 group ${isActive ? 'nav-active scale-105' : ''}`
+                    }
+                  >
+                    {isActive('/admin/statistics') && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary rounded-r-md shadow-md z-10"></span>
+                    )}
+                    <div className="w-16 flex items-center justify-center flex-shrink-0">
+                      <Icon 
+                        icon={chartIcon} 
+                        className={`transition-all duration-300 ${isActive('/admin/statistics') ? 'text-primary transform scale-170 font-bold' : 'text-gray-500 group-hover:text-primary group-hover:scale-130'}`}
+                      />
+                    </div>
+                    <div className={`transition-all duration-300 whitespace-nowrap ${expanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
+                      <span className={`transition-all duration-200 ${isActive('/admin/statistics') ? 'font-medium text-primary transform scale-105' : 'text-text group-hover:text-primary group-hover:scale-105'}`}>
+                        Statistics
+                      </span>
+                    </div>
+                  </NavLink>
+                </li>
+              )}
             </ul>
             
             {/* Settings section */}
