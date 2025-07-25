@@ -237,4 +237,214 @@ router.get('/monthly', authAdmin, async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/statistics/tree-types
+ * @desc    Get distribution of tree types
+ * @access  Private (Admin)
+ */
+router.get('/tree-types', authAdmin, async (req, res) => {
+  try {
+    const treeTypeDistribution = await Tree.aggregate([
+      {
+        $group: {
+          _id: "$species",
+          value: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { value: -1 }
+      },
+      {
+        $limit: 10
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          value: 1
+        }
+      }
+    ]);
+
+    res.json(treeTypeDistribution);
+  } catch (err) {
+    logger.error('Error fetching tree type distribution:', err);
+    res.status(500).json({ message: 'Server error while fetching tree type distribution' });
+  }
+});
+
+/**
+ * @route   GET /api/statistics/user-activity
+ * @desc    Get user activity by hour
+ * @access  Private (Admin)
+ */
+router.get('/user-activity', authAdmin, async (req, res) => {
+  try {
+    const userActivity = await WifiSession.aggregate([
+      {
+        $project: {
+          hour: { $hour: "$startTime" }
+        }
+      },
+      {
+        $group: {
+          _id: "$hour",
+          active: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      },
+      {
+        $project: {
+          _id: 0,
+          hour: { 
+            $concat: [
+              { $cond: [{ $lt: ["$_id", 10] }, { $concat: ["0", { $toString: "$_id" }] }, { $toString: "$_id" }] },
+              ":00"
+            ]
+          },
+          active: 1
+        }
+      }
+    ]);
+
+    // Fill in missing hours with zero activity
+    const result = Array.from({ length: 24 }, (_, i) => {
+      const hour = i < 10 ? `0${i}:00` : `${i}:00`;
+      const found = userActivity.find(item => item.hour === hour);
+      return found || { hour, active: 0 };
+    });
+
+    res.json(result);
+  } catch (err) {
+    logger.error('Error fetching user activity by hour:', err);
+    res.status(500).json({ message: 'Server error while fetching user activity' });
+  }
+});
+
+/**
+ * @route   GET /api/statistics/points-distribution
+ * @desc    Get distribution of points by source
+ * @access  Private (Admin)
+ */
+router.get('/points-distribution', authAdmin, async (req, res) => {
+  try {
+    const pointsDistribution = await Point.aggregate([
+      {
+        $group: {
+          _id: "$type",
+          value: { $sum: "$amount" }
+        }
+      },
+      {
+        $match: {
+          value: { $gt: 0 }  // Only include positive points
+        }
+      },
+      {
+        $sort: { value: -1 }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$_id", "WIFI_SESSION"] }, then: "WiFi Sessions" },
+                { case: { $eq: ["$_id", "TREE_REDEMPTION"] }, then: "Tree Planting" },
+                { case: { $eq: ["$_id", "REAL_TREE_REDEMPTION"] }, then: "Real Tree Planting" },
+                { case: { $eq: ["$_id", "ADMIN_ADJUSTMENT"] }, then: "Admin Adjustments" },
+                { case: { $eq: ["$_id", "ATTENDANCE"] }, then: "Attendance" },
+                { case: { $eq: ["$_id", "ACHIEVEMENT"] }, then: "Achievements" },
+                { case: { $eq: ["$_id", "BONUS"] }, then: "Bonuses" }
+              ],
+              default: "Other"
+            }
+          },
+          value: 1
+        }
+      }
+    ]);
+
+    // Calculate total to convert to percentages
+    const total = pointsDistribution.reduce((sum, item) => sum + item.value, 0);
+    
+    // Convert values to percentages
+    const result = pointsDistribution.map(item => ({
+      name: item.name,
+      value: Math.round((item.value / total) * 100)
+    }));
+
+    res.json(result);
+  } catch (err) {
+    logger.error('Error fetching points distribution:', err);
+    res.status(500).json({ message: 'Server error while fetching points distribution' });
+  }
+});
+
+/**
+ * @route   GET /api/statistics/daily-sessions
+ * @desc    Get daily WiFi sessions for the past month
+ * @access  Private (Admin)
+ */
+router.get('/daily-sessions', authAdmin, async (req, res) => {
+  try {
+    // Get current date and calculate date 30 days ago
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    
+    const dailySessions = await WifiSession.aggregate([
+      {
+        $match: {
+          startTime: { $gte: thirtyDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$startTime" },
+            month: { $month: "$startTime" },
+            day: { $dayOfMonth: "$startTime" }
+          },
+          sessions: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: { 
+            $concat: [
+              { $toString: "$_id.day" }, 
+              "/", 
+              { $toString: "$_id.month" }
+            ] 
+          },
+          sessions: 1
+        }
+      }
+    ]);
+
+    // Fill in missing days with zero sessions
+    const result = [];
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - (29 - i));
+      const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
+      
+      const found = dailySessions.find(item => item.date === dateStr);
+      result.push(found || { date: dateStr, sessions: 0 });
+    }
+
+    res.json(result);
+  } catch (err) {
+    logger.error('Error fetching daily sessions:', err);
+    res.status(500).json({ message: 'Server error while fetching daily sessions' });
+  }
+});
+
 module.exports = router; 

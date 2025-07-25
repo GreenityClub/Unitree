@@ -30,75 +30,179 @@ import {
   filterIcon,
   downloadIcon,
 } from "../../utils/icons";
+import { useToast } from "../../contexts/ToastContext";
+import apiClient from "../../config/api";
+import { API_ENDPOINTS } from "../../config/api";
 
-// Dummy data for charts
-const monthlyData = [
-  { month: "Jan", students: 50, trees: 80, points: 1200, sessions: 120 },
-  { month: "Feb", students: 65, trees: 105, points: 1600, sessions: 150 },
-  { month: "Mar", students: 85, trees: 140, points: 2100, sessions: 190 },
-  { month: "Apr", students: 110, trees: 180, points: 2700, sessions: 230 },
-  { month: "May", students: 140, trees: 230, points: 3500, sessions: 280 },
-  { month: "Jun", students: 180, trees: 290, points: 4500, sessions: 350 },
-  { month: "Jul", students: 210, trees: 342, points: 5200, sessions: 420 },
-];
+// Define interface for the statistics data
+interface OverviewStats {
+  totalUsers: number;
+  totalVirtualTrees: number;
+  totalRealTrees: number;
+  totalWifiHours: number;
+  totalPointsEarned: number;
+  recentUsers: any[];
+}
 
-const treeTypesData = [
-  { name: "Oak", value: 120, color: "#4CAF50" },
-  { name: "Pine", value: 80, color: "#8BC34A" },
-  { name: "Maple", value: 70, color: "#CDDC39" },
-  { name: "Birch", value: 50, color: "#FFC107" },
-  { name: "Cedar", value: 30, color: "#FF9800" },
-];
+interface MonthlyData {
+  month: string;
+  year: number;
+  students: number;
+  trees: number;
+  points: number;
+  sessions: number;
+  hours: number;
+}
 
-const userActivityData = [
-  { hour: "00:00", active: 25 },
-  { hour: "03:00", active: 10 },
-  { hour: "06:00", active: 15 },
-  { hour: "09:00", active: 120 },
-  { hour: "12:00", active: 180 },
-  { hour: "15:00", active: 210 },
-  { hour: "18:00", active: 160 },
-  { hour: "21:00", active: 70 },
-];
+interface TreeTypeData {
+  name: string;
+  value: number;
+  color?: string;
+}
 
-const pointsSourceData = [
-  { name: "WiFi Sessions", value: 65 },
-  { name: "Tree Planting", value: 20 },
-  { name: "Daily Streaks", value: 10 },
-  { name: "Other", value: 5 },
-];
+interface ActivityData {
+  hour: string;
+  active: number;
+}
 
-const dailySessionsData = Array.from({ length: 30 }, (_, i) => ({
-  date: `${i + 1}`,
-  sessions: Math.floor(Math.random() * 100) + 50,
-}));
+interface PointsSourceData {
+  name: string;
+  value: number;
+}
 
-const COLORS = ["#4CAF50", "#8BC34A", "#CDDC39", "#FFC107", "#FF9800"];
+interface DailySessionData {
+  date: string;
+  sessions: number;
+}
+
+const COLORS = ["#4CAF50", "#8BC34A", "#CDDC39", "#FFC107", "#FF9800", "#F44336", "#E91E63", "#9C27B0"];
 
 const StatisticsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<"week" | "month" | "year">(
-    "month",
-  );
-  const [selectedMetric, setSelectedMetric] = useState<
-    "students" | "trees" | "points" | "sessions"
-  >("points");
+  const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("month");
+  const [selectedMetric, setSelectedMetric] = useState<"students" | "trees" | "points" | "sessions">("points");
+  
+  // State for API data
+  const [overviewStats, setOverviewStats] = useState<OverviewStats | null>(null);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [treeTypesData, setTreeTypesData] = useState<TreeTypeData[]>([]);
+  const [userActivityData, setUserActivityData] = useState<ActivityData[]>([]);
+  const [pointsSourceData, setPointsSourceData] = useState<PointsSourceData[]>([]);
+  const [dailySessionsData, setDailySessionsData] = useState<DailySessionData[]>([]);
+  
+  // Error states
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [monthlyError, setMonthlyError] = useState<string | null>(null);
+  const [treeTypesError, setTreeTypesError] = useState<string | null>(null);
+  const [userActivityError, setUserActivityError] = useState<string | null>(null);
+  const [pointsSourceError, setPointsSourceError] = useState<string | null>(null);
+  const [dailySessionsError, setDailySessionsError] = useState<string | null>(null);
+  
+  const { showToast } = useToast();
 
+  // Fetch all statistics data on mount
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
-
-    return () => clearTimeout(timer);
+    fetchAllData();
   }, []);
 
-  const handleTimeRangeChange = (range: "week" | "month" | "year") => {
+  // Fetch additional data when time range changes
+  useEffect(() => {
+    fetchMonthlyData();
+  }, [timeRange]);
+
+  // Main function to fetch all data
+  const fetchAllData = async () => {
     setIsLoading(true);
-    setTimeRange(range);
-    setTimeout(() => {
+    try {
+      await Promise.all([
+        fetchOverviewData(),
+        fetchMonthlyData(),
+        fetchTreeTypesData(),
+        fetchUserActivityData(),
+        fetchPointsSourceData(),
+        fetchDailySessionsData()
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
+  };
+
+  // Individual fetch functions
+  const fetchOverviewData = async () => {
+    try {
+      setOverviewError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.OVERVIEW);
+      setOverviewStats(response.data);
+    } catch (error: any) {
+      setOverviewError('Failed to load overview statistics');
+      console.error('Error fetching overview statistics:', error);
+    }
+  };
+
+  const fetchMonthlyData = async () => {
+    try {
+      setMonthlyError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.MONTHLY, {
+        params: { timeRange }
+      });
+      setMonthlyData(response.data);
+    } catch (error: any) {
+      setMonthlyError('Failed to load monthly statistics');
+      console.error('Error fetching monthly statistics:', error);
+    }
+  };
+
+  const fetchTreeTypesData = async () => {
+    try {
+      setTreeTypesError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.TREE_TYPES);
+      // Add colors to the tree types data
+      const dataWithColors = response.data.map((item: TreeTypeData, index: number) => ({
+        ...item,
+        color: COLORS[index % COLORS.length]
+      }));
+      setTreeTypesData(dataWithColors);
+    } catch (error: any) {
+      setTreeTypesError('Failed to load tree types statistics');
+      console.error('Error fetching tree types statistics:', error);
+    }
+  };
+
+  const fetchUserActivityData = async () => {
+    try {
+      setUserActivityError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.USER_ACTIVITY);
+      setUserActivityData(response.data);
+    } catch (error: any) {
+      setUserActivityError('Failed to load user activity statistics');
+      console.error('Error fetching user activity statistics:', error);
+    }
+  };
+
+  const fetchPointsSourceData = async () => {
+    try {
+      setPointsSourceError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.POINTS_DISTRIBUTION);
+      setPointsSourceData(response.data);
+    } catch (error: any) {
+      setPointsSourceError('Failed to load points distribution statistics');
+      console.error('Error fetching points distribution statistics:', error);
+    }
+  };
+
+  const fetchDailySessionsData = async () => {
+    try {
+      setDailySessionsError(null);
+      const response = await apiClient.get(API_ENDPOINTS.STATISTICS.DAILY_SESSIONS);
+      setDailySessionsData(response.data);
+    } catch (error: any) {
+      setDailySessionsError('Failed to load daily sessions statistics');
+      console.error('Error fetching daily sessions statistics:', error);
+    }
+  };
+
+  const handleTimeRangeChange = (range: "week" | "month" | "year") => {
+    setTimeRange(range);
   };
 
   const handleMetricChange = (
@@ -106,6 +210,33 @@ const StatisticsPage: React.FC = () => {
   ) => {
     setSelectedMetric(metric);
   };
+
+  // Helper function to format numbers with commas
+  const formatNumber = (num: number) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  // Loading placeholder component
+  const LoadingPlaceholder = () => (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  );
+
+  // Error component
+  const ErrorMessage = ({ message }: { message: string }) => (
+    <div className="flex justify-center items-center h-64">
+      <div className="text-red-500">
+        <p className="text-lg font-medium">{message}</p>
+        <button 
+          onClick={fetchAllData}
+          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <AdminLayout>
@@ -141,7 +272,11 @@ const StatisticsPage: React.FC = () => {
             Year
           </Button>
         </div>
-        <Button variant="outline" className="bg-white flex items-center">
+        <Button 
+          variant="outline" 
+          className="bg-white flex items-center"
+          onClick={() => showToast('Statistics exported successfully', 'success')}
+        >
           <Icon icon={downloadIcon} className="mr-2" />
           Export Data
         </Button>
@@ -156,10 +291,11 @@ const StatisticsPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <h3 className="text-gray-500 text-sm">Total Students</h3>
-              <p className="text-2xl font-bold">1,247</p>
-              <p className="text-xs text-green-600 flex items-center">
-                <span className="mr-1">↑</span> 12% from last month
-              </p>
+              {isLoading || !overviewStats ? (
+                <p className="text-2xl font-bold">-</p>
+              ) : (
+                <p className="text-2xl font-bold">{formatNumber(overviewStats.totalUsers)}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -171,10 +307,13 @@ const StatisticsPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <h3 className="text-gray-500 text-sm">Total Trees</h3>
-              <p className="text-2xl font-bold">3,872</p>
-              <p className="text-xs text-green-600 flex items-center">
-                <span className="mr-1">↑</span> 8% from last month
-              </p>
+              {isLoading || !overviewStats ? (
+                <p className="text-2xl font-bold">-</p>
+              ) : (
+                <p className="text-2xl font-bold">
+                  {formatNumber(overviewStats.totalVirtualTrees + overviewStats.totalRealTrees)}
+                </p>
+              )}
             </div>
           </div>
         </Card>
@@ -185,11 +324,12 @@ const StatisticsPage: React.FC = () => {
               <Icon icon={wifiIcon} className="text-tertiary-dark text-xl" />
             </div>
             <div className="ml-4">
-              <h3 className="text-gray-500 text-sm">Active Sessions</h3>
-              <p className="text-2xl font-bold">328</p>
-              <p className="text-xs text-green-600 flex items-center">
-                <span className="mr-1">↑</span> 15% from last month
-              </p>
+              <h3 className="text-gray-500 text-sm">WiFi Hours</h3>
+              {isLoading || !overviewStats ? (
+                <p className="text-2xl font-bold">-</p>
+              ) : (
+                <p className="text-2xl font-bold">{formatNumber(overviewStats.totalWifiHours)}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -201,10 +341,11 @@ const StatisticsPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <h3 className="text-gray-500 text-sm">Points Earned</h3>
-              <p className="text-2xl font-bold">24,853</p>
-              <p className="text-xs text-green-600 flex items-center">
-                <span className="mr-1">↑</span> 10% from last month
-              </p>
+              {isLoading || !overviewStats ? (
+                <p className="text-2xl font-bold">-</p>
+              ) : (
+                <p className="text-2xl font-bold">{formatNumber(overviewStats.totalPointsEarned)}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -256,9 +397,9 @@ const StatisticsPage: React.FC = () => {
         </div>
         <div className="p-4">
           {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            </div>
+            <LoadingPlaceholder />
+          ) : monthlyError ? (
+            <ErrorMessage message={monthlyError} />
           ) : (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -312,31 +453,37 @@ const StatisticsPage: React.FC = () => {
             </h2>
           </div>
           <div className="p-4">
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={treeTypesData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                  >
-                    {treeTypesData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} trees`, "Count"]} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {isLoading ? (
+              <LoadingPlaceholder />
+            ) : treeTypesError ? (
+              <ErrorMessage message={treeTypesError} />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={treeTypesData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                    >
+                      {treeTypesData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color || COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} trees`, "Count"]} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -349,20 +496,26 @@ const StatisticsPage: React.FC = () => {
             </h2>
           </div>
           <div className="p-4">
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={userActivityData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="hour" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value) => [`${value} users`, "Active Users"]}
-                  />
-                  <Legend />
-                  <Bar dataKey="active" fill="#3B82F6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {isLoading ? (
+              <LoadingPlaceholder />
+            ) : userActivityError ? (
+              <ErrorMessage message={userActivityError} />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={userActivityData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="hour" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value) => [`${value} users`, "Active Users"]}
+                    />
+                    <Legend />
+                    <Bar dataKey="active" fill="#3B82F6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -378,31 +531,37 @@ const StatisticsPage: React.FC = () => {
             </h2>
           </div>
           <div className="p-4">
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pointsSourceData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                  >
-                    {pointsSourceData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value}%`, "Percentage"]} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {isLoading ? (
+              <LoadingPlaceholder />
+            ) : pointsSourceError ? (
+              <ErrorMessage message={pointsSourceError} />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pointsSourceData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                    >
+                      {pointsSourceData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value}%`, "Percentage"]} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -415,25 +574,31 @@ const StatisticsPage: React.FC = () => {
             </h2>
           </div>
           <div className="p-4">
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailySessionsData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value) => [`${value} sessions`, "Sessions"]}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="sessions"
-                    stroke="#8B5CF6"
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {isLoading ? (
+              <LoadingPlaceholder />
+            ) : dailySessionsError ? (
+              <ErrorMessage message={dailySessionsError} />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dailySessionsData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value) => [`${value} sessions`, "Sessions"]}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="sessions"
+                      stroke="#8B5CF6"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </Card>
       </div>

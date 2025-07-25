@@ -416,26 +416,65 @@ router.post('/redeem', auth, async (req, res) => {
 // @access  Private (Mobile)
 router.get('/', auth, async (req, res) => {
   try {
+    // Check if the user exists and has a valid trees array
+    const user = await User.findById(req.user._id).select('treesPlanted virtualTreesPlanted trees');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Find all trees for this user
     const trees = await Tree.find({ userId: req.user._id });
+    
+    if (!trees || trees.length === 0) {
+      logger.info(`No trees found for user ${req.user._id}`);
+      return res.json([]);
+    }
+    
+    logger.info(`Found ${trees.length} trees for user ${req.user._id}, reported treesPlanted: ${user.treesPlanted}, virtualTreesPlanted: ${user.virtualTreesPlanted}`);
+
+    // Fix potential data inconsistency between user document and tree count
+    if (user.virtualTreesPlanted !== trees.length) {
+      logger.warn(`Data inconsistency detected for user ${req.user._id}: virtualTreesPlanted=${user.virtualTreesPlanted}, actual tree count=${trees.length}. Fixing...`);
+      
+      // Update user's virtualTreesPlanted and total treesPlanted counts
+      const realTreeCount = user.treesPlanted - user.virtualTreesPlanted || 0;
+      await User.findByIdAndUpdate(req.user._id, {
+        virtualTreesPlanted: trees.length,
+        treesPlanted: trees.length + realTreeCount
+      });
+      
+      logger.info(`User tree counts updated: virtualTreesPlanted=${trees.length}, treesPlanted=${trees.length + realTreeCount}`);
+    }
     
     // Update each tree's status in real-time
     const updatedTrees = await Promise.all(
       trees.map(async (tree) => {
-        await tree.updateStage();
-        tree.updateHealthScore();
-        await tree.save();
-        return {
-          ...tree.toObject(),
-          growthProgress: tree.growthProgress,
-          healthStatus: tree.healthStatus
-        };
+        try {
+          await tree.updateStage();
+          tree.updateHealthScore();
+          await tree.save();
+          return {
+            ...tree.toObject(),
+            growthProgress: tree.growthProgress,
+            healthStatus: tree.healthStatus
+          };
+        } catch (treeError) {
+          logger.error(`Error processing tree ${tree._id} for user ${req.user._id}:`, treeError);
+          // Return the tree without the calculated properties as fallback
+          return {
+            ...tree.toObject(),
+            growthProgress: 0,
+            healthStatus: 'unknown',
+            _hasError: true
+          };
+        }
       })
     );
     
     res.json(updatedTrees);
   } catch (error) {
-    console.error('Error fetching trees:', error);
-    res.status(500).json({ message: 'Error fetching trees' });
+    logger.error(`Error fetching trees for user ${req.user?._id}:`, error);
+    res.status(500).json({ message: 'Error fetching trees', error: error.message });
   }
 });
 
@@ -462,22 +501,43 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const tree = await Tree.findOne({ _id: req.params.id, userId: req.user._id });
     if (!tree) {
+      logger.warn(`Tree ${req.params.id} not found for user ${req.user._id}`);
       return res.status(404).json({ message: 'Tree not found' });
     }
     
-    // Update tree status in real-time
-    await tree.updateStage();
-    tree.updateHealthScore();
-    await tree.save();
+    logger.info(`Fetching tree details for tree ${tree._id}, species: ${tree.species}, stage: ${tree.stage}`);
     
-    res.json({
-      ...tree.toObject(),
-      growthProgress: tree.growthProgress,
-      healthStatus: tree.healthStatus
-    });
+    // Update tree status in real-time
+    try {
+      await tree.updateStage();
+      tree.updateHealthScore();
+      await tree.save();
+      
+      const treeData = {
+        ...tree.toObject(),
+        growthProgress: tree.growthProgress,
+        healthStatus: tree.healthStatus
+      };
+      
+      res.json(treeData);
+    } catch (updateError) {
+      logger.error(`Error updating tree status for tree ${tree._id}:`, updateError);
+      
+      // Return the tree anyway, but without calculated properties
+      res.json({
+        ...tree.toObject(),
+        growthProgress: 0,
+        healthStatus: 'unknown',
+        _updateError: true
+      });
+    }
   } catch (error) {
-    console.error('Error fetching tree:', error);
-    res.status(500).json({ message: 'Error fetching tree' });
+    logger.error(`Error fetching tree ${req.params.id} for user ${req.user?._id}:`, error);
+    res.status(500).json({ 
+      message: 'Error fetching tree', 
+      error: error.message,
+      treeId: req.params.id
+    });
   }
 });
 

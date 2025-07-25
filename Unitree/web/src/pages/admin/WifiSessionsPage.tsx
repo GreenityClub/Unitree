@@ -37,7 +37,7 @@ interface WifiSession {
     _id: string;
     fullname: string;
     nickname: string;
-    studentId: string;
+  studentId: string;
   };
   ipAddress: string;
   startTime: string;
@@ -105,9 +105,9 @@ const WifiSessionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState<'all' | 'active' | 'completed'>('all');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
+  
   const { showToast } = useToast();
-
+  
   // Column definitions
   const columnHelper = createColumnHelper<WifiSession>();
   const columns = [
@@ -240,13 +240,13 @@ const WifiSessionsPage: React.FC = () => {
     setSelectedSession(session);
     setShowDetailModal(true);
   };
-
+  
   // Add function to handle delete click
   const handleDeleteClick = (session: WifiSession) => {
     setSelectedSession(session);
     setShowDeleteModal(true);
   };
-
+  
   // Add function to handle delete confirmation
   const confirmDelete = async () => {
     if (!selectedSession) return;
@@ -276,7 +276,7 @@ const WifiSessionsPage: React.FC = () => {
         <h1 className="text-3xl font-bold mb-2">WiFi Sessions</h1>
         <p className="text-gray-600">Monitor and manage WiFi sessions</p>
       </div>
-
+      
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Card>
@@ -325,42 +325,42 @@ const WifiSessionsPage: React.FC = () => {
           </div>
         </Card>
       </div>
-
+      
       {/* Filters */}
       <Card className="mb-6">
         <div className="p-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Input
-                  type="text"
+              <Input
+                type="text"
                   placeholder="Search by user name or IP address..."
-                  value={globalFilter || ''}
-                  onChange={e => setGlobalFilter(e.target.value)}
-                  className="pl-10"
-                />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  <Icon icon={searchIcon} className="text-gray-400" />
+                value={globalFilter || ''}
+                onChange={e => setGlobalFilter(e.target.value)}
+                className="pl-10"
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                <Icon icon={searchIcon} className="text-gray-400" />
                 </div>
               </div>
             </div>
             
             <div className="flex space-x-2">
-              <Button
+              <Button 
                 variant={currentStatus === 'all' ? 'primary' : 'outline'}
                 className={currentStatus === 'all' ? 'bg-blue-600' : 'bg-white'}
                 onClick={() => handleStatusFilterChange('all')}
               >
                 All
               </Button>
-              <Button
+              <Button 
                 variant={currentStatus === 'active' ? 'primary' : 'outline'}
                 className={currentStatus === 'active' ? 'bg-green-600' : 'bg-white'}
                 onClick={() => handleStatusFilterChange('active')}
               >
                 Active
               </Button>
-              <Button
+              <Button 
                 variant={currentStatus === 'completed' ? 'primary' : 'outline'}
                 className={currentStatus === 'completed' ? 'bg-gray-600' : 'bg-white'}
                 onClick={() => handleStatusFilterChange('completed')}
@@ -379,7 +379,7 @@ const WifiSessionsPage: React.FC = () => {
           </div>
         </div>
       </Card>
-
+      
       {/* Sessions Table */}
       <Card>
         <div className="overflow-x-auto">
@@ -404,15 +404,15 @@ const WifiSessionsPage: React.FC = () => {
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                           onClick={header.column.getToggleSortingHandler()}
                         >
-                          <div className="flex items-center">
+                            <div className="flex items-center">
                             {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                            <span>
-                              {{
-                                asc: ' 🔼',
-                                desc: ' 🔽',
-                              }[header.column.getIsSorted() as string] ?? null}
-                            </span>
-                          </div>
+                              <span>
+                                {{
+                                  asc: ' 🔼',
+                                  desc: ' 🔽',
+                                }[header.column.getIsSorted() as string] ?? null}
+                              </span>
+                            </div>
                         </th>
                       ))}
                     </tr>
@@ -427,18 +427,18 @@ const WifiSessionsPage: React.FC = () => {
                     </tr>
                   ) : (
                     table.getRowModel().rows.map(row => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
                     ))
                   )}
                 </tbody>
               </table>
-
+              
               {/* Pagination */}
               <div className="py-3 px-6 flex items-center justify-between border-t border-gray-200">
                 <div className="flex-1 flex items-center justify-between">
@@ -456,41 +456,41 @@ const WifiSessionsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
+                      <Button
+                        variant="outline"
                       className="bg-white"
-                      onClick={() => table.setPageIndex(0)}
-                      disabled={!table.getCanPreviousPage()}
-                    >
-                      First
-                    </Button>
-                    <Button
-                      variant="outline"
+                        onClick={() => table.setPageIndex(0)}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
                       className="bg-white"
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
-                    >
-                      Previous
-                    </Button>
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        Previous
+                      </Button>
                     <span className="text-gray-700">
                       Page {pagination.pageIndex + 1} of {Math.max(1, totalPages)}
                     </span>
-                    <Button
-                      variant="outline"
+                      <Button
+                        variant="outline"
                       className="bg-white"
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
-                    >
-                      Next
-                    </Button>
-                    <Button
-                      variant="outline"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        variant="outline"
                       className="bg-white"
                       onClick={() => table.setPageIndex(totalPages - 1)}
-                      disabled={!table.getCanNextPage()}
-                    >
-                      Last
-                    </Button>
+                        disabled={!table.getCanNextPage()}
+                      >
+                        Last
+                      </Button>
                   </div>
                 </div>
               </div>
@@ -498,7 +498,7 @@ const WifiSessionsPage: React.FC = () => {
           )}
         </div>
       </Card>
-
+      
       {/* Session Detail Modal */}
       <Modal
         isOpen={showDetailModal}
@@ -582,7 +582,7 @@ const WifiSessionsPage: React.FC = () => {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         title="Delete WiFi Session"
-        variant="danger"
+        variant="error"
       >
         <div className="mb-6">
           <div className="flex justify-center mb-4">
@@ -625,8 +625,9 @@ const WifiSessionsPage: React.FC = () => {
             Cancel
           </Button>
           <Button
-            variant="danger"
+            variant="primary"
             onClick={confirmDelete}
+            className="bg-red-600 hover:bg-red-700 text-white"
           >
             Delete Session
           </Button>

@@ -153,6 +153,10 @@ export const API_ENDPOINTS = {
   STATISTICS: {
     OVERVIEW: '/api/statistics/overview',
     MONTHLY: '/api/statistics/monthly',
+    TREE_TYPES: '/api/statistics/tree-types',
+    USER_ACTIVITY: '/api/statistics/user-activity',
+    POINTS_DISTRIBUTION: '/api/statistics/points-distribution',
+    DAILY_SESSIONS: '/api/statistics/daily-sessions'
   },
 };
 

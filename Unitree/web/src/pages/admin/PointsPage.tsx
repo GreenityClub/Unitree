@@ -56,7 +56,7 @@ const formatDate = (dateString: string) => {
 
 // Helper to format transaction type for display
 const formatTransactionType = (type: string) => {
-  switch (type) {
+    switch (type) {
     case 'WIFI_SESSION':
       return 'WiFi Session';
     case 'TREE_REDEMPTION':
@@ -71,7 +71,7 @@ const formatTransactionType = (type: string) => {
       return 'Achievement';
     case 'BONUS':
       return 'Bonus';
-    default:
+      default:
       return type;
   }
 };
@@ -167,7 +167,7 @@ const PointsPage: React.FC = () => {
           >
             <Icon icon={deleteIcon} />
           </button>
-        </div>
+          </div>
       ),
     }),
   ] as ColumnDef<PointTransaction>[];
@@ -197,8 +197,8 @@ const PointsPage: React.FC = () => {
     fetchTransactions();
   }, [pagination.pageIndex, pagination.pageSize, currentFilter]);
 
-  const fetchTransactions = async () => {
-    setIsLoading(true);
+    const fetchTransactions = async () => {
+      setIsLoading(true);
     setError(null);
     try {
       const response = await apiClient.get('/api/points/admin/all', {
@@ -216,9 +216,9 @@ const PointsPage: React.FC = () => {
       console.error('Failed to fetch transactions:', err);
       setError(err.response?.data?.message || 'Failed to load transaction data');
     } finally {
-      setIsLoading(false);
-    }
-  };
+        setIsLoading(false);
+      }
+    };
 
   // Handle opening the adjustment modal
   const openAdjustModal = () => {
@@ -392,13 +392,13 @@ const PointsPage: React.FC = () => {
                     </tr>
                   ) : (
                     table.getRowModel().rows.map(row => (
-                      <tr key={row.id} className="hover:bg-gray-50">
+                    <tr key={row.id} className="hover:bg-gray-50">
                         {row.getVisibleCells().map(cell => (
                           <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
+                        </td>
+                      ))}
+                    </tr>
                     ))
                   )}
                 </tbody>
@@ -473,12 +473,12 @@ const PointsPage: React.FC = () => {
       >
         <div className="mb-6">
           <div className="grid grid-cols-1 gap-4">
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 User ID
-              </label>
-              <Input
-                type="text"
+            </label>
+            <Input
+              type="text"
                 placeholder="Enter user ID"
                 value={adjustmentForm.userId}
                 onChange={e => setAdjustmentForm({...adjustmentForm, userId: e.target.value})}
@@ -486,14 +486,14 @@ const PointsPage: React.FC = () => {
               <p className="mt-1 text-xs text-gray-500">
                 Enter the full user ID (e.g., 64f5a234e0ab12cd34ef5678)
               </p>
-            </div>
+          </div>
             
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Points Amount
-              </label>
-              <Input
-                type="number"
+            </label>
+            <Input
+              type="number"
                 placeholder="Enter points amount (positive or negative)"
                 value={adjustmentForm.amount.toString()}
                 onChange={e => setAdjustmentForm({...adjustmentForm, amount: parseInt(e.target.value)})}
@@ -501,14 +501,14 @@ const PointsPage: React.FC = () => {
               <p className="mt-1 text-xs text-gray-500">
                 Positive value adds points, negative value deducts points
               </p>
-            </div>
+          </div>
             
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Reason
-              </label>
-              <Input
-                type="text"
+            </label>
+            <Input
+              type="text"
                 placeholder="Enter reason for adjustment"
                 value={adjustmentForm.reason}
                 onChange={e => setAdjustmentForm({...adjustmentForm, reason: e.target.value})}
@@ -538,7 +538,7 @@ const PointsPage: React.FC = () => {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         title="Delete Point Transaction"
-        variant="danger"
+        variant="error"
       >
         <div className="mb-6">
           <div className="flex justify-center mb-4">
@@ -583,8 +583,9 @@ const PointsPage: React.FC = () => {
             Cancel
           </Button>
           <Button
-            variant="danger"
+            variant="primary"
             onClick={confirmDelete}
+            className="bg-red-600 hover:bg-red-700 text-white"
           >
             Delete Transaction
           </Button>
