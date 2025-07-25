@@ -3,567 +3,363 @@ import { AdminLayout } from '../../components/Layout';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import Icon from '../../components/ui/Icon';
-import { useToast } from '../../contexts/ToastContext';
 import Modal from '../../components/ui/Modal';
+import { useToast } from '../../contexts/ToastContext';
+import Icon from '../../components/ui/Icon';
+import apiClient from '../../config/api';
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
-  createColumnHelper,
   flexRender,
+  createColumnHelper,
+  ColumnDef,
   SortingState,
 } from '@tanstack/react-table';
 import {
-  wifiIcon, userIcon, searchIcon, filterIcon,
-  calendarIcon, clockIcon, arrowRightIcon,
-  exclamationCircleIcon, checkCircleIcon
+  wifiIcon,
+  userIcon,
+  clockIcon,
+  locationIcon,
+  searchIcon,
+  infoIcon,
+  filterIcon,
 } from '../../utils/icons';
-import { format, formatDistanceToNow, differenceInMinutes } from 'date-fns';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
+import { format } from 'date-fns';
 
-// Interface for WiFi Session data
+// Interface for WiFi session data
 interface WifiSession {
-  id: string;
-  userId: string;
-  studentName: string;
-  studentId: string;
+  _id: string;
+  user: {
+    _id: string;
+    fullname: string;
+    nickname: string;
+    studentId: string;
+  };
+  ipAddress: string;
   startTime: string;
   endTime: string | null;
   duration: number | null;
-  pointsEarned: number | null;
-  status: 'active' | 'completed' | 'terminated';
-  ipAddress: string;
-  deviceType: string;
-  location: string;
+  pointsEarned: number;
+  isActive: boolean;
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  };
+  createdAt: string;
 }
 
-// Generate mock WiFi session data
-const generateWifiSessions = (count: number): WifiSession[] => {
-  const locations = ['Library', 'Main Building', 'Science Block', 'Student Center', 'Cafeteria'];
-  const deviceTypes = ['Mobile', 'Laptop', 'Tablet'];
-  const now = new Date();
+// Format duration in seconds to readable format
+const formatDuration = (seconds: number | null): string => {
+  if (seconds === null) return 'N/A';
   
-  return Array.from({ length: count }, (_, i) => {
-    const startTime = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000); // Within last week
-    const isActive = Math.random() > 0.7;
-    const isTerminated = !isActive && Math.random() > 0.8;
-    
-    let endTime = null;
-    let duration = null;
-    let pointsEarned = null;
-    
-    if (!isActive) {
-      const sessionDuration = Math.floor(Math.random() * 120) + 15; // 15-135 minutes
-      endTime = new Date(startTime.getTime() + sessionDuration * 60 * 1000).toISOString();
-      duration = sessionDuration;
-      pointsEarned = Math.floor(sessionDuration * 2); // 2 points per minute
-    }
-    
-    return {
-      id: `session-${i + 1}`,
-      userId: `user-${Math.floor(Math.random() * 1000) + 1}`,
-      studentName: `Student ${Math.floor(Math.random() * 100) + 1}`,
-      studentId: `S${10000 + Math.floor(Math.random() * 1000)}`,
-      startTime: startTime.toISOString(),
-      endTime,
-      duration,
-      pointsEarned,
-      status: isActive ? 'active' : isTerminated ? 'terminated' : 'completed',
-      ipAddress: `192.168.${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255) + 1}`,
-      deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
-      location: locations[Math.floor(Math.random() * locations.length)]
-    };
-  });
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  } else {
+    return `${remainingSeconds}s`;
+  }
 };
 
-// Calculate stats from sessions
-const calculateStats = (sessions: WifiSession[]) => {
-  const now = new Date();
-  const activeSessions = sessions.filter(session => session.status === 'active').length;
-  const todaySessions = sessions.filter(session => {
-    const sessionDate = new Date(session.startTime);
-    return sessionDate.setHours(0, 0, 0, 0) === now.setHours(0, 0, 0, 0);
-  }).length;
-  
-  const pointsToday = sessions
-    .filter(session => {
-      const sessionDate = new Date(session.startTime);
-      return sessionDate.getDate() === now.getDate() && 
-        sessionDate.getMonth() === now.getMonth() && 
-        sessionDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, session) => sum + (session.pointsEarned || 0), 0);
-    
-  const totalMinutes = sessions.reduce((sum, session) => {
-    if (session.duration) {
-      return sum + session.duration;
-    } else if (session.status === 'active') {
-      // For active sessions, calculate current duration
-      const startTime = new Date(session.startTime);
-      return sum + differenceInMinutes(new Date(), startTime);
-    }
-    return sum;
-  }, 0);
-  
-  return {
-    activeSessions,
-    todaySessions,
-    pointsToday,
-    totalMinutes
-  };
+// Format date and time
+const formatDateTime = (dateString: string | null): string => {
+  if (!dateString) return 'N/A';
+  return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss');
+};
+
+// Session status badge component
+const SessionStatusBadge: React.FC<{ isActive: boolean }> = ({ isActive }) => {
+  return (
+    <span
+      className={`px-2 py-1 text-xs font-medium rounded-full ${
+        isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+      }`}
+    >
+      {isActive ? 'Active' : 'Completed'}
+    </span>
+  );
 };
 
 const WifiSessionsPage: React.FC = () => {
-  const [wifiSessions, setWifiSessions] = useState<WifiSession[]>([]);
+  const [sessions, setSessions] = useState<WifiSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'terminated'>('all');
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [startDate, endDate] = dateRange;
-  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<WifiSession | null>(null);
-  const [stats, setStats] = useState({
-    activeSessions: 0,
-    todaySessions: 0,
-    pointsToday: 0,
-    totalMinutes: 0
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 20,
   });
-  
+  const [totalSessions, setTotalSessions] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<WifiSession | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<'all' | 'active' | 'completed'>('all');
+
   const { showToast } = useToast();
-  
+
   // Column definitions
   const columnHelper = createColumnHelper<WifiSession>();
   const columns = [
-    columnHelper.accessor('studentName', {
-      header: 'Student',
+    columnHelper.accessor('user.fullname', {
+      header: 'User',
       cell: info => (
         <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <Icon icon={userIcon} className="h-5 w-5 text-blue-600" />
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
+            <Icon icon={userIcon} className="text-blue-600" />
           </div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">{info.getValue()}</div>
-            <div className="text-xs text-gray-500">ID: {info.row.original.studentId}</div>
+          <div>
+            <div className="font-medium">{info.getValue() || 'Unknown'}</div>
+            <div className="text-xs text-gray-500">
+              {info.row.original.user?.studentId || ''}
+            </div>
           </div>
+        </div>
+      ),
+    }),
+    columnHelper.accessor('ipAddress', {
+      header: 'IP Address',
+      cell: info => (
+        <div className="flex items-center">
+          <Icon icon={wifiIcon} className="mr-2 text-blue-500" />
+          {info.getValue()}
         </div>
       ),
     }),
     columnHelper.accessor('startTime', {
       header: 'Start Time',
-      cell: info => (
-        <div>
-          <div className="text-sm text-gray-900">{format(new Date(info.getValue()), 'MMM d, yyyy')}</div>
-          <div className="text-xs text-gray-500">{format(new Date(info.getValue()), 'HH:mm:ss')}</div>
-        </div>
-      ),
+      cell: info => formatDateTime(info.getValue()),
     }),
     columnHelper.accessor('endTime', {
       header: 'End Time',
       cell: info => {
-        if (info.getValue()) {
-          return (
-            <div>
-              <div className="text-sm text-gray-900">{format(new Date(info.getValue() as string), 'MMM d, yyyy')}</div>
-              <div className="text-xs text-gray-500">{format(new Date(info.getValue() as string), 'HH:mm:ss')}</div>
-            </div>
-          );
-        }
-        return info.row.original.status === 'active' ? (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            Active
-          </span>
-        ) : (
-          <span className="text-sm text-gray-500">-</span>
-        );
+        const endTime = info.getValue();
+        return endTime ? formatDateTime(endTime) : 'Still active';
       },
     }),
     columnHelper.accessor('duration', {
       header: 'Duration',
-      cell: info => {
-        if (info.getValue()) {
-          const minutes = info.getValue() as number;
-          const hours = Math.floor(minutes / 60);
-          const mins = minutes % 60;
-          return (
-            <span className="text-sm text-gray-900">
-              {hours > 0 ? `${hours}h ${mins}m` : `${mins} minutes`}
-            </span>
-          );
-        }
-        if (info.row.original.status === 'active') {
-          const startTime = new Date(info.row.original.startTime);
-          return (
-            <span className="text-sm text-green-600">
-              {formatDistanceToNow(startTime, { addSuffix: false })}
-            </span>
-          );
-        }
-        return <span className="text-sm text-gray-500">-</span>;
-      },
+      cell: info => formatDuration(info.getValue()),
     }),
     columnHelper.accessor('pointsEarned', {
       header: 'Points',
-      cell: info => {
-        if (info.getValue()) {
-          return <span className="text-sm font-medium text-gray-900">{info.getValue()}</span>;
-        }
-        if (info.row.original.status === 'active') {
-          const startTime = new Date(info.row.original.startTime);
-          const minutes = differenceInMinutes(new Date(), startTime);
-          const estimatedPoints = Math.max(0, Math.floor(minutes * 2)); // Assume 2 points per minute
-          return (
-            <span className="text-sm text-green-600">
-              ~{estimatedPoints} (est.)
-            </span>
-          );
-        }
-        return <span className="text-sm text-gray-500">-</span>;
-      },
+      cell: info => (
+        <span className="font-medium">{info.getValue()}</span>
+      ),
     }),
-    columnHelper.accessor('status', {
+    columnHelper.accessor('isActive', {
       header: 'Status',
-      cell: info => {
-        const status = info.getValue();
-        let badgeClass = '';
-        let icon = null;
-        
-        switch (status) {
-          case 'active':
-            badgeClass = 'bg-green-100 text-green-800';
-            icon = <Icon icon={wifiIcon} className="mr-1 h-3 w-3" />;
-            break;
-          case 'completed':
-            badgeClass = 'bg-blue-100 text-blue-800';
-            icon = <Icon icon={checkCircleIcon} className="mr-1 h-3 w-3" />;
-            break;
-          case 'terminated':
-            badgeClass = 'bg-red-100 text-red-800';
-            icon = <Icon icon={exclamationCircleIcon} className="mr-1 h-3 w-3" />;
-            break;
-          default:
-            badgeClass = 'bg-gray-100 text-gray-800';
-            break;
-        }
-        
-        return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
-            {icon}
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </span>
-        );
-      },
-    }),
-    columnHelper.accessor('location', {
-      header: 'Location',
-      cell: info => <span className="text-sm text-gray-900">{info.getValue()}</span>,
+      cell: info => <SessionStatusBadge isActive={info.getValue()} />,
     }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
-      cell: props => {
-        const session = props.row.original;
-        return session.status === 'active' ? (
+      cell: props => (
+        <div className="flex space-x-2">
           <button
-            onClick={() => handleEndSession(session)}
-            className="text-red-600 hover:text-red-900 font-medium"
+            onClick={() => handleViewDetails(props.row.original)}
+            className="p-1 rounded-full hover:bg-gray-100"
+            title="View session details"
           >
-            End Session
+            <Icon icon={infoIcon} className="text-blue-500" />
           </button>
-        ) : (
-          <button
-            onClick={() => handleViewDetails(session)}
-            className="text-blue-600 hover:text-blue-900 font-medium"
-          >
-            View
-          </button>
-        );
-      },
+        </div>
+      ),
     }),
-  ];
-  
-  // Load WiFi sessions on component mount
-  useEffect(() => {
-    const fetchWifiSessions = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call with a timeout
-        setTimeout(() => {
-          const mockSessions = generateWifiSessions(50);
-          setWifiSessions(mockSessions);
-          setStats(calculateStats(mockSessions));
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error('Failed to fetch WiFi sessions:', error);
-        setIsLoading(false);
-      }
-    };
-    
-    fetchWifiSessions();
-    
-    // Update active sessions duration regularly
-    const intervalId = setInterval(() => {
-      if (wifiSessions.some(session => session.status === 'active')) {
-        setStats(calculateStats(wifiSessions));
-      }
-    }, 60000); // Update every minute
-    
-    return () => clearInterval(intervalId);
-  }, [wifiSessions.length]);
+  ] as ColumnDef<WifiSession>[];
 
-  // Filter sessions
-  const filteredSessions = React.useMemo(() => {
-    return wifiSessions.filter(session => {
-      // Status filter
-      if (statusFilter !== 'all' && session.status !== statusFilter) {
-        return false;
-      }
-      
-      // Date range filter
-      if (startDate && endDate) {
-        const sessionDate = new Date(session.startTime);
-        if (sessionDate < startDate || sessionDate > endDate) {
-          return false;
-        }
-      }
-      
-      // Global search
-      if (globalFilter) {
-        const searchTerm = globalFilter.toLowerCase();
-        return (
-          session.studentName.toLowerCase().includes(searchTerm) ||
-          session.studentId.toLowerCase().includes(searchTerm) ||
-          session.location.toLowerCase().includes(searchTerm) ||
-          session.ipAddress.toLowerCase().includes(searchTerm) ||
-          session.deviceType.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      return true;
-    });
-  }, [wifiSessions, statusFilter, startDate, endDate, globalFilter]);
-  
-  // Table instance
+  // Set up the table instance
   const table = useReactTable({
-    data: filteredSessions,
+    data: sessions,
     columns,
     state: {
       sorting,
+      globalFilter,
+      pagination,
     },
     onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: totalPages,
   });
-  
-  // Handle view details
+
+  // Load sessions on component mount and when filters change
+  useEffect(() => {
+    fetchSessions();
+  }, [pagination.pageIndex, pagination.pageSize, currentStatus]);
+
+  const fetchSessions = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get('/api/wifi/sessions', {
+        params: {
+          page: pagination.pageIndex + 1, // API uses 1-based indexing
+          limit: pagination.pageSize,
+          status: currentStatus !== 'all' ? currentStatus : undefined,
+          sortBy: 'startTime',
+          order: 'desc'
+        }
+      });
+      
+      setSessions(response.data.sessions);
+      setTotalSessions(response.data.total);
+      setTotalPages(response.data.pages);
+    } catch (err: any) {
+      console.error('Failed to fetch WiFi sessions:', err);
+      setError(err.response?.data?.message || 'Failed to load WiFi session data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle viewing session details
   const handleViewDetails = (session: WifiSession) => {
     setSelectedSession(session);
-    // In a real app, would show details modal or navigate to details page
+    setShowDetailModal(true);
   };
-  
-  // Handle end session
-  const handleEndSession = (session: WifiSession) => {
-    setSelectedSession(session);
-    setShowEndSessionModal(true);
-  };
-  
-  // Confirm end session
-  const confirmEndSession = () => {
-    if (!selectedSession) return;
-    
-    // Update the session
-    const now = new Date();
-    const startTime = new Date(selectedSession.startTime);
-    const durationMinutes = differenceInMinutes(now, startTime);
-    const pointsEarned = Math.max(0, Math.floor(durationMinutes * 2)); // Assume 2 points per minute
-    
-    const updatedSessions = wifiSessions.map(session => {
-      if (session.id === selectedSession.id) {
-        return {
-          ...session,
-          status: 'completed' as 'completed',
-          endTime: now.toISOString(),
-          duration: durationMinutes,
-          pointsEarned
-        };
-      }
-      return session;
-    });
-    
-    setWifiSessions(updatedSessions);
-    setStats(calculateStats(updatedSessions));
-    showToast(`Session for ${selectedSession.studentName} ended successfully.`, 'success');
-    setShowEndSessionModal(false);
-    setSelectedSession(null);
-  };
-  
-  // Reset filters
-  const resetFilters = () => {
-    setGlobalFilter('');
-    setStatusFilter('all');
-    setDateRange([null, null]);
+
+  const handleStatusFilterChange = (status: 'all' | 'active' | 'completed') => {
+    setCurrentStatus(status);
+    setPagination(prev => ({ ...prev, pageIndex: 0 })); // Reset to first page when filter changes
   };
 
   return (
     <AdminLayout>
-    <div className="mb-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">WiFi Sessions</h1>
-        <p className="text-gray-600">Monitor and manage WiFi sessions and point earnings</p>
+        <p className="text-gray-600">Monitor and manage WiFi sessions</p>
       </div>
-      
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card variant="primary">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card>
           <div className="p-4">
-            <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                <Icon icon={wifiIcon} className="text-blue-600 text-xl" />
+              </div>
               <div>
-                <p className="text-gray-500 text-sm">Active Sessions</p>
-                <h3 className="text-2xl font-bold">{stats.activeSessions}</h3>
-              </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <Icon icon={wifiIcon} className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="secondary">
-          <div className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-gray-500 text-sm">Today's Sessions</p>
-                <h3 className="text-2xl font-bold">{stats.todaySessions}</h3>
-              </div>
-              <div className="bg-blue-100 rounded-full p-3">
-                <Icon icon={calendarIcon} className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="tertiary">
-          <div className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-gray-500 text-sm">Points Today</p>
-                <h3 className="text-2xl font-bold">{stats.pointsToday}</h3>
-              </div>
-              <div className="bg-amber-100 rounded-full p-3">
-                <Icon icon={arrowRightIcon} className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="accent">
-          <div className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-gray-500 text-sm">Total Time</p>
-                <h3 className="text-2xl font-bold">
-                  {stats.totalMinutes > 60 
-                    ? `${Math.floor(stats.totalMinutes / 60)}h ${stats.totalMinutes % 60}m` 
-                    : `${stats.totalMinutes}m`}
+                <p className="text-sm text-gray-500">Active Sessions</p>
+                <h3 className="text-xl font-bold">
+                  {sessions.filter(s => s.isActive).length}
                 </h3>
               </div>
-              <div className="bg-purple-100 rounded-full p-3">
-                <Icon icon={clockIcon} className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </Card>
+        
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                <Icon icon={clockIcon} className="text-green-600 text-xl" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Total Sessions</p>
+                <h3 className="text-xl font-bold">{totalSessions}</h3>
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
+                <Icon icon={userIcon} className="text-purple-600 text-xl" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Unique Users</p>
+                <h3 className="text-xl font-bold">
+                  {new Set(sessions.map(s => s.user?._id)).size}
+                </h3>
               </div>
             </div>
           </div>
         </Card>
       </div>
-      
-      {/* Search and filters */}
+
+      {/* Filters */}
       <Card className="mb-6">
         <div className="p-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Input
-                type="text"
-                placeholder="Search sessions..."
-                value={globalFilter || ''}
-                onChange={e => setGlobalFilter(e.target.value)}
-                className="pl-10"
-              />
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <Icon icon={searchIcon} className="text-gray-400" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search by user name or IP address..."
+                  value={globalFilter || ''}
+                  onChange={e => setGlobalFilter(e.target.value)}
+                  className="pl-10"
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                  <Icon icon={searchIcon} className="text-gray-400" />
+                </div>
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                variant={statusFilter === 'all' ? 'primary' : 'outline'}
-                onClick={() => setStatusFilter('all')}
-                className={statusFilter === 'all' ? '' : 'bg-white'}
+            <div className="flex space-x-2">
+              <Button
+                variant={currentStatus === 'all' ? 'primary' : 'outline'}
+                className={currentStatus === 'all' ? 'bg-blue-600' : 'bg-white'}
+                onClick={() => handleStatusFilterChange('all')}
               >
                 All
               </Button>
-              <Button 
-                variant={statusFilter === 'active' ? 'primary' : 'outline'}
-                onClick={() => setStatusFilter('active')}
-                className={statusFilter === 'active' ? 'bg-green-600' : 'bg-white'}
+              <Button
+                variant={currentStatus === 'active' ? 'primary' : 'outline'}
+                className={currentStatus === 'active' ? 'bg-green-600' : 'bg-white'}
+                onClick={() => handleStatusFilterChange('active')}
               >
                 Active
               </Button>
-              <Button 
-                variant={statusFilter === 'completed' ? 'primary' : 'outline'}
-                onClick={() => setStatusFilter('completed')}
-                className={statusFilter === 'completed' ? 'bg-blue-600' : 'bg-white'}
+              <Button
+                variant={currentStatus === 'completed' ? 'primary' : 'outline'}
+                className={currentStatus === 'completed' ? 'bg-gray-600' : 'bg-white'}
+                onClick={() => handleStatusFilterChange('completed')}
               >
                 Completed
               </Button>
-              <Button 
-                variant={statusFilter === 'terminated' ? 'primary' : 'outline'}
-                onClick={() => setStatusFilter('terminated')}
-                className={statusFilter === 'terminated' ? 'bg-red-600' : 'bg-white'}
-              >
-                Terminated
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center space-x-2">
-              <Icon icon={calendarIcon} className="text-gray-400" />
-              <div className="flex-1">
-                <DatePicker
-                  selectsRange={true}
-                  startDate={startDate}
-                  endDate={endDate}
-                  onChange={(update: [Date | null, Date | null]) => {
-                    setDateRange(update);
-                  }}
-                  placeholderText="Filter by date range"
-                  className="border border-gray-300 rounded-md px-3 py-2 w-full"
-                />
-              </div>
             </div>
             
-            <Button variant="outline" onClick={resetFilters} className="bg-white">
-              Reset Filters
+            <Button 
+              variant="primary" 
+              onClick={fetchSessions} 
+              className="flex items-center"
+            >
+              Refresh
             </Button>
           </div>
         </div>
       </Card>
-      
+
       {/* Sessions Table */}
       <Card>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-red-500">{error}</div>
             </div>
           ) : (
-            <>
+            <div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   {table.getHeaderGroups().map(headerGroup => (
@@ -575,175 +371,178 @@ const WifiSessionsPage: React.FC = () => {
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                           onClick={header.column.getToggleSortingHandler()}
                         >
-                          {header.isPlaceholder ? null : (
-                            <div className="flex items-center">
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                              <span>
-                                {{
-                                  asc: ' 🔼',
-                                  desc: ' 🔽',
-                                }[header.column.getIsSorted() as string] ?? null}
-                              </span>
-                            </div>
-                          )}
+                          <div className="flex items-center">
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                            <span>
+                              {{
+                                asc: ' 🔼',
+                                desc: ' 🔽',
+                              }[header.column.getIsSorted() as string] ?? null}
+                            </span>
+                          </div>
                         </th>
                       ))}
                     </tr>
                   ))}
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {table.getRowModel().rows.map(row => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
+                  {sessions.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+                        No WiFi sessions found
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-              
+
               {/* Pagination */}
-              <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <Button
-                    variant="outline"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                    className="bg-white"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                    className="bg-white"
-                  >
-                    Next
-                  </Button>
-                </div>
-                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div className="py-3 px-6 flex items-center justify-between border-t border-gray-200">
+                <div className="flex-1 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700">
-                      Showing <span className="font-medium">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span> to{' '}
+                      Showing{' '}
                       <span className="font-medium">
-                        {Math.min(
-                          (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                          filteredSessions.length
-                        )}
+                        {sessions.length > 0 ? pagination.pageIndex * pagination.pageSize + 1 : 0}
                       </span>{' '}
-                      of <span className="font-medium">{filteredSessions.length}</span> results
+                      to{' '}
+                      <span className="font-medium">
+                        {Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalSessions)}
+                      </span>{' '}
+                      of <span className="font-medium">{totalSessions}</span> results
                     </p>
                   </div>
-                  <div>
-                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                      <Button
-                        variant="outline"
-                        onClick={() => table.setPageIndex(0)}
-                        disabled={!table.getCanPreviousPage()}
-                        className="bg-white relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50"
-                      >
-                        First
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                        className="bg-white relative inline-flex items-center px-2 py-2 border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50"
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                        className="bg-white relative inline-flex items-center px-2 py-2 border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50"
-                      >
-                        Next
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                        disabled={!table.getCanNextPage()}
-                        className="bg-white relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50"
-                      >
-                        Last
-                      </Button>
-                    </nav>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      className="bg-white"
+                      onClick={() => table.setPageIndex(0)}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="bg-white"
+                      onClick={() => table.previousPage()}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-gray-700">
+                      Page {pagination.pageIndex + 1} of {Math.max(1, totalPages)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      className="bg-white"
+                      onClick={() => table.nextPage()}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="bg-white"
+                      onClick={() => table.setPageIndex(totalPages - 1)}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      Last
+                    </Button>
                   </div>
                 </div>
               </div>
-            </>
-          )}
-          
-          {!isLoading && filteredSessions.length === 0 && (
-            <div className="text-center py-8">
-              <Icon icon={wifiIcon} className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No sessions found with the current filters</p>
-              <Button onClick={resetFilters} variant="outline" className="mt-2 bg-white">
-                Reset Filters
-              </Button>
             </div>
           )}
         </div>
       </Card>
-      
-      {/* End Session Modal */}
+
+      {/* Session Detail Modal */}
       <Modal
-        isOpen={showEndSessionModal}
-        onClose={() => setShowEndSessionModal(false)}
-        title="End WiFi Session"
-        variant="warning"
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="WiFi Session Details"
+        variant="info"
       >
-        <div className="text-center mb-6">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
-            <Icon icon={exclamationCircleIcon} className="h-6 w-6 text-yellow-600" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900">End WiFi Session</h3>
-          <p className="text-sm text-gray-500 mt-2">
-            Are you sure you want to end the current WiFi session for {selectedSession?.studentName}?
-          </p>
-          
-          {selectedSession && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-md text-left">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-gray-500">Student:</div>
-                <div>{selectedSession.studentName}</div>
-                <div className="text-gray-500">Started:</div>
-                <div>{format(new Date(selectedSession.startTime), 'MMM d, yyyy HH:mm')}</div>
-                <div className="text-gray-500">Duration:</div>
-                <div>
-                  {formatDistanceToNow(new Date(selectedSession.startTime), { addSuffix: false })}
-                </div>
-                <div className="text-gray-500">Location:</div>
-                <div>{selectedSession.location}</div>
+        {selectedSession && (
+          <div className="mb-6">
+            <div className="mb-4 flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                <Icon icon={wifiIcon} className="text-blue-600 text-3xl" />
               </div>
             </div>
-          )}
-        </div>
-        <div className="flex justify-end space-x-3">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">User</h4>
+                <p className="text-lg">{selectedSession.user?.fullname || 'Unknown'}</p>
+                <p className="text-sm text-gray-500">ID: {selectedSession.user?.studentId || 'N/A'}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">IP Address</h4>
+                <p className="text-lg">{selectedSession.ipAddress}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Start Time</h4>
+                <p className="text-lg">{formatDateTime(selectedSession.startTime)}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">End Time</h4>
+                <p className="text-lg">{selectedSession.endTime ? formatDateTime(selectedSession.endTime) : 'Still active'}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Duration</h4>
+                <p className="text-lg">{formatDuration(selectedSession.duration)}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Points Earned</h4>
+                <p className="text-lg">{selectedSession.pointsEarned}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                <SessionStatusBadge isActive={selectedSession.isActive} />
+              </div>
+              
+              {selectedSession.location && (
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-gray-500">Location</h4>
+                  <p className="text-lg flex items-center">
+                    <Icon icon={locationIcon} className="mr-2 text-gray-500" />
+                    {selectedSession.location.latitude.toFixed(6)}, {selectedSession.location.longitude.toFixed(6)}
+                    {selectedSession.location.accuracy && (
+                      <span className="ml-2 text-sm text-gray-500">(±{selectedSession.location.accuracy}m)</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end">
           <Button
             variant="outline"
-            onClick={() => setShowEndSessionModal(false)}
+            onClick={() => setShowDetailModal(false)}
             className="bg-white"
           >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={confirmEndSession}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white"
-          >
-            End Session
+            Close
           </Button>
         </div>
       </Modal>
-    </div>
     </AdminLayout>
   );
 };

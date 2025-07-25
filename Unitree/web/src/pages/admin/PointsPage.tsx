@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { AdminLayout } from "../../components/Layout";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
-import Input from "../../components/ui/Input";
-import Modal from "../../components/ui/Modal";
-import { useToast } from "../../contexts/ToastContext";
-import Icon from "../../components/ui/Icon";
+import React, { useState, useEffect } from 'react';
+import { AdminLayout } from '../../components/Layout';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
+import { useToast } from '../../contexts/ToastContext';
+import Icon from '../../components/ui/Icon';
+import apiClient from '../../config/api';
 import {
   useReactTable,
   getCoreRowModel,
@@ -16,228 +17,137 @@ import {
   createColumnHelper,
   ColumnDef,
   SortingState,
-} from "@tanstack/react-table";
+} from '@tanstack/react-table';
 import {
+  searchIcon,
   medalIcon,
   userIcon,
-  wifiIcon,
-  treeIcon,
-  searchIcon,
-  addIcon,
   filterIcon,
-  downloadIcon,
-  arrowUpIcon,
-  arrowDownIcon,
-} from "../../utils/icons";
-import { format } from "date-fns";
+  addIcon,
+  editIcon
+} from '../../utils/icons';
+import { format } from 'date-fns';
 
 // Interface for Point transaction data
 interface PointTransaction {
-  id: string;
-  studentId: string;
-  studentName: string;
-  amount: number; // Positive for earned, negative for spent
-  type: "wifi" | "tree" | "bonus" | "admin" | "other";
-  description: string;
-  timestamp: string;
-  balance: number; // Balance after this transaction
+  _id: string;
+  userId: {
+    _id: string;
+    fullname: string;
+    nickname: string;
+  };
+  amount: number;
+  type: 'WIFI_SESSION' | 'TREE_REDEMPTION' | 'REAL_TREE_REDEMPTION' | 'ADMIN_ADJUSTMENT' | 'ATTENDANCE' | 'ACHIEVEMENT' | 'BONUS';
+  metadata: any;
+  createdAt: string;
 }
 
-// Dummy point transaction data
-const dummyPointTransactions: PointTransaction[] = Array.from(
-  { length: 30 },
-  (_, index) => {
-    const isEarned = Math.random() > 0.3;
-    const types = ["wifi", "tree", "bonus", "admin", "other"];
-    const type = types[Math.floor(Math.random() * types.length)] as
-      | "wifi"
-      | "tree"
-      | "bonus"
-      | "admin"
-      | "other";
+interface PointsAdjustmentForm {
+  userId: string;
+  amount: number;
+  reason: string;
+}
 
-    let description = "";
-    let amount = 0;
-
-    switch (type) {
-      case "wifi":
-        description = `WiFi session ${isEarned ? "completed" : "cancelled"} - ${Math.floor(Math.random() * 60) + 30} minutes`;
-        amount = isEarned
-          ? Math.floor(Math.random() * 50) + 10
-          : -Math.floor(Math.random() * 30);
-        break;
-      case "tree":
-        description = isEarned ? `Planted a new tree` : `Spent on tree upgrade`;
-        amount = isEarned
-          ? Math.floor(Math.random() * 200) + 50
-          : -Math.floor(Math.random() * 100) - 50;
-        break;
-      case "bonus":
-        description = `${Math.floor(Math.random() * 5) + 1} day streak bonus`;
-        amount = Math.floor(Math.random() * 100) + 20;
-        break;
-      case "admin":
-        description = isEarned ? `Admin bonus` : `Admin correction`;
-        amount = isEarned
-          ? Math.floor(Math.random() * 100) + 50
-          : -Math.floor(Math.random() * 100) - 10;
-        break;
-      default:
-        description = isEarned ? `Earned from event` : `Spent on feature`;
-        amount = isEarned
-          ? Math.floor(Math.random() * 75) + 25
-          : -Math.floor(Math.random() * 50) - 25;
-    }
-
-    return {
-      id: `tr-${index + 1}`,
-      studentId: `S${10000 + Math.floor(Math.random() * 1000)}`,
-      studentName: `Student ${Math.floor(Math.random() * 50) + 1}`,
-      amount,
-      type,
-      description,
-      timestamp: new Date(
-        2023,
-        Math.floor(Math.random() * 12),
-        Math.floor(Math.random() * 28) + 1,
-        Math.floor(Math.random() * 24),
-        Math.floor(Math.random() * 60),
-      ).toISOString(),
-      balance: Math.floor(Math.random() * 3000) + 500,
-    };
-  },
-);
-
-// Sort transactions by timestamp
-dummyPointTransactions.sort(
-  (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-);
-
-// Format date and time
-const formatDateTime = (dateString: string) => {
-  return format(new Date(dateString), "dd/MM/yyyy HH:mm");
+// Helper to format date
+const formatDate = (dateString: string) => {
+  return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss');
 };
 
-// Transaction Type Badge component
-const TransactionTypeBadge: React.FC<{
-  type: "wifi" | "tree" | "bonus" | "admin" | "other";
-}> = ({ type }) => {
-  const getTypeStyles = () => {
-    switch (type) {
-      case "wifi":
-        return "bg-blue-100 text-blue-800";
-      case "tree":
-        return "bg-green-100 text-green-800";
-      case "bonus":
-        return "bg-purple-100 text-purple-800";
-      case "admin":
-        return "bg-amber-100 text-amber-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getTypeIcon = () => {
-    switch (type) {
-      case "wifi":
-        return wifiIcon;
-      case "tree":
-        return treeIcon;
-      case "bonus":
-        return medalIcon;
-      case "admin":
-        return userIcon;
-      default:
-        return medalIcon;
-    }
-  };
-
-  return (
-    <span
-      className={`px-2 py-1 text-xs font-medium rounded-full flex items-center ${getTypeStyles()}`}
-    >
-      <Icon icon={getTypeIcon()} className="mr-1" />
-      {type.charAt(0).toUpperCase() + type.slice(1)}
-    </span>
-  );
+// Helper to format transaction type for display
+const formatTransactionType = (type: string) => {
+  switch (type) {
+    case 'WIFI_SESSION':
+      return 'WiFi Session';
+    case 'TREE_REDEMPTION':
+      return 'Tree Redemption';
+    case 'REAL_TREE_REDEMPTION':
+      return 'Real Tree Redemption';
+    case 'ADMIN_ADJUSTMENT':
+      return 'Admin Adjustment';
+    case 'ATTENDANCE':
+      return 'Attendance';
+    case 'ACHIEVEMENT':
+      return 'Achievement';
+    case 'BONUS':
+      return 'Bonus';
+    default:
+      return type;
+  }
 };
 
 const PointsPage: React.FC = () => {
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [showAddPointsModal, setShowAddPointsModal] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [pointAmount, setPointAmount] = useState(0);
-  const [pointDescription, setPointDescription] = useState("");
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 20,
+  });
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustmentForm, setAdjustmentForm] = useState<PointsAdjustmentForm>({
+    userId: '',
+    amount: 0,
+    reason: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [currentFilter, setCurrentFilter] = useState('all');
 
   const { showToast } = useToast();
 
   // Column definitions
   const columnHelper = createColumnHelper<PointTransaction>();
+  
   const columns = [
-    columnHelper.accessor("timestamp", {
-      header: "Date & Time",
-      cell: (info) => formatDateTime(info.getValue()),
-      footer: (info) => info.column.id,
-    }),
-    columnHelper.accessor("studentName", {
-      header: "Student",
-      cell: (info) => (
+    columnHelper.accessor('userId.fullname', {
+      header: 'User',
+      cell: info => (
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
-            <Icon icon={userIcon} className="text-blue-500" />
+            <Icon icon={userIcon} className="text-blue-600" />
           </div>
           <div>
-            <div className="font-medium">{info.getValue()}</div>
-            <div className="text-xs text-gray-500">
-              ID: {info.row.original.studentId}
-            </div>
+            <div className="font-medium">{info.getValue() || 'Unknown'}</div>
+            <div className="text-xs text-gray-500">{info.row.original.userId?.nickname || ''}</div>
           </div>
         </div>
       ),
-      footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("type", {
-      header: "Type",
-      cell: (info) => <TransactionTypeBadge type={info.getValue()} />,
-      footer: (info) => info.column.id,
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-      cell: (info) => info.getValue(),
-      footer: (info) => info.column.id,
-    }),
-    columnHelper.accessor("amount", {
-      header: () => (
-        <div className="flex items-center">
-          <Icon icon={medalIcon} className="mr-1 text-amber-500" />
-          <span>Points</span>
+    columnHelper.accessor('amount', {
+      header: 'Points',
+      cell: info => (
+        <div className={`font-semibold ${info.getValue() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {info.getValue() >= 0 ? '+' : ''}{info.getValue()}
         </div>
       ),
-      cell: (info) => {
-        const amount = info.getValue();
-        return (
-          <div
-            className={`flex items-center font-medium ${amount >= 0 ? "text-green-600" : "text-red-600"}`}
-          >
-            <Icon
-              icon={amount >= 0 ? arrowUpIcon : arrowDownIcon}
-              className="mr-1"
-            />
-            {amount >= 0 ? `+${amount}` : amount}
-          </div>
-        );
-      },
-      footer: (info) => info.column.id,
     }),
-    columnHelper.accessor("balance", {
-      header: "Balance",
-      cell: (info) => (
-        <span className="font-medium">{info.getValue().toLocaleString()}</span>
-      ),
-      footer: (info) => info.column.id,
+    columnHelper.accessor('type', {
+      header: 'Transaction Type',
+      cell: info => formatTransactionType(info.getValue()),
+    }),
+    columnHelper.accessor(row => {
+      // Extract relevant metadata based on transaction type
+      switch (row.type) {
+        case 'WIFI_SESSION':
+          return row.metadata?.duration 
+            ? `${Math.floor(row.metadata.duration / 60)} minutes` 
+            : 'WiFi Session';
+        case 'TREE_REDEMPTION':
+          return row.metadata?.speciesName || 'Tree Redemption';
+        case 'ADMIN_ADJUSTMENT':
+          return row.metadata?.reason || 'Admin Adjustment';
+        default:
+          return '';
+      }
+    }, {
+      id: 'description',
+      header: 'Description',
+    }),
+    columnHelper.accessor('createdAt', {
+      header: 'Date',
+      cell: info => formatDate(info.getValue()),
     }),
   ] as ColumnDef<PointTransaction>[];
 
@@ -246,121 +156,93 @@ const PointsPage: React.FC = () => {
     data: transactions,
     columns,
     state: {
-      globalFilter,
       sorting,
+      globalFilter,
+      pagination,
     },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: "includesString",
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: totalPages,
   });
 
-  // Load transactions on component mount
+  // Load transactions on component mount and pagination change
   useEffect(() => {
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call with a timeout
-        setTimeout(() => {
-          setTransactions(dummyPointTransactions);
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error("Failed to fetch point transactions:", error);
-        setIsLoading(false);
-      }
-    };
-
     fetchTransactions();
-  }, []);
+  }, [pagination.pageIndex, pagination.pageSize, currentFilter]);
 
-  // Handle opening the add points modal
-  const handleAddPoints = () => {
-    setShowAddPointsModal(true);
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get('/api/points/admin/all', {
+        params: {
+          page: pagination.pageIndex + 1, // API uses 1-based indexing
+          limit: pagination.pageSize,
+          type: currentFilter !== 'all' ? currentFilter : undefined
+        }
+      });
+      
+      setTransactions(response.data.transactions);
+      setTotalTransactions(response.data.total);
+      setTotalPages(response.data.pages);
+    } catch (err: any) {
+      console.error('Failed to fetch transactions:', err);
+      setError(err.response?.data?.message || 'Failed to load transaction data');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle adding points to a student
-  const confirmAddPoints = () => {
-    if (selectedStudentId && pointAmount && pointDescription) {
-      // Create new transaction
-      const newTransaction: PointTransaction = {
-        id: `tr-${Date.now()}`,
-        studentId: selectedStudentId,
-        studentName: `Student (${selectedStudentId})`, // This would normally come from the API
-        amount: pointAmount,
-        type: "admin",
-        description: pointDescription,
-        timestamp: new Date().toISOString(),
-        balance: 0, // This would be calculated by the backend
-      };
+  // Handle opening the adjustment modal
+  const openAdjustModal = () => {
+    setAdjustmentForm({
+      userId: '',
+      amount: 0,
+      reason: '',
+    });
+    setShowAdjustModal(true);
+  };
 
-      // Add to transactions list
-      setTransactions((current) => [newTransaction, ...current]);
+  // Handle points adjustment
+  const handleAdjustPoints = async () => {
+    try {
+      if (!adjustmentForm.userId || !adjustmentForm.reason) {
+        showToast('User ID and reason are required', 'error');
+        return;
+      }
+
+      const response = await apiClient.post('/api/points/admin/adjust', adjustmentForm);
+      
+      showToast(`Points adjusted successfully for user`, 'success');
+      setShowAdjustModal(false);
+      fetchTransactions(); // Refresh data
+    } catch (err: any) {
       showToast(
-        `${pointAmount > 0 ? "Added" : "Deducted"} ${Math.abs(pointAmount)} points ${pointAmount > 0 ? "to" : "from"} student ${selectedStudentId}.`,
-        "success",
+        err.response?.data?.message || 'Failed to adjust points',
+        'error'
       );
-
-      // Reset form
-      setSelectedStudentId("");
-      setPointAmount(0);
-      setPointDescription("");
-      setShowAddPointsModal(false);
     }
+  };
+
+  const handleFilterChange = (filter: string) => {
+    setCurrentFilter(filter);
+    setPagination(prev => ({ ...prev, pageIndex: 0 })); // Reset to first page when filter changes
   };
 
   return (
     <AdminLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Points Management</h1>
-        <p className="text-gray-600">
-          Manage and monitor all point transactions in the system
-        </p>
+        <p className="text-gray-600">View and manage point transactions</p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card variant="primary" className="shadow-md">
-          <div className="flex items-center">
-            <div className="flex items-center justify-center p-3 rounded-full bg-primary-light">
-              <Icon icon={medalIcon} className="text-primary text-xl" />
-            </div>
-            <div className="ml-4">
-              <h3 className="text-gray-500 text-sm">Total Points Earned</h3>
-              <p className="text-2xl font-bold">436,582</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card variant="secondary" className="shadow-md">
-          <div className="flex items-center">
-            <div className="flex items-center justify-center p-3 rounded-full bg-secondary-light">
-              <Icon icon={userIcon} className="text-secondary-dark text-xl" />
-            </div>
-            <div className="ml-4">
-              <h3 className="text-gray-500 text-sm">Avg. Points Per Student</h3>
-              <p className="text-2xl font-bold">1,247</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card variant="accent" className="shadow-md">
-          <div className="flex items-center">
-            <div className="flex items-center justify-center p-3 rounded-full bg-accent-light">
-              <Icon icon={wifiIcon} className="text-accent-dark text-xl" />
-            </div>
-            <div className="ml-4">
-              <h3 className="text-gray-500 text-sm">Points From WiFi</h3>
-              <p className="text-2xl font-bold">238,974</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Search and Actions */}
+      {/* Search and Filter Controls */}
       <Card className="mb-6">
         <div className="p-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -368,7 +250,7 @@ const PointsPage: React.FC = () => {
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="Search transactions by student, ID or description..."
+                  placeholder="Search by user name..."
                   value={globalFilter || ""}
                   onChange={(e) => setGlobalFilter(e.target.value)}
                   className="pl-10"
@@ -378,24 +260,42 @@ const PointsPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="bg-white flex items-center">
-                <Icon icon={filterIcon} className="mr-2" />
-                Filter
-              </Button>
-              <Button variant="outline" className="bg-white flex items-center">
-                <Icon icon={downloadIcon} className="mr-2" />
-                Export
+            
+            <div className="flex space-x-2">
+              <Button
+                variant={currentFilter === 'all' ? 'primary' : 'outline'}
+                onClick={() => handleFilterChange('all')}
+              >
+                All
               </Button>
               <Button
-                variant="primary"
-                className="flex items-center"
-                onClick={handleAddPoints}
+                variant={currentFilter === 'WIFI_SESSION' ? 'primary' : 'outline'}
+                onClick={() => handleFilterChange('WIFI_SESSION')}
               >
-                <Icon icon={addIcon} className="mr-2" />
-                Add Points
+                WiFi
+              </Button>
+              <Button
+                variant={currentFilter === 'TREE_REDEMPTION' ? 'primary' : 'outline'}
+                onClick={() => handleFilterChange('TREE_REDEMPTION')}
+              >
+                Trees
+              </Button>
+              <Button
+                variant={currentFilter === 'ADMIN_ADJUSTMENT' ? 'primary' : 'outline'}
+                onClick={() => handleFilterChange('ADMIN_ADJUSTMENT')}
+              >
+                Adjustments
               </Button>
             </div>
+            
+            <Button
+              variant="primary"
+              className="flex items-center"
+              onClick={openAdjustModal}
+            >
+              <Icon icon={addIcon} className="mr-2" />
+              Adjust Points
+            </Button>
           </div>
         </div>
       </Card>
@@ -407,13 +307,17 @@ const PointsPage: React.FC = () => {
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-red-500">{error}</div>
+            </div>
           ) : (
             <div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
-                  {table.getHeaderGroups().map((headerGroup) => (
+                  {table.getHeaderGroups().map(headerGroup => (
                     <tr key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
+                      {headerGroup.headers.map(header => (
                         <th
                           key={header.id}
                           scope="col"
@@ -421,16 +325,11 @@ const PointsPage: React.FC = () => {
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <div className="flex items-center">
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext(),
-                                )}
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                             <span>
                               {{
-                                asc: " 🔼",
-                                desc: " 🔽",
+                                asc: ' 🔼',
+                                desc: ' 🔽',
                               }[header.column.getIsSorted() as string] ?? null}
                             </span>
                           </div>
@@ -440,21 +339,23 @@ const PointsPage: React.FC = () => {
                   ))}
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-6 py-4 whitespace-nowrap"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+                        No transactions found
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
 
@@ -463,25 +364,15 @@ const PointsPage: React.FC = () => {
                 <div className="flex-1 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700">
-                      Showing{" "}
+                      Showing{' '}
                       <span className="font-medium">
-                        {table.getState().pagination.pageIndex *
-                          table.getState().pagination.pageSize +
-                          1}
-                      </span>{" "}
-                      to{" "}
+                        {transactions.length > 0 ? pagination.pageIndex * pagination.pageSize + 1 : 0}
+                      </span>{' '}
+                      to{' '}
                       <span className="font-medium">
-                        {Math.min(
-                          (table.getState().pagination.pageIndex + 1) *
-                            table.getState().pagination.pageSize,
-                          table.getFilteredRowModel().rows.length,
-                        )}
-                      </span>{" "}
-                      of{" "}
-                      <span className="font-medium">
-                        {table.getFilteredRowModel().rows.length}
-                      </span>{" "}
-                      results
+                        {Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalTransactions)}
+                      </span>{' '}
+                      of <span className="font-medium">{totalTransactions}</span> results
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -502,8 +393,7 @@ const PointsPage: React.FC = () => {
                       Previous
                     </Button>
                     <span className="text-gray-700">
-                      Page {table.getState().pagination.pageIndex + 1} of{" "}
-                      {table.getPageCount()}
+                      Page {pagination.pageIndex + 1} of {Math.max(1, totalPages)}
                     </span>
                     <Button
                       variant="outline"
@@ -516,9 +406,7 @@ const PointsPage: React.FC = () => {
                     <Button
                       variant="outline"
                       className="bg-white"
-                      onClick={() =>
-                        table.setPageIndex(table.getPageCount() - 1)
-                      }
+                      onClick={() => table.setPageIndex(totalPages - 1)}
                       disabled={!table.getCanNextPage()}
                     >
                       Last
@@ -531,76 +419,71 @@ const PointsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Add Points Modal */}
+      {/* Points Adjustment Modal */}
       <Modal
-        isOpen={showAddPointsModal}
-        onClose={() => setShowAddPointsModal(false)}
-        title="Add/Deduct Points"
+        isOpen={showAdjustModal}
+        onClose={() => setShowAdjustModal(false)}
+        title="Adjust User Points"
         variant="info"
       >
-        <div className="mb-6 space-y-4">
-          <div>
-            <label
-              htmlFor="student-id"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Student ID
-            </label>
-            <Input
-              id="student-id"
-              type="text"
-              placeholder="Enter student ID"
-              value={selectedStudentId}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="point-amount"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Points (use negative value to deduct)
-            </label>
-            <Input
-              id="point-amount"
-              type="number"
-              placeholder="Enter point amount"
-              value={pointAmount === 0 ? "" : pointAmount}
-              onChange={(e) =>
-                setPointAmount(parseInt(e.target.value, 10) || 0)
-              }
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Description
-            </label>
-            <Input
-              id="description"
-              type="text"
-              placeholder="Enter reason for adding/deducting points"
-              value={pointDescription}
-              onChange={(e) => setPointDescription(e.target.value)}
-            />
+        <div className="mb-6">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                User ID
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter user ID"
+                value={adjustmentForm.userId}
+                onChange={e => setAdjustmentForm({...adjustmentForm, userId: e.target.value})}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the full user ID (e.g., 64f5a234e0ab12cd34ef5678)
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Points Amount
+              </label>
+              <Input
+                type="number"
+                placeholder="Enter points amount (positive or negative)"
+                value={adjustmentForm.amount.toString()}
+                onChange={e => setAdjustmentForm({...adjustmentForm, amount: parseInt(e.target.value)})}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Positive value adds points, negative value deducts points
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reason
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter reason for adjustment"
+                value={adjustmentForm.reason}
+                onChange={e => setAdjustmentForm({...adjustmentForm, reason: e.target.value})}
+              />
+            </div>
           </div>
         </div>
         <div className="flex justify-end space-x-3">
           <Button
             variant="outline"
-            onClick={() => setShowAddPointsModal(false)}
+            onClick={() => setShowAdjustModal(false)}
             className="bg-white"
           >
             Cancel
           </Button>
           <Button
             variant="primary"
-            onClick={confirmAddPoints}
-            disabled={!selectedStudentId || !pointAmount || !pointDescription}
+            onClick={handleAdjustPoints}
           >
-            {pointAmount > 0 ? "Add" : "Deduct"} Points
+            Adjust Points
           </Button>
         </div>
       </Modal>

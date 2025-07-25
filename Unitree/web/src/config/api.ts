@@ -20,7 +20,10 @@ apiClient.interceptors.request.use(
     const isAdminRoute = config.url?.includes('/api/admins') || 
                         config.url?.includes('/api/auth/admin') ||
                         config.url?.includes('/api/statistics') ||
-                        config.url?.includes('/api/users');  // Add /api/users to admin routes
+                        config.url?.includes('/api/users') ||  // Add /api/users to admin routes
+                        config.url?.includes('/api/trees/admin') || // Add tree admin routes
+                        config.url?.includes('/api/points/admin') || // Add points admin routes
+                        config.url?.includes('/api/wifi/sessions'); // Add WiFi sessions admin routes
     
     // Select the appropriate token based on the route
     const token = isAdminRoute 
@@ -47,7 +50,10 @@ apiClient.interceptors.response.use(
     const isAdminRoute = error.config?.url?.includes('/api/admins') || 
                         error.config?.url?.includes('/api/auth/admin') ||
                         error.config?.url?.includes('/api/statistics') ||
-                        error.config?.url?.includes('/api/users');  // Add /api/users to admin routes
+                        error.config?.url?.includes('/api/users') ||  // Add /api/users to admin routes
+                        error.config?.url?.includes('/api/trees/admin') || // Add tree admin routes
+                        error.config?.url?.includes('/api/points/admin') || // Add points admin routes
+                        error.config?.url?.includes('/api/wifi/sessions'); // Add WiFi sessions admin routes
                         
     if (error.response?.status === 401) {
       // Handle unauthorized access based on route type
@@ -114,6 +120,10 @@ export const API_ENDPOINTS = {
     GET_BALANCE: '/api/points/balance',
     GET_HISTORY: '/api/points/history',
     GET_LEADERBOARD: '/api/points/leaderboard',
+    ADMIN: {
+      GET_ALL: '/api/points/admin/all',
+      ADJUST: '/api/points/admin/adjust'
+    }
   },
   // WiFi endpoints
   WIFI: {
@@ -121,6 +131,7 @@ export const API_ENDPOINTS = {
     START_SESSION: '/api/wifi/start',
     STOP_SESSION: '/api/wifi/stop',
     GET_STATUS: '/api/wifi/status',
+    GET_SESSION_BY_ID: (id: string) => `/api/wifi/sessions/${id}`
   },
   // Notification endpoints
   NOTIFICATION: {

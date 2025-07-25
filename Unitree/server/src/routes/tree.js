@@ -426,8 +426,8 @@ router.get('/', auth, async (req, res) => {
         await tree.save();
         return {
           ...tree.toObject(),
-          growthProgress: tree.getGrowthProgress(),
-          healthStatus: tree.getHealthStatus()
+          growthProgress: tree.growthProgress,
+          healthStatus: tree.healthStatus
         };
       })
     );
@@ -472,8 +472,8 @@ router.get('/:id', auth, async (req, res) => {
     
     res.json({
       ...tree.toObject(),
-      growthProgress: tree.getGrowthProgress(),
-      healthStatus: tree.getHealthStatus()
+      growthProgress: tree.growthProgress,
+      healthStatus: tree.healthStatus
     });
   } catch (error) {
     console.error('Error fetching tree:', error);
@@ -503,8 +503,8 @@ router.post('/:id/water', auth, async (req, res) => {
       message: waterResult.message,
       tree: {
         ...tree.toObject(),
-        growthProgress: tree.getGrowthProgress(),
-        healthStatus: tree.getHealthStatus()
+        growthProgress: tree.growthProgress,
+        healthStatus: tree.healthStatus
       }
     });
   } catch (error) {
