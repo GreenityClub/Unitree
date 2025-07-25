@@ -83,7 +83,7 @@ router.post('/', authAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    // Check if admin already exists
+    // Check if admin already exists with same username
     let admin = await Admin.findOne({ username });
     if (admin) {
       return res.status(400).json({ message: 'Admin already exists with that username' });

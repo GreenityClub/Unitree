@@ -1401,3 +1401,10 @@
 {"level":"info","message":"Fixed counts for user 6878aa4e662833bd21b92f86: virtual=0, real=0, total=0","timestamp":"2025-07-25T03:37:27.546Z"}
 {"level":"info","message":"Tree counter fix completed. Updated 5 users. Errors: 0","timestamp":"2025-07-25T03:37:27.547Z"}
 {"level":"info","message":"Database disconnected","timestamp":"2025-07-25T03:37:27.575Z"}
+{"level":"info","message":"Logger initialized in development mode with level info.","timestamp":"2025-07-25T04:04:24.657Z"}
+{"level":"info","message":"Starting admin email removal script","timestamp":"2025-07-25T04:04:24.665Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-07-25T04:04:26.058Z"}
+{"level":"info","message":"Updated 0 admin documents: removed email field","timestamp":"2025-07-25T04:04:26.105Z"}
+{"level":"info","message":"Successfully dropped the email index","timestamp":"2025-07-25T04:04:26.161Z"}
+{"level":"info","message":"Admin email removal completed successfully","timestamp":"2025-07-25T04:04:26.162Z"}
+{"level":"info","message":"Database disconnected","timestamp":"2025-07-25T04:04:26.175Z"}
