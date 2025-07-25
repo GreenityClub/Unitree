@@ -101,6 +101,57 @@ router.post('/admin/adjust', authAdmin, async (req, res) => {
     }
 });
 
+// @route   DELETE /api/points/admin/:id
+// @desc    Delete a point transaction and update user points (for admin)
+// @access  Private (Admin)
+router.delete('/admin/:id', authAdmin, async (req, res) => {
+    try {
+        const pointTransaction = await Point.findById(req.params.id);
+        if (!pointTransaction) {
+            return res.status(404).json({ message: 'Point transaction not found' });
+        }
+
+        // Get the user associated with this transaction
+        const user = await User.findById(pointTransaction.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User associated with this transaction not found' });
+        }
+
+        // Update user points by reversing the transaction
+        // If it was a positive transaction, subtract points from both current and all-time points
+        // If it was a negative transaction, add points back to current points only
+        user.points -= pointTransaction.amount;
+        
+        // Update allTimePoints - only subtract if the original transaction was positive
+        // This ensures lifetime earnings are accurate
+        if (pointTransaction.amount > 0) {
+            user.allTimePoints -= pointTransaction.amount;
+        }
+
+        // Make sure points don't go negative
+        if (user.points < 0) user.points = 0;
+        if (user.allTimePoints < 0) user.allTimePoints = 0;
+
+        // Save the updated user and delete the transaction
+        await user.save();
+        await Point.findByIdAndDelete(req.params.id);
+
+        logger.info(`Admin deleted point transaction ${req.params.id}, updated user ${user._id} points to ${user.points}, allTimePoints to ${user.allTimePoints}`);
+
+        res.json({
+            message: 'Point transaction deleted and user points updated',
+            user: {
+                id: user._id,
+                points: user.points,
+                allTimePoints: user.allTimePoints
+            }
+        });
+    } catch (error) {
+        logger.error('Admin delete point transaction error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
 
 // =================================================================
 // ==                  DEPRECATED/UNUSED APIS                   ==

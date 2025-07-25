@@ -929,6 +929,82 @@ router.get('/sessions/:id', authAdmin, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/wifi/sessions/:id
+// @desc    Delete a WiFi session and update user stats (for admin)
+// @access  Private (Admin)
+router.delete('/sessions/:id', authAdmin, async (req, res) => {
+  try {
+    // Find the session
+    const session = await WifiSession.findById(req.params.id);
+    if (!session) {
+      return res.status(404).json({ message: 'WiFi session not found' });
+    }
+
+    // Get the user associated with this session
+    const user = await User.findById(session.user);
+    if (!user) {
+      return res.status(404).json({ message: 'User associated with this session not found' });
+    }
+
+    // Calculate how to adjust the user's stats
+    const adjustPoints = session.pointsEarned ? -session.pointsEarned : 0;
+    const adjustDuration = session.duration ? -session.duration : 0;
+
+    // Update user points and time statistics
+    user.points += adjustPoints;
+    
+    // Only reduce allTimePoints if points were earned
+    if (session.pointsEarned > 0) {
+      user.allTimePoints += adjustPoints;
+    }
+    
+    // Adjust time tracking counters
+    user.dayTimeConnected += adjustDuration;
+    user.weekTimeConnected += adjustDuration;
+    user.monthTimeConnected += adjustDuration;
+    user.totalTimeConnected += adjustDuration;
+    
+    // Make sure no values go negative
+    if (user.points < 0) user.points = 0;
+    if (user.allTimePoints < 0) user.allTimePoints = 0;
+    if (user.dayTimeConnected < 0) user.dayTimeConnected = 0;
+    if (user.weekTimeConnected < 0) user.weekTimeConnected = 0;
+    if (user.monthTimeConnected < 0) user.monthTimeConnected = 0;
+    if (user.totalTimeConnected < 0) user.totalTimeConnected = 0;
+
+    // Save the updated user and delete the session
+    await user.save();
+    
+    // Also delete the associated point transaction if one exists
+    if (session.pointsEarned > 0) {
+      // Look for associated point transaction
+      await Point.findOneAndDelete({
+        userId: session.user,
+        type: 'WIFI_SESSION',
+        'metadata.startTime': session.startTime,
+        'metadata.endTime': session.endTime
+      });
+    }
+    
+    await WifiSession.findByIdAndDelete(req.params.id);
+
+    logger.info(`Admin deleted WiFi session ${req.params.id}, updated user ${user._id} points to ${user.points}, allTimePoints to ${user.allTimePoints}`);
+
+    res.json({
+      message: 'WiFi session deleted and user stats updated',
+      user: {
+        id: user._id,
+        points: user.points,
+        allTimePoints: user.allTimePoints,
+        totalTimeConnected: user.totalTimeConnected
+      }
+    });
+  } catch (error) {
+    logger.error('Admin delete WiFi session error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
 // =================================================================
 // ==                  DEPRECATED/UNUSED APIS                   ==
 // =================================================================

@@ -26,6 +26,7 @@ import {
   searchIcon,
   infoIcon,
   filterIcon,
+  deleteIcon
 } from '../../utils/icons';
 import { format } from 'date-fns';
 
@@ -103,6 +104,7 @@ const WifiSessionsPage: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<WifiSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState<'all' | 'active' | 'completed'>('all');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const { showToast } = useToast();
 
@@ -166,10 +168,17 @@ const WifiSessionsPage: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleViewDetails(props.row.original)}
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="p-1 rounded-full hover:bg-blue-50"
             title="View session details"
           >
             <Icon icon={infoIcon} className="text-blue-500" />
+          </button>
+          <button
+            onClick={() => handleDeleteClick(props.row.original)}
+            className="p-1 rounded-full hover:bg-red-50"
+            title="Delete session"
+          >
+            <Icon icon={deleteIcon} className="text-red-600" />
           </button>
         </div>
       ),
@@ -230,6 +239,30 @@ const WifiSessionsPage: React.FC = () => {
   const handleViewDetails = (session: WifiSession) => {
     setSelectedSession(session);
     setShowDetailModal(true);
+  };
+
+  // Add function to handle delete click
+  const handleDeleteClick = (session: WifiSession) => {
+    setSelectedSession(session);
+    setShowDeleteModal(true);
+  };
+
+  // Add function to handle delete confirmation
+  const confirmDelete = async () => {
+    if (!selectedSession) return;
+    
+    try {
+      await apiClient.delete(`/api/wifi/sessions/${selectedSession._id}`);
+      
+      showToast(`WiFi session deleted successfully`, 'success');
+      setShowDeleteModal(false);
+      fetchSessions(); // Refresh the data
+    } catch (err: any) {
+      showToast(
+        err.response?.data?.message || 'Failed to delete WiFi session',
+        'error'
+      );
+    }
   };
 
   const handleStatusFilterChange = (status: 'all' | 'active' | 'completed') => {
@@ -540,6 +573,62 @@ const WifiSessionsPage: React.FC = () => {
             className="bg-white"
           >
             Close
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete WiFi Session"
+        variant="danger"
+      >
+        <div className="mb-6">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <Icon icon={deleteIcon} className="text-red-600 text-xl" />
+            </div>
+          </div>
+          
+          <p className="text-center mb-2">Are you sure you want to delete this WiFi session?</p>
+          
+          {selectedSession && (
+            <div className="border rounded-md p-4 bg-gray-50 mb-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="font-medium">User:</div>
+                <div>{selectedSession.user?.fullname || 'Unknown'}</div>
+                
+                <div className="font-medium">Start Time:</div>
+                <div>{formatDateTime(selectedSession.startTime)}</div>
+                
+                <div className="font-medium">Duration:</div>
+                <div>{formatDuration(selectedSession.duration)}</div>
+                
+                <div className="font-medium">Points Earned:</div>
+                <div>{selectedSession.pointsEarned}</div>
+              </div>
+            </div>
+          )}
+          
+          <p className="text-red-600 text-sm mb-4">
+            Warning: This action will also remove points earned from this session and update the user's statistics. This action cannot be undone.
+          </p>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteModal(false)}
+            className="bg-white"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+          >
+            Delete Session
           </Button>
         </div>
       </Modal>

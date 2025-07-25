@@ -24,7 +24,8 @@ import {
   userIcon,
   filterIcon,
   addIcon,
-  editIcon
+  editIcon,
+  deleteIcon
 } from '../../utils/icons';
 import { format } from 'date-fns';
 
@@ -95,6 +96,10 @@ const PointsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentFilter, setCurrentFilter] = useState('all');
 
+  // Add a state for delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<PointTransaction | null>(null);
+
   const { showToast } = useToast();
 
   // Column definitions
@@ -148,6 +153,22 @@ const PointsPage: React.FC = () => {
     columnHelper.accessor('createdAt', {
       header: 'Date',
       cell: info => formatDate(info.getValue()),
+    }),
+    // Add a new column for actions
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      cell: info => (
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleDeleteClick(info.row.original)}
+            className="p-1 rounded-full hover:bg-red-50 text-red-600"
+            title="Delete transaction"
+          >
+            <Icon icon={deleteIcon} />
+          </button>
+        </div>
+      ),
     }),
   ] as ColumnDef<PointTransaction>[];
 
@@ -225,6 +246,30 @@ const PointsPage: React.FC = () => {
     } catch (err: any) {
       showToast(
         err.response?.data?.message || 'Failed to adjust points',
+        'error'
+      );
+    }
+  };
+
+  // Add function to handle delete click
+  const handleDeleteClick = (transaction: PointTransaction) => {
+    setSelectedTransaction(transaction);
+    setShowDeleteModal(true);
+  };
+
+  // Add function to handle delete confirmation
+  const confirmDelete = async () => {
+    if (!selectedTransaction) return;
+    
+    try {
+      await apiClient.delete(`/api/points/admin/${selectedTransaction._id}`);
+      
+      showToast(`Transaction deleted successfully`, 'success');
+      setShowDeleteModal(false);
+      fetchTransactions(); // Refresh the data
+    } catch (err: any) {
+      showToast(
+        err.response?.data?.message || 'Failed to delete transaction',
         'error'
       );
     }
@@ -484,6 +529,64 @@ const PointsPage: React.FC = () => {
             onClick={handleAdjustPoints}
           >
             Adjust Points
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Point Transaction"
+        variant="danger"
+      >
+        <div className="mb-6">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <Icon icon={deleteIcon} className="text-red-600 text-xl" />
+            </div>
+          </div>
+          
+          <p className="text-center mb-2">Are you sure you want to delete this transaction?</p>
+          
+          {selectedTransaction && (
+            <div className="border rounded-md p-4 bg-gray-50 mb-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="font-medium">User:</div>
+                <div>{selectedTransaction.userId?.fullname || 'Unknown'}</div>
+                
+                <div className="font-medium">Amount:</div>
+                <div className={selectedTransaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {selectedTransaction.amount}
+                </div>
+                
+                <div className="font-medium">Type:</div>
+                <div>{formatTransactionType(selectedTransaction.type)}</div>
+                
+                <div className="font-medium">Date:</div>
+                <div>{formatDate(selectedTransaction.createdAt)}</div>
+              </div>
+            </div>
+          )}
+          
+          <p className="text-red-600 text-sm mb-4">
+            Warning: This action will also update the user's points balance and can't be undone.
+          </p>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteModal(false)}
+            className="bg-white"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+          >
+            Delete Transaction
           </Button>
         </div>
       </Modal>
