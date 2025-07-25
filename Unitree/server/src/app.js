@@ -70,12 +70,15 @@ app.use(cors({
     ENV.CLIENT_DEV_URL,
     ENV.CLIENT_URL_DEV,
     ENV.CLIENT_URL_DEV_2,
+    'https://unitree-ashen.vercel.app',
+    'https://unitree-admin.vercel.app',
     'http://192.168.1.5:3000',  // Add the mobile app's API URL
     'http://localhost:3000'
   ].filter(Boolean), // Remove undefined values
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Content-Type-Options']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -151,6 +154,17 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})
     });
   }
+});
+
+// Add preflight OPTIONS handler for better CORS support
+app.options('*', (req, res) => {
+  // Set CORS headers for preflight requests
+  res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.status(200).send();
 });
 
 // Connect to MongoDB with retry logic
