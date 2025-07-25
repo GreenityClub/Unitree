@@ -668,6 +668,62 @@ router.post('/admin/change-password', authAdmin, async (req, res) => {
 });
 
 // =================================================================
+// ==                       USER PASSWORD MANAGEMENT                  ==
+// =================================================================
+
+/**
+ * @route   POST /api/auth/change-password
+ * @desc    Change user password
+ * @access  Private
+ */
+router.post('/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: 'Current password and new password are required'
+      });
+    }
+
+    // Password complexity validation
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        message: 'New password must be at least 6 characters'
+      });
+    }
+
+    // Get user with password field included (it's usually excluded by default)
+    const user = await User.findById(req.user._id).select('+password');
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    // Log the event (but don't include the passwords)
+    logger.info(`User ${user._id} changed their password`);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (err) {
+    logger.error('Error changing password:', err);
+    res.status(500).json({
+      message: 'Server error while changing password'
+    });
+  }
+});
+
+// =================================================================
 // ==                  DEPRECATED/UNUSED APIS                   ==
 // =================================================================
 

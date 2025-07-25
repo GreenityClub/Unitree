@@ -250,14 +250,14 @@ const RealTreesPage: React.FC = () => {
         // await apiClient.delete(`/api/trees/admin/realtrees/${selectedTree._id}`);
         
         // For now, we'll just filter it out from state
-        setRealTrees((current) =>
+      setRealTrees((current) =>
           current.filter((tree) => tree._id !== selectedTree._id),
-        );
+      );
         
-        showToast(
+      showToast(
           `Real tree ${selectedTree.treeSpecie} has been deleted.`,
-          "success",
-        );
+        "success",
+      );
         
       } catch (err: any) {
         showToast(
@@ -265,8 +265,8 @@ const RealTreesPage: React.FC = () => {
           "error",
         );
       } finally {
-        setShowDeleteModal(false);
-        setSelectedTree(null);
+      setShowDeleteModal(false);
+      setSelectedTree(null);
       }
     }
   };
@@ -374,19 +374,19 @@ const RealTreesPage: React.FC = () => {
                     </tr>
                   ) : (
                     table.getRowModel().rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        {row.getVisibleCells().map((cell) => (
-                          <td
-                            key={cell.id}
-                            className="px-6 py-4 whitespace-nowrap"
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
-                          </td>
-                        ))}
-                      </tr>
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-6 py-4 whitespace-nowrap"
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                     ))
                   )}
                 </tbody>

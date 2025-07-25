@@ -84,6 +84,7 @@ export const API_ENDPOINTS = {
     ADMIN_LOGIN: '/api/auth/admin/login',
     ADMIN_ME: '/api/auth/admin/me',
     ADMIN_SEED: '/api/auth/admin/seed',
+    CHANGE_PASSWORD: '/api/auth/change-password', // New endpoint for password change
   },
   // User endpoints
   USER: {
@@ -139,6 +140,7 @@ export const API_ENDPOINTS = {
     MARK_READ: (id: string) => `/api/notification/${id}/read`,
     MARK_ALL_READ: '/api/notification/mark-all-read',
     SETTINGS: '/api/user/notification-settings',
+    ADMIN: '/api/admin/notifications', // New endpoint for admin notifications
   },
   // Admin endpoints
   ADMIN: {
@@ -159,6 +161,12 @@ export const API_ENDPOINTS = {
     DAILY_SESSIONS: '/api/statistics/daily-sessions',
     WIFI_HOURS: '/api/statistics/wifi-hours',
     POINTS_EARNED: '/api/statistics/points-earned'
+  },
+  // Settings endpoints
+  SETTINGS: {
+    GET: '/api/settings',
+    UPDATE: '/api/settings',
+    RESET: '/api/settings/reset'
   },
 };
 

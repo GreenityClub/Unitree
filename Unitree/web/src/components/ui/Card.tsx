@@ -1,87 +1,160 @@
 import React from 'react';
-import { CardProps } from '../../types';
 
+export type CardVariant = 'default' | 'primary' | 'secondary' | 'tertiary' | 'accent' | 'info' | 'success' | 'warning' | 'error' | 'danger';
+export type RoundedSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full' | 'none';
+
+export interface CardProps {
+  /**
+   * Card content
+   */
+  children: React.ReactNode;
+  
+  /**
+   * Optional card title
+   */
+  title?: string;
+  
+  /**
+   * Optional card subtitle
+   */
+  subtitle?: string;
+  
+  /**
+   * Variant defines the color scheme
+   */
+  variant?: CardVariant;
+  
+  /**
+   * Border radius size
+   */
+  rounded?: RoundedSize;
+  
+  /**
+   * Additional CSS classes to apply
+   */
+  className?: string;
+  
+  /**
+   * Whether to include a header section
+   */
+  withHeader?: boolean;
+  
+  /**
+   * Whether to include a footer section
+   */
+  withFooter?: boolean;
+  
+  /**
+   * Optional click handler
+   */
+  onClick?: () => void;
+}
+
+/**
+ * Card component for displaying content in a contained box
+ * with various styles and optional header/footer sections
+ */
 const Card: React.FC<CardProps> = ({
   children,
   title,
+  subtitle,
+  variant = 'default',
+  rounded = 'lg',
   className = '',
-  onClick,
-  rounded = 'lg', // Default to rounded-lg if not specified
-  variant = 'default', // Default, primary, secondary, tertiary, accent, danger
+  withHeader = false,
+  withFooter = false,
+  onClick
 }) => {
-  // Map rounded prop values to actual pixel values
-  const getBorderRadiusValue = () => {
-    const radiusMap = {
-      'none': '0px',
-      'sm': '0.125rem',    // 2px
-      'md': '0.375rem',    // 6px
-      'lg': '0.5rem',      // 8px
-      'xl': '0.75rem',     // 12px
-      '2xl': '1rem',       // 16px
-      '3xl': '1.5rem',     // 24px
-      '4xl': '2rem',       // 32px
-      'full': '9999px'     // fully rounded
-    };
-    
-    return radiusMap[rounded] || '0.5rem'; // Default to 0.5rem (lg) if invalid value
-  };
+  // Base classes for the card
+  let cardClasses = 'shadow-sm overflow-hidden';
   
-  // Card variant classes
-  const variantClasses = {
-    default: 'bg-white shadow-sm border border-gray-200',
-    primary: 'card-primary shadow-sm',
-    secondary: 'card-secondary shadow-sm',
-    tertiary: 'card-tertiary shadow-sm',
-    accent: 'card-accent shadow-sm',
-    danger: 'bg-red-50 border border-red-200 shadow-sm', // Add danger variant
-  };
+  // Add rounded classes based on the rounded prop
+  switch (rounded) {
+    case 'none':
+      cardClasses += ' rounded-none';
+      break;
+    case 'sm':
+      cardClasses += ' rounded-sm';
+      break;
+    case 'md':
+      cardClasses += ' rounded-md';
+      break;
+    case 'lg':
+      cardClasses += ' rounded-lg';
+      break;
+    case 'xl':
+      cardClasses += ' rounded-xl';
+      break;
+    case '2xl':
+      cardClasses += ' rounded-2xl';
+      break;
+    case '3xl':
+      cardClasses += ' rounded-3xl';
+      break;
+    case '4xl':
+      cardClasses += ' rounded-4xl';
+      break;
+    case 'full':
+      cardClasses += ' rounded-full';
+      break;
+    default:
+      cardClasses += ' rounded-lg';
+  }
   
-  const baseClasses = 'overflow-hidden';
-  const clickableClasses = onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : '';
-  const classes = `${baseClasses} ${variantClasses[variant as keyof typeof variantClasses] || variantClasses.default} ${clickableClasses} ${className}`;
+  // Add variant-specific classes - keep original dashboard style
+  switch (variant) {
+    case 'primary':
+      cardClasses += ' bg-green-50 border border-green-100';
+      break;
+    case 'secondary':
+      cardClasses += ' bg-emerald-50 border border-emerald-100';
+      break;
+    case 'tertiary':
+      cardClasses += ' bg-blue-50 border border-blue-100';
+      break;
+    case 'accent':
+      cardClasses += ' bg-red-50 border border-red-100';
+      break;
+    case 'info':
+      cardClasses += ' bg-blue-50 border border-blue-200';
+      break;
+    case 'success':
+      cardClasses += ' bg-green-50 border border-green-200';
+      break;
+    case 'warning':
+      cardClasses += ' bg-yellow-50 border border-yellow-200';
+      break;
+    case 'error':
+    case 'danger': // Support both names for backward compatibility
+      cardClasses += ' bg-red-50 border border-red-200';
+      break;
+    default:
+      cardClasses += ' bg-white border border-gray-200';
+  }
   
-  const style = {
-    borderRadius: getBorderRadiusValue()
-  };
+  // Add cursor pointer if onClick provided
+  if (onClick) {
+    cardClasses += ' cursor-pointer hover:shadow-md transition-shadow';
+  }
   
-  // Title style based on variant
-  const getTitleClasses = () => {
-    const titleClasses = {
-      default: 'text-gray-900',
-      primary: 'text-text',
-      secondary: 'text-text',
-      tertiary: 'text-text',
-      accent: 'text-text',
-      danger: 'text-red-700', // Add danger title style
-    };
-    
-    return `text-lg font-medium ${titleClasses[variant as keyof typeof titleClasses] || titleClasses.default}`;
-  };
+  // Add custom classes
+  cardClasses += ` ${className}`;
   
-  // Border style based on variant
-  const getTitleBorderClasses = () => {
-    const borderClasses = {
-      default: 'border-gray-200',
-      primary: 'border-primary',
-      secondary: 'border-secondary',
-      tertiary: 'border-tertiary',
-      accent: 'border-accent',
-      danger: 'border-red-200', // Add danger border style
-    };
-    
-    return `border-b ${borderClasses[variant as keyof typeof borderClasses] || borderClasses.default}`;
-  };
+  // Determine if we need a default header based on title prop
+  const needsDefaultHeader = title && !withHeader;
   
   return (
-    <div className={classes} onClick={onClick} style={style}>
-      {title && (
-        <div className={`px-6 py-4 ${getTitleBorderClasses()}`}>
-          <h3 className={getTitleClasses()}>{title}</h3>
+    <div className={cardClasses} onClick={onClick}>
+      {/* Default header based on title prop */}
+      {needsDefaultHeader && (
+        <div className="px-4 py-3 border-b bg-gray-50">
+          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
         </div>
       )}
-      <div className="px-6 py-4">
-        {children}
-      </div>
+      
+      {/* Content */}
+      {children}
     </div>
   );
 };

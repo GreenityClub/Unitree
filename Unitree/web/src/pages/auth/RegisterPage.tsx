@@ -191,7 +191,7 @@ const RegisterPage: React.FC = () => {
               <Button
                 type="submit"
                 className="w-full"
-                loading={isLoading}
+                isLoading={isLoading}
                 disabled={isLoading}
               >
                 Send verification code
@@ -251,7 +251,7 @@ const RegisterPage: React.FC = () => {
               <Button
                 type="submit"
                 className="w-full"
-                loading={isLoading}
+                isLoading={isLoading}
                 disabled={isLoading}
               >
                 Create account

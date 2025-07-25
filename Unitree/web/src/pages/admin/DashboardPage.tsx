@@ -140,8 +140,8 @@ const DashboardPage: React.FC = () => {
         <>
           {/* Main Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card variant="primary" className="shadow-md">
-              <div className="flex items-center">
+            <Card variant="primary" className="shadow-md" rounded="xl">
+              <div className="flex items-center p-4">
                 <div className="flex items-center justify-center p-3 rounded-full bg-primary-light">
                   <Icon icon={usersIcon} className="text-primary text-xl" />
                 </div>
@@ -152,8 +152,8 @@ const DashboardPage: React.FC = () => {
               </div>
             </Card>
             
-            <Card variant="secondary" className="shadow-md">
-              <div className="flex items-center">
+            <Card variant="secondary" className="shadow-md" rounded="xl">
+              <div className="flex items-center p-4">
                 <div className="flex items-center justify-center p-3 rounded-full bg-secondary-light">
                   <Icon icon={treeIcon} className="text-secondary-dark text-xl" />
                 </div>
@@ -168,8 +168,8 @@ const DashboardPage: React.FC = () => {
               </div>
             </Card>
                 
-            <Card variant="tertiary" className="shadow-md cursor-pointer" onClick={() => setActiveTab('wifi')}>
-              <div className="flex items-center">
+            <Card variant="tertiary" className="shadow-md cursor-pointer" rounded="xl" onClick={() => setActiveTab('wifi')}>
+              <div className="flex items-center p-4">
                 <div className="flex items-center justify-center p-3 rounded-full bg-tertiary-light">
                   <Icon icon={wifiIcon} className="text-tertiary-dark text-xl" />
                 </div>
@@ -180,8 +180,8 @@ const DashboardPage: React.FC = () => {
               </div>
             </Card>
               
-            <Card variant="accent" className="shadow-md cursor-pointer" onClick={() => setActiveTab('points')}>
-              <div className="flex items-center">
+            <Card variant="accent" className="shadow-md cursor-pointer" rounded="xl" onClick={() => setActiveTab('points')}>
+              <div className="flex items-center p-4">
                 <div className="flex items-center justify-center p-3 rounded-full bg-accent-light">
                   <Icon icon={medalIcon} className="text-accent-dark text-xl" />
                 </div>

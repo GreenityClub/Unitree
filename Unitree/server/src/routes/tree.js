@@ -450,11 +450,11 @@ router.get('/', auth, async (req, res) => {
     const updatedTrees = await Promise.all(
       trees.map(async (tree) => {
         try {
-          await tree.updateStage();
-          tree.updateHealthScore();
-          await tree.save();
-          return {
-            ...tree.toObject(),
+        await tree.updateStage();
+        tree.updateHealthScore();
+        await tree.save();
+        return {
+          ...tree.toObject(),
             growthProgress: tree.growthProgress,
             healthStatus: tree.healthStatus
           };
@@ -466,7 +466,7 @@ router.get('/', auth, async (req, res) => {
             growthProgress: 0,
             healthStatus: 'unknown',
             _hasError: true
-          };
+        };
         }
       })
     );
@@ -509,10 +509,10 @@ router.get('/:id', auth, async (req, res) => {
     
     // Update tree status in real-time
     try {
-      await tree.updateStage();
-      tree.updateHealthScore();
-      await tree.save();
-      
+    await tree.updateStage();
+    tree.updateHealthScore();
+    await tree.save();
+    
       const treeData = {
         ...tree.toObject(),
         growthProgress: tree.growthProgress,
@@ -524,12 +524,12 @@ router.get('/:id', auth, async (req, res) => {
       logger.error(`Error updating tree status for tree ${tree._id}:`, updateError);
       
       // Return the tree anyway, but without calculated properties
-      res.json({
-        ...tree.toObject(),
+    res.json({
+      ...tree.toObject(),
         growthProgress: 0,
         healthStatus: 'unknown',
         _updateError: true
-      });
+    });
     }
   } catch (error) {
     logger.error(`Error fetching tree ${req.params.id} for user ${req.user?._id}:`, error);

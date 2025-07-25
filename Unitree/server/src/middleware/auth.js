@@ -120,8 +120,33 @@ const requireRole = (role) => {
   };
 };
 
+/**
+ * Middleware factory to require a specific admin permission.
+ * This should be used after `authAdmin`.
+ * @param {string} permission The required permission (e.g., 'manageAdmins').
+ */
+const checkPermission = (permission) => {
+  return (req, res, next) => {
+    // Superadmins bypass all permission checks
+    if (req.admin && req.admin.role === 'superadmin') {
+      return next();
+    }
+    
+    // Check if admin has the specified permission
+    if (!req.admin || !req.admin.permissions || !req.admin.permissions[permission]) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: You don't have the required permission: ${permission}`
+      });
+    }
+    
+    next();
+  };
+};
+
 module.exports = {
   auth,
   authAdmin,
-  requireRole
+  requireRole,
+  checkPermission
 }; 

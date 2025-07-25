@@ -101,7 +101,7 @@ const AdminLoginPage: React.FC = () => {
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md mx-4 ">
         <Card 
-          className="backdrop-blur-sm bg-white/95 border-green-800/20 shadow-2xl" 
+          className="backdrop-blur-sm bg-white/95 border-green-800/20 shadow-2xl"
           rounded="4xl"
         >
           <div className="p-0">

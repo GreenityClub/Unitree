@@ -76,45 +76,45 @@ const formatDate = (dateString: string) => {
   return format(new Date(dateString), 'dd/MM/yyyy');
 };
 
-// Health indicator component
-const HealthIndicator: React.FC<{ health: number }> = ({ health }) => {
-  let color = 'bg-green-500';
-  if (health < 30) color = 'bg-red-500';
-  else if (health < 70) color = 'bg-yellow-500';
-  
-  return (
-    <div className="flex items-center">
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
-        <div 
-          className={`h-2.5 rounded-full ${color}`} 
-          style={{ width: `${health}%` }}
-        ></div>
+  // Health indicator component
+  const HealthIndicator: React.FC<{ health: number }> = ({ health }) => {
+    let color = 'bg-green-500';
+    if (health < 30) color = 'bg-red-500';
+    else if (health < 70) color = 'bg-yellow-500';
+    
+    return (
+      <div className="flex items-center">
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div 
+            className={`h-2.5 rounded-full ${color}`} 
+            style={{ width: `${health}%` }}
+          ></div>
+        </div>
+        <span className="ml-2 text-sm font-medium">{health}%</span>
       </div>
-      <span className="ml-2 text-sm font-medium">{health}%</span>
-    </div>
-  );
-};
+    );
+  };
 
-// Tree stage component
+  // Tree stage component
 const TreeStage: React.FC<{ stage: string }> = ({ stage }) => {
   const stages = ['seedling', 'sprout', 'sapling', 'young_tree', 'mature_tree', 'ancient_tree'];
   const stageIndex = stages.indexOf(stage);
   const maxStage = stages.length;
   
-  return (
-    <div className="flex items-center space-x-1">
+    return (
+      <div className="flex items-center space-x-1">
       {stages.map((_, i) => (
-        <div 
-          key={i} 
+          <div 
+            key={i} 
           className={`w-2 h-2 rounded-full ${i <= stageIndex ? 'bg-green-500' : 'bg-gray-300'}`}
-        ></div>
-      ))}
+          ></div>
+        ))}
       <span className="ml-2 text-sm font-medium">
         {stageIndex + 1}/{maxStage}
       </span>
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
 const TreesPage: React.FC = () => {
   const [trees, setTrees] = useState<Tree[]>([]);
@@ -434,15 +434,15 @@ const TreesPage: React.FC = () => {
                   ) : (
                     filteredTrees.slice(0, 10).map((tree) => {
                       const treeType = treeTypes.find(t => t.id === tree.species);
-                      return (
+                    return (
                         <tr key={tree._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <Icon icon={treeIcon} className="h-6 w-6 text-green-600" />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{tree.name}</div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <Icon icon={treeIcon} className="h-6 w-6 text-green-600" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{tree.name}</div>
                                 <div className="text-sm text-gray-500">ID: {tree._id}</div>
                               </div>
                             </div>
@@ -452,21 +452,21 @@ const TreesPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {treeType?.name || tree.species}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                             <TreeStage stage={tree.stage} />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                             <HealthIndicator health={tree.healthScore} />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(tree.plantedDate)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(tree.lastWatered)}
-                          </td>
-                        </tr>
-                      );
+                        </td>
+                      </tr>
+                    );
                     })
                   )}
                 </tbody>

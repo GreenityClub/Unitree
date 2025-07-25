@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, authAdmin } = require('../middleware/auth');
 const notificationService = require('../services/notificationService');
 const User = require('../models/User');
 const logger = require('../utils/logger');
@@ -240,6 +240,56 @@ router.put('/settings', auth, async (req, res) => {
       message: 'Failed to update notification settings',
       error: error.message
     });
+  }
+});
+
+// =================================================================
+// ==                      ADMIN NOTIFICATIONS                    ==
+// =================================================================
+
+/**
+ * @route   GET /api/admin/notifications
+ * @desc    Get admin notifications
+ * @access  Private (Admin)
+ */
+router.get('/admin/notifications', authAdmin, async (req, res) => {
+  try {
+    // This could be enhanced to fetch from a AdminNotification model if created
+    // For now we'll implement a simple in-memory notification system
+    
+    // Get the last 5 system-wide events from logs (simplified approach)
+    // In a real implementation, this would come from a dedicated collection
+    const notifications = [
+      {
+        id: '1',
+        type: 'system',
+        title: 'System Update',
+        message: 'The system will be updated tonight at 2:00 AM.',
+        read: false,
+        createdAt: new Date(Date.now() - 1000 * 60 * 60) // 1 hour ago
+      },
+      {
+        id: '2',
+        type: 'user',
+        title: 'New User Registration',
+        message: '5 new users registered today.',
+        read: true,
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12) // 12 hours ago
+      },
+      {
+        id: '3',
+        type: 'alert',
+        title: 'High Server Load',
+        message: 'The server experienced high load at 3:15 PM.',
+        read: false,
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24) // 1 day ago
+      }
+    ];
+    
+    res.json(notifications);
+  } catch (err) {
+    logger.error('Error fetching admin notifications:', err);
+    res.status(500).json({ message: 'Server error while fetching notifications' });
   }
 });
 

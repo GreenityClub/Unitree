@@ -105,7 +105,7 @@ const TreeTypesPage: React.FC = () => {
             <Icon icon={leafIcon} className="text-green-500" />
           </div>
           <div>
-            <span className="font-medium">{info.getValue()}</span>
+          <span className="font-medium">{info.getValue()}</span>
             <div className="text-xs text-gray-500">
               {info.row.original.scientificName}
             </div>
@@ -231,21 +231,21 @@ const TreeTypesPage: React.FC = () => {
           API_ENDPOINTS.TREE.ADMIN.DELETE_TREE_TYPE(selectedTreeType._id)
         );
         
-        setTreeTypes((current) =>
+      setTreeTypes((current) =>
           current.filter((type) => type._id !== selectedTreeType._id),
-        );
+      );
         
-        showToast(
-          `Tree Type ${selectedTreeType.name} has been deleted.`,
-          "success",
-        );
+      showToast(
+        `Tree Type ${selectedTreeType.name} has been deleted.`,
+        "success",
+      );
       } catch (err: any) {
         showToast(
           err.response?.data?.message || 'Failed to delete tree type',
           "error"
         );
       } finally {
-        setShowDeleteModal(false);
+      setShowDeleteModal(false);
         setSelectedTreeType(null);
       }
     }
@@ -389,19 +389,19 @@ const TreeTypesPage: React.FC = () => {
                     </tr>
                   ) : (
                     table.getRowModel().rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        {row.getVisibleCells().map((cell) => (
-                          <td
-                            key={cell.id}
-                            className="px-6 py-4 whitespace-nowrap"
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
-                          </td>
-                        ))}
-                      </tr>
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-6 py-4 whitespace-nowrap"
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                     ))
                   )}
                 </tbody>

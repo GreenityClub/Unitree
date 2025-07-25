@@ -81,7 +81,7 @@ const StatisticsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("month");
   const [selectedMetric, setSelectedMetric] = useState<"students" | "trees" | "points" | "sessions">("points");
-  
+
   // State for API data
   const [overviewStats, setOverviewStats] = useState<OverviewStats | null>(null);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -284,8 +284,8 @@ const StatisticsPage: React.FC = () => {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card variant="primary" className="shadow-md">
-          <div className="flex items-center">
+        <Card variant="primary" className="shadow-md" rounded="xl">
+          <div className="flex items-center p-4">
             <div className="flex items-center justify-center p-3 rounded-full bg-primary-light">
               <Icon icon={userIcon} className="text-primary text-xl" />
             </div>
@@ -300,8 +300,8 @@ const StatisticsPage: React.FC = () => {
           </div>
         </Card>
 
-        <Card variant="secondary" className="shadow-md">
-          <div className="flex items-center">
+        <Card variant="secondary" className="shadow-md" rounded="xl">
+          <div className="flex items-center p-4">
             <div className="flex items-center justify-center p-3 rounded-full bg-secondary-light">
               <Icon icon={treeIcon} className="text-secondary-dark text-xl" />
             </div>
@@ -312,14 +312,14 @@ const StatisticsPage: React.FC = () => {
               ) : (
                 <p className="text-2xl font-bold">
                   {formatNumber(overviewStats.totalVirtualTrees + overviewStats.totalRealTrees)}
-                </p>
+              </p>
               )}
             </div>
           </div>
         </Card>
 
-        <Card variant="tertiary" className="shadow-md">
-          <div className="flex items-center">
+        <Card variant="tertiary" className="shadow-md" rounded="xl">
+          <div className="flex items-center p-4">
             <div className="flex items-center justify-center p-3 rounded-full bg-tertiary-light">
               <Icon icon={wifiIcon} className="text-tertiary-dark text-xl" />
             </div>
@@ -334,8 +334,8 @@ const StatisticsPage: React.FC = () => {
           </div>
         </Card>
 
-        <Card variant="accent" className="shadow-md">
-          <div className="flex items-center">
+        <Card variant="accent" className="shadow-md" rounded="xl">
+          <div className="flex items-center p-4">
             <div className="flex items-center justify-center p-3 rounded-full bg-accent-light">
               <Icon icon={medalIcon} className="text-accent-dark text-xl" />
             </div>
@@ -352,7 +352,7 @@ const StatisticsPage: React.FC = () => {
       </div>
 
       {/* Growth Chart */}
-      <Card className="mb-8">
+      <Card className="mb-8" rounded="xl">
         <div className="p-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold flex items-center">
@@ -445,7 +445,7 @@ const StatisticsPage: React.FC = () => {
       {/* Charts Grid - 2 columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Tree Types Distribution */}
-        <Card>
+        <Card rounded="xl">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold flex items-center">
               <Icon icon={treeIcon} className="mr-2 text-green-600" />
@@ -458,37 +458,37 @@ const StatisticsPage: React.FC = () => {
             ) : treeTypesError ? (
               <ErrorMessage message={treeTypesError} />
             ) : (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={treeTypesData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                    >
-                      {treeTypesData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={treeTypesData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  >
+                    {treeTypesData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
                           fill={entry.color || COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [`${value} trees`, "Count"]} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value} trees`, "Count"]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
             )}
           </div>
         </Card>
 
         {/* User Activity by Hour */}
-        <Card>
+        <Card rounded="xl">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold flex items-center">
               <Icon icon={chartIcon} className="mr-2 text-blue-600" />
@@ -501,20 +501,20 @@ const StatisticsPage: React.FC = () => {
             ) : userActivityError ? (
               <ErrorMessage message={userActivityError} />
             ) : (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={userActivityData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => [`${value} users`, "Active Users"]}
-                    />
-                    <Legend />
-                    <Bar dataKey="active" fill="#3B82F6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={userActivityData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="hour" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) => [`${value} users`, "Active Users"]}
+                  />
+                  <Legend />
+                  <Bar dataKey="active" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             )}
           </div>
         </Card>
@@ -523,7 +523,7 @@ const StatisticsPage: React.FC = () => {
       {/* Charts Grid - 2 columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Points Source Distribution */}
-        <Card>
+        <Card rounded="xl">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold flex items-center">
               <Icon icon={medalIcon} className="mr-2 text-amber-500" />
@@ -536,37 +536,37 @@ const StatisticsPage: React.FC = () => {
             ) : pointsSourceError ? (
               <ErrorMessage message={pointsSourceError} />
             ) : (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pointsSourceData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                    >
-                      {pointsSourceData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [`${value}%`, "Percentage"]} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pointsSourceData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  >
+                    {pointsSourceData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value}%`, "Percentage"]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
             )}
           </div>
         </Card>
 
         {/* Daily WiFi Sessions */}
-        <Card>
+        <Card rounded="xl">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold flex items-center">
               <Icon icon={wifiIcon} className="mr-2 text-indigo-600" />
@@ -579,25 +579,25 @@ const StatisticsPage: React.FC = () => {
             ) : dailySessionsError ? (
               <ErrorMessage message={dailySessionsError} />
             ) : (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dailySessionsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => [`${value} sessions`, "Sessions"]}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="sessions"
-                      stroke="#8B5CF6"
-                      activeDot={{ r: 8 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dailySessionsData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) => [`${value} sessions`, "Sessions"]}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="sessions"
+                    stroke="#8B5CF6"
+                    activeDot={{ r: 8 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
             )}
           </div>
         </Card>

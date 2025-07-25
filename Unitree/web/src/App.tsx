@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 import { ToastProvider } from './contexts/ToastContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import LoginPage from './pages/auth/AdminLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -327,7 +328,9 @@ const App: React.FC = () => {
     <AuthProvider>
       <AdminAuthProvider>
         <ToastProvider>
-        <AppContent />
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
         </ToastProvider>
       </AdminAuthProvider>
     </AuthProvider>
