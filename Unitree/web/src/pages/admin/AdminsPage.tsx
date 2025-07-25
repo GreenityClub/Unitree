@@ -38,11 +38,6 @@ const AdminsPage: React.FC = () => {
   // Check if current user is a superadmin
   const isSuperAdmin = currentAdmin?.role === 'superadmin';
   
-  // If not a superadmin, redirect to dashboard
-  if (!isSuperAdmin) {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
-  
   // Form state for creating a new admin
   const [newAdmin, setNewAdmin] = useState({
     username: '',
@@ -64,8 +59,10 @@ const AdminsPage: React.FC = () => {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    fetchAdmins();
-  }, []);
+    if (isSuperAdmin) {
+      fetchAdmins();
+    }
+  }, [isSuperAdmin]);
 
   const fetchAdmins = async () => {
     try {
@@ -147,6 +144,11 @@ const AdminsPage: React.FC = () => {
   };
 
   const canManageAdmins = isSuperAdmin || currentAdmin?.permissions?.manageAdmins;
+  
+  // If not a superadmin, redirect to dashboard
+  if (!isSuperAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   return (
     <AdminLayout>
