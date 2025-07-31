@@ -56,15 +56,21 @@ apiClient.interceptors.response.use(
                         error.config?.url?.includes('/api/wifi/sessions'); // Add WiFi sessions admin routes
                         
     if (error.response?.status === 401) {
-      // Handle unauthorized access based on route type
-      if (isAdminRoute) {
-        localStorage.removeItem('adminAuthToken');
-        localStorage.removeItem('admin');
-        window.location.href = '/admin/login';
-      } else {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+      // Don't redirect if this is a login attempt (let the login form handle the error)
+      const isLoginAttempt = error.config?.url?.includes('/api/auth/admin/login') || 
+                            error.config?.url?.includes('/api/auth/login');
+      
+      if (!isLoginAttempt) {
+        // Handle unauthorized access based on route type for authenticated routes only
+        if (isAdminRoute) {
+          localStorage.removeItem('adminAuthToken');
+          localStorage.removeItem('admin');
+          window.location.href = '/admin/login';
+        } else {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

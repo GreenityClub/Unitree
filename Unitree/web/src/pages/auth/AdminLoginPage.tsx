@@ -6,7 +6,6 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Icon from '../../components/ui/Icon';
-import Modal from '../../components/ui/Modal';
 import { eyeIcon, eyeSlashIcon, treeIcon } from '../../utils/icons';
 
 const AdminLoginPage: React.FC = () => {
@@ -15,8 +14,6 @@ const AdminLoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const { login } = useAdminAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -57,12 +54,8 @@ const AdminLoginPage: React.FC = () => {
       }, 500);
       
     } catch (err: any) {
-      // Show error via modal and toast
+      // Show error via toast only
       const errorMsg = err.message || 'Login failed';
-      setErrorMessage(errorMsg);
-      setShowErrorModal(true);
-      
-      // Also show as a toast
       showToast(errorMsg, 'error', 5000);
     } finally {
       setIsLoading(false);
@@ -80,9 +73,6 @@ const AdminLoginPage: React.FC = () => {
     }
   };
 
-  const closeErrorModal = () => {
-    setShowErrorModal(false);
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
@@ -97,6 +87,16 @@ const AdminLoginPage: React.FC = () => {
 
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 via-transparent to-amber-800/20" />
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-20 flex items-center justify-center">
+          <div className="bg-white/90 rounded-lg p-6 shadow-xl flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700"></div>
+            <span className="text-gray-700 font-medium">Signing in...</span>
+          </div>
+        </div>
+      )}
 
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md mx-4 ">
@@ -175,24 +175,6 @@ const AdminLoginPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Error Modal */}
-      <Modal 
-        isOpen={showErrorModal} 
-        onClose={closeErrorModal}
-        title="Login Failed"
-        variant="error"
-      >
-        <div className="text-center">
-          <p className="mb-4">{errorMessage}</p>
-          <Button 
-            variant="primary" 
-            onClick={closeErrorModal} 
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            Try Again
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 };

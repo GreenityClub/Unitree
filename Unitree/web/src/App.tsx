@@ -102,12 +102,23 @@ const SuperAdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ chi
 const AdminPublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAdminAuth();
 
+  // Don't show loading screen on login page - let the login form handle its own loading state
+  // Only show loading when checking existing auth status on initial load
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    // Check if we're on the login page by looking at current location
+    const isLoginPage = window.location.pathname === '/admin/login';
+    
+    if (isLoginPage) {
+      // On login page, render children immediately to avoid white screen
+      return <>{children}</>;
+    } else {
+      // On other pages, show loading screen
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
   }
 
   if (isAuthenticated) {
